@@ -1,0 +1,85 @@
+name: Demo
+
+options:
+  minimumXcodeGenVersion: 2.45.4
+  xcodeVersion: "26.0"
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+  schemePathPrefix: "../../"
+
+packages:
+  AppFoundation:
+    path: ../..
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: J458WW3452
+    SWIFT_VERSION: 6.0
+    SWIFT_STRICT_CONCURRENCY: complete
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+
+configs:
+  Debug: debug
+  Release: release
+
+targets:
+  Demo:
+    type: application
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: Demo
+    dependencies:
+      - package: AppFoundation
+        product: AppFoundation
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.hoangbkit.appfoundationdemo
+        PRODUCT_NAME: Demo
+        MARKETING_VERSION: 1.0
+        CURRENT_PROJECT_VERSION: 1
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Demo
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        CODE_SIGN_STYLE: Automatic
+        TARGETED_DEVICE_FAMILY: 1
+
+  DemoTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: DemoTests
+    dependencies:
+      - target: Demo
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.hoangbkit.appfoundationdemo.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  Demo:
+    build:
+      targets:
+        Demo: all
+        DemoTests: [test]
+    run:
+      config: Debug
+      storeKitConfiguration: Examples/Demo/Demo/Configuration.storekit
+    test:
+      config: Debug
+      gatherCoverageData: true
+      targets:
+        - name: DemoTests
+          parallelizable: true
+          randomExecutionOrder: true
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

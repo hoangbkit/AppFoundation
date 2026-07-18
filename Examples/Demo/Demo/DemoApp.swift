@@ -5,7 +5,12 @@ import SwiftUI
 @MainActor
 struct DemoApp: App {
     @State private var purchases = PurchaseController(
-        configuration: DemoConfiguration.purchases
+        configuration: DemoConfiguration.purchases,
+        service: PurchaseServiceFactory.make(
+            mode: DemoConfiguration.purchaseServiceMode,
+            simulatedProducts: DemoConfiguration.simulatedProducts,
+            simulatedPersistenceKey: "appfoundation.demo.simulated-purchases"
+        )
     )
 
     var body: some Scene {

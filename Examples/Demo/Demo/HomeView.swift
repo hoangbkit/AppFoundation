@@ -141,6 +141,16 @@ struct HomeView: View {
                     .tracking(1.2)
                     .foregroundStyle(.secondary)
 
+                #if DEBUG
+                if purchases.isUsingSimulatedPurchases {
+                    FoundationPill(
+                        "SIMULATED BILLING",
+                        systemImage: "hammer.fill",
+                        tint: .orange
+                    )
+                }
+                #endif
+
                 HStack(spacing: 12) {
                     Image(systemName: entitlementIcon)
                         .font(.title2.weight(.semibold))
@@ -171,6 +181,17 @@ struct HomeView: View {
                     }
                     .buttonStyle(FoundationPrimaryButtonStyle(theme: DemoConfiguration.theme))
                 }
+
+                #if DEBUG
+                if purchases.isUsingSimulatedPurchases {
+                    Button("Reset simulated purchases", role: .destructive) {
+                        Task {
+                            await purchases.resetSimulatedPurchases()
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                }
+                #endif
             }
         }
     }
@@ -289,9 +310,21 @@ struct HomeView: View {
         case .checking:
             "Verifying current App Store entitlements."
         case .inactive:
+            #if DEBUG
+            purchases.isUsingSimulatedPurchases
+                ? "Open the paywall to test purchases without App Store Connect."
+                : "Open the sample paywall to test StoreKit purchases."
+            #else
             "Open the sample paywall to test StoreKit purchases."
+            #endif
         case .active:
+            #if DEBUG
+            purchases.isUsingSimulatedPurchases
+                ? "This entitlement comes from the Debug purchase simulator."
+                : "This status comes from verified StoreKit transactions."
+            #else
             "This status comes from verified StoreKit transactions."
+            #endif
         }
     }
 

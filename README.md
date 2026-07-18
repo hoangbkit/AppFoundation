@@ -5,6 +5,7 @@ A production-oriented Swift package for shipping consistent iOS apps faster. It 
 ## Included
 
 - StoreKit 2 purchase controller with verified in-memory entitlement state
+- Debug-only in-process purchase simulation for CLI-deployed prototypes
 - Transaction update observation and foreground refresh support
 - Product loading retry, restore, pending purchase, and error states
 - Pure entitlement evaluation that can be unit tested without StoreKit
@@ -52,6 +53,28 @@ struct MyApp: App {
 
 `PurchaseController.entitlementState` is derived from verified StoreKit transactions. Do not mirror it into UserDefaults as an access-control source of truth.
 
+## Prototype purchases without StoreKit
+
+Debug builds can use an in-process simulator while keeping the same controller and paywall UI:
+
+```swift
+let mode = PurchaseServiceMode.fromEnvironment(fallback: .live)
+let service = PurchaseServiceFactory.make(
+    mode: mode,
+    simulatedProducts: products,
+    simulatedPersistenceKey: "com.example.app.simulated-purchases"
+)
+
+let purchases = PurchaseController(
+    configuration: configuration,
+    service: service
+)
+```
+
+`SimulatedPurchaseService` loads app-defined products, grants local entitlements, supports restore persistence, and can simulate pending, cancelled, catalog-failure, purchase-failure, and restore-failure states. Its implementation is excluded from Release builds; `PurchaseServiceFactory` always returns `LiveStoreKitService` in Release.
+
+Set `APPFOUNDATION_PURCHASE_MODE` to `live` or `simulated` at launch. With `devicectl`, prefix the variable with `DEVICECTL_CHILD_` in the calling environment.
+
 ## Present the paywall
 
 ```swift
@@ -98,6 +121,8 @@ The generated project uses:
 - Bundle identifier `com.hoangbkit.demo`
 - iOS deployment target `26.0`
 - Local `Configuration.storekit` attached to the shared scheme
+
+`mycli deploy SE2 --billing simulated` explicitly launches the Demo with in-process simulation. A normal `mycli deploy SE2` uses live StoreKit, while Xcode's Run scheme uses live StoreKit with the attached local `.storekit` configuration.
 
 ## Testing
 

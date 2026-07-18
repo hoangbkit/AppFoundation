@@ -51,6 +51,13 @@ public final class PurchaseController {
         return products.first
     }
 
+    #if DEBUG
+    /// Whether this controller is currently backed by the in-process purchase simulator.
+    public var isUsingSimulatedPurchases: Bool {
+        service is SimulatedPurchaseService
+    }
+    #endif
+
     public func product(withID productID: String) -> StoreProduct? {
         products.first(where: { $0.id == productID })
     }
@@ -170,6 +177,19 @@ public final class PurchaseController {
         activity = .idle
     }
 
+    #if DEBUG
+    /// Clears simulator state and refreshes the observable entitlement state.
+    public func resetSimulatedPurchases() async {
+        guard let simulatedService = service as? SimulatedPurchaseService else {
+            return
+        }
+
+        simulatedService.reset()
+        activity = .idle
+        await refreshEntitlements()
+    }
+    #endif
+
     private func startObservingTransactions() {
         updateTask?.cancel()
         updateTask = Task { [weak self, service] in
@@ -204,6 +224,11 @@ public final class PurchaseController {
                 return PurchaseFailure(
                     code: .notEntitled,
                     message: "This Apple ID is not entitled to the purchase."
+                )
+            case .unsupported:
+                return PurchaseFailure(
+                    code: .system,
+                    message: "This purchase is not supported on this device."
                 )
             case .systemError:
                 return PurchaseFailure(

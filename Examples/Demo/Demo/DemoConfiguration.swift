@@ -16,6 +16,29 @@ enum DemoConfiguration {
         preferredProductID: "com.hoangbkit.appfoundationdemo.pro.yearly"
     )
 
+    static let simulatedProducts: [StoreProduct] = [
+        StoreProduct(
+            id: "com.hoangbkit.appfoundationdemo.pro.monthly",
+            displayName: "Demo Pro Monthly",
+            description: "Monthly access to every Demo Pro feature.",
+            displayPrice: "$2.99",
+            price: 2.99,
+            subscriptionPeriod: .init(value: 1, unit: .month)
+        ),
+        StoreProduct(
+            id: "com.hoangbkit.appfoundationdemo.pro.yearly",
+            displayName: "Demo Pro Yearly",
+            description: "Annual access to every Demo Pro feature.",
+            displayPrice: "$19.99",
+            price: 19.99,
+            subscriptionPeriod: .init(value: 1, unit: .year)
+        ),
+    ]
+
+    static let purchaseServiceMode = PurchaseServiceFactory.effectiveMode(
+        for: PurchaseServiceMode.fromEnvironment(fallback: .live)
+    )
+
     static let onboardingPages: [FoundationOnboardingPage] = [
         FoundationOnboardingPage(
             id: "foundation",
@@ -45,8 +68,9 @@ enum DemoConfiguration {
 
     static let paywall = FoundationPaywallConfiguration(
         title: "Make every app premium",
-        subtitle:
-            "This sample uses a local StoreKit configuration. Replace the product identifiers and copy for each real app.",
+        subtitle: purchaseServiceMode == .simulated
+            ? "This Debug build uses AppFoundation's in-process purchase simulator."
+            : "This sample uses StoreKit. Replace the product identifiers and copy for each real app.",
         features: [
             FoundationPaywallFeature(
                 id: "storekit",

@@ -26,6 +26,8 @@ PurchaseController(configuration: configuration, service: mockService)
 
 The service protocol is main-actor isolated. StoreKit product objects stay inside the live service and are not leaked across concurrency domains.
 
+Debug prototypes can use `SimulatedPurchaseService` through `PurchaseServiceFactory`. The simulator conforms to the same boundary, operates only on `StoreProduct` and `EntitlementRecord`, and is not compiled into Release builds. The factory always resolves to `LiveStoreKitService` in Release even if an environment variable requests simulation.
+
 ## Lifecycle
 
 Attach `.managesPurchases(controller)` once near the app root. It calls `prepare()` and refreshes entitlements when the scene becomes active. The controller also observes `Transaction.updates` for changes that arrive while the app is running.

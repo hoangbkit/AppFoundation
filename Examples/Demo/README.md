@@ -10,7 +10,22 @@ cd Examples/Demo
 make open
 ```
 
-The shared `Demo` scheme automatically uses `Demo/Configuration.storekit`, so the monthly and yearly subscription products can be tested without App Store Connect.
+Debug deployments use live StoreKit by default. Explicitly opt in to AppFoundation's in-process purchase simulator with:
+
+```bash
+mycli deploy SE2 --billing simulated
+```
+
+Simulated purchases persist locally, and the Demo includes a reset button for repeated paywall testing.
+
+The shared `Demo` Xcode scheme attaches `Demo/Configuration.storekit`, so Product > Run uses Xcode's StoreKit test environment with the default live provider.
+
+To deploy with real StoreKit, omit the billing option or state it explicitly:
+
+```bash
+mycli deploy SE2
+mycli deploy SE2 --billing live
+```
 
 ## Project identity
 

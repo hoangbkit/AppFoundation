@@ -13,11 +13,21 @@ struct DemoApp: App {
         )
     )
 
+    @State private var themes = ThemeManager(
+        catalog: .foundationDefaults,
+        stateStore: UserDefaultsThemeStateStore(
+            storageKey: "appfoundation.demo.theme-state"
+        )
+    )
+
     var body: some Scene {
         WindowGroup {
             AppRootView()
                 .environment(purchases)
+                .environment(themes)
                 .managesPurchases(purchases)
+                .appFoundationTheme(themes)
+                .synchronizesThemeAccess(themes, hasPro: purchases.isEntitled)
         }
     }
 }

@@ -2,38 +2,66 @@
 
 ## Entitlements
 
-`PurchaseController` is the UI-facing state owner. It never persists a trusted `isPro` Boolean. Instead it asks `PurchaseServing` for current verified transactions and passes normalized `EntitlementRecord` values into the pure `EntitlementEvaluator`.
+`PurchaseController` is the UI-facing purchase state owner. It never persists a trusted `isPro` Boolean. Instead it asks `PurchaseServing` for current verified transactions and passes normalized `EntitlementRecord` values into the pure `EntitlementEvaluator`.
 
-This separation provides three useful boundaries:
+This separation keeps StoreKit-specific types inside `LiveStoreKitService`, entitlement rules deterministic, and SwiftUI purchase state compact.
 
-1. StoreKit-specific types remain inside `LiveStoreKitService`.
-2. Entitlement rules remain deterministic and testable.
-3. SwiftUI observes a compact state model: checking, inactive, or active.
+## Theme boundary
+
+The theme system is deliberately split into two layers.
+
+### Portable layer
+
+`AppTheme`, `ThemeAppearance`, `ThemeCatalog`, `ThemeStoredState`, and `ThemeResolver` use Foundation-only value types. They can be shared with widgets and tested without SwiftUI.
+
+`ThemeResolver` is the source of truth for deciding which appearance should render:
+
+1. An active Pro preview wins for a free user.
+2. A selected free theme or any selected theme for a Pro user renders normally.
+3. A selected Pro theme for a free user remains selected but the catalog fallback renders.
+
+Preserving the selected Pro ID lets the app restore the user's preferred appearance when Pro becomes active again.
+
+### App layer
+
+`ThemeManager` is an observable main-actor owner for SwiftUI apps. It persists selection, starts and expires previews, synchronizes verified Pro state, and emits state-change callbacks for widgets or app icons.
+
+The manager consumes a Boolean supplied by the app. It does not import StoreKit or authorize premium features itself.
+
+## Default catalog
+
+`FoundationThemes` contains six polished semantic palettes inspired by MiLove. The values are reusable, but the package does not include app-specific artwork, hearts, fonts, layouts, or icon assets.
+
+`ThemeCatalog` is immutable and composable. Apps create their own catalog by excluding defaults, replacing definitions with the same stable ID, changing access, and adding custom values.
+
+The fallback is normalized to free access. This guarantees a renderable theme when the user does not have Pro.
+
+## Persistence and extensions
+
+`UserDefaultsThemeStateStore` writes one Codable state object. Supplying an app-group suite makes the same state available to widgets.
+
+The cached `lastKnownHasPro` flag is for extension presentation only. Purchase authorization remains owned by verified StoreKit state in the containing app.
 
 ## Dependency injection
 
-Production apps can use the convenience initializer:
+Production purchases can use:
 
 ```swift
 PurchaseController(configuration: configuration)
 ```
 
-Tests can inject any `PurchaseServing` implementation:
+Tests can inject any `PurchaseServing` implementation.
 
-```swift
-PurchaseController(configuration: configuration, service: mockService)
-```
-
-The service protocol is main-actor isolated. StoreKit product objects stay inside the live service and are not leaked across concurrency domains.
-
-Debug prototypes can use `SimulatedPurchaseService` through `PurchaseServiceFactory`. The simulator conforms to the same boundary, operates only on `StoreProduct` and `EntitlementRecord`, and is not compiled into Release builds. The factory always resolves to `LiveStoreKitService` in Release even if an environment variable requests simulation.
+Themes can inject any `ThemeStateStoring` implementation and a deterministic clock into `ThemeManager`, allowing preview and expiry behavior to be tested without real UserDefaults or wall-clock delays.
 
 ## Lifecycle
 
-Attach `.managesPurchases(controller)` once near the app root. It calls `prepare()` and refreshes entitlements when the scene becomes active. The controller also observes `Transaction.updates` for changes that arrive while the app is running.
+Attach `.managesPurchases(controller)` near the app root. Attach `.synchronizesThemeAccess(themeManager, hasPro: controller.isEntitled)` beside it.
+
+When a theme preview is active, the manager schedules local expiry. Apps should also call `refresh()` after lifecycle transitions when they manage the lifecycle manually. Widgets use `ThemeResolution.nextAutomaticChangeDate` to schedule their own fallback timeline entry.
 
 ## UI composition
 
-The package intentionally provides complete default screens plus smaller primitives. Apps can ship the default onboarding, paywall, and settings screens or compose their own screens using `FoundationCard`, `FoundationPill`, `FoundationBackground`, and `FoundationPrimaryButtonStyle`.
+The package provides a default `ThemePickerView`, `AppThemeBackground`, `AppThemeCard`, SwiftUI environment injection, and bridges to the older `FoundationTheme` primitives.
 
-Brand data belongs in each app. Product identifiers, URLs, copy, and colors are constructor arguments rather than package constants.
+Apps may use these defaults or supply custom theme previews and complete custom screens. Shared code owns theme mechanics; app targets own product identity and visual storytelling.

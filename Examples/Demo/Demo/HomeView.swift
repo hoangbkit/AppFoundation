@@ -3,10 +3,12 @@ import SwiftUI
 
 struct HomeView: View {
     @Environment(PurchaseController.self) private var purchases
+    @Environment(ThemeManager.self) private var themes
 
     @State private var selectedPaywallStyle: PaywallStyle?
     @State private var isShowingPaywallStylePicker = false
     @State private var isShowingOnboarding = false
+    @State private var isShowingThemeDemo = false
     @State private var isShowingSettings = false
 
     var body: some View {
@@ -61,6 +63,9 @@ struct HomeView: View {
                     selectedPaywallStyle = style
                 }
             }
+            .navigationDestination(isPresented: $isShowingThemeDemo) {
+                ThemeDemoView()
+            }
             .fullScreenCover(isPresented: $isShowingOnboarding) {
                 FoundationOnboardingView(
                     pages: DemoConfiguration.onboardingPages,
@@ -76,7 +81,7 @@ struct HomeView: View {
                 )
             }
         }
-        .tint(DemoConfiguration.theme.primary)
+        .tint(themes.effectiveTheme.accentColor)
     }
 
     private func homeListRow<Content: View>(
@@ -217,6 +222,13 @@ struct HomeView: View {
                     subtitle: "Compare two StoreKit-powered styles",
                     systemImage: "creditcard.fill",
                     action: { isShowingPaywallStylePicker = true }
+                )
+                componentDivider
+                componentRow(
+                    title: "Themes",
+                    subtitle: "Persistent selection and timed Pro previews",
+                    systemImage: "paintpalette.fill",
+                    action: { isShowingThemeDemo = true }
                 )
                 componentDivider
                 componentRow(

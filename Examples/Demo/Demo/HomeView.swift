@@ -2,13 +2,14 @@ import AppFoundation
 import SwiftUI
 
 struct HomeView: View {
-    @Environment(PurchaseController.self) private var purchases
+    @Environment(PurchaseManager.self) private var purchases
     @Environment(ThemeManager.self) private var themes
 
     @State private var selectedPaywallStyle: PaywallStyle?
     @State private var isShowingPaywallStylePicker = false
     @State private var isShowingOnboarding = false
     @State private var isShowingThemeDemo = false
+    @State private var isShowingInfrastructureDemo = false
     @State private var isShowingSettings = false
 
     var body: some View {
@@ -17,17 +18,9 @@ struct HomeView: View {
                 FoundationBackground(theme: DemoConfiguration.theme)
 
                 List {
-                    homeListRow(top: 8, bottom: 11) {
-                        heroCard
-                    }
-
-                    homeListRow(top: 11, bottom: 11) {
-                        entitlementCard
-                    }
-
-                    homeListRow(top: 11, bottom: 32) {
-                        componentsCard
-                    }
+                    row(top: 8, bottom: 11) { heroCard }
+                    row(top: 11, bottom: 11) { entitlementCard }
+                    row(top: 11, bottom: 32) { componentsCard }
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
@@ -36,35 +29,39 @@ struct HomeView: View {
             .navigationTitle("AppFoundation")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
+                    Button("Settings", systemImage: "gearshape.fill") {
                         isShowingSettings = true
-                    } label: {
-                        Image(systemName: "gearshape.fill")
                     }
-                    .accessibilityLabel("Settings")
+                    .labelStyle(.iconOnly)
                 }
             }
             .sheet(item: $selectedPaywallStyle) { style in
                 switch style {
-                case .standard:
+                case .current:
+                    PaywallView(
+                        purchaseManager: purchases,
+                        configuration: DemoConfiguration.modernPaywall
+                    )
+                case .legacyGradient:
                     FoundationPaywallView(
                         purchases: purchases,
-                        configuration: DemoConfiguration.paywall
+                        configuration: DemoConfiguration.legacyPaywall
                     )
-                case .claude:
+                case .legacyClaude:
                     ClaudePaywallView(
                         purchases: purchases,
-                        configuration: DemoConfiguration.claudePaywall
+                        configuration: DemoConfiguration.legacyClaudePaywall
                     )
                 }
             }
             .navigationDestination(isPresented: $isShowingPaywallStylePicker) {
-                PaywallStylePickerView { style in
-                    selectedPaywallStyle = style
-                }
+                PaywallStylePickerView { selectedPaywallStyle = $0 }
             }
             .navigationDestination(isPresented: $isShowingThemeDemo) {
                 ThemeDemoView()
+            }
+            .navigationDestination(isPresented: $isShowingInfrastructureDemo) {
+                InfrastructureDemoView()
             }
             .fullScreenCover(isPresented: $isShowingOnboarding) {
                 FoundationOnboardingView(
@@ -84,7 +81,7 @@ struct HomeView: View {
         .tint(themes.effectiveTheme.accentColor)
     }
 
-    private func homeListRow<Content: View>(
+    private func row<Content: View>(
         top: CGFloat,
         bottom: CGFloat,
         @ViewBuilder content: () -> Content
@@ -103,13 +100,11 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 20) {
                 HStack {
                     FoundationPill(
-                        "APPFOUNDATION",
+                        "SHARED INFRASTRUCTURE",
                         systemImage: "square.stack.3d.up.fill",
                         tint: DemoConfiguration.theme.primary
                     )
-
                     Spacer()
-
                     Image(systemName: "swift")
                         .font(.title2.weight(.semibold))
                         .foregroundStyle(.orange)
@@ -120,10 +115,7 @@ struct HomeView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Build the app.\nSkip the boilerplate.")
                         .font(.system(size: 32, weight: .bold, design: .rounded))
-                        .lineSpacing(1)
-
-                    Text("Production-ready StoreKit 2 infrastructure and polished SwiftUI screens in one focused package.")
-                        .font(.body)
+                    Text("Explore purchases, themes, export, backup, widget storage, notifications, and production utilities in one Demo app.")
                         .foregroundStyle(.secondary)
                         .lineSpacing(4)
                 }
@@ -164,22 +156,20 @@ struct HomeView: View {
                         .background(entitlementColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 14))
 
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(entitlementTitle)
-                            .font(.headline)
+                        Text(entitlementTitle).font(.headline)
                         Text(entitlementMessage)
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
-
                     Spacer()
                 }
 
-                if !purchases.isEntitled {
+                if !purchases.hasPro {
                     Button {
-                        isShowingPaywallStylePicker = true
+                        selectedPaywallStyle = .current
                     } label: {
                         HStack {
-                            Text("Compare paywall styles")
+                            Text("Open current PaywallView")
                             Spacer()
                             Image(systemName: "arrow.right")
                         }
@@ -190,9 +180,7 @@ struct HomeView: View {
                 #if DEBUG
                 if purchases.isUsingSimulatedPurchases {
                     Button("Reset simulated purchases", role: .destructive) {
-                        Task {
-                            await purchases.resetSimulatedPurchases()
-                        }
+                        Task { await purchases.resetSimulatedPurchases() }
                     }
                     .buttonStyle(.bordered)
                 }
@@ -204,44 +192,45 @@ struct HomeView: View {
     private var componentsCard: some View {
         FoundationCard(theme: DemoConfiguration.theme) {
             VStack(alignment: .leading, spacing: 0) {
-                Text("EXPLORE COMPONENTS")
+                Text("EXPLORE THE PACKAGE")
                     .font(.caption2.weight(.bold))
                     .tracking(1.2)
                     .foregroundStyle(.secondary)
                     .padding(.bottom, 10)
 
                 componentRow(
-                    title: "Onboarding",
-                    subtitle: "Preview the complete onboarding flow",
-                    systemImage: "rectangle.stack.fill",
-                    action: { isShowingOnboarding = true }
+                    title: "New APIs",
+                    subtitle: "Commerce gates, export, backup, shared snapshots, notifications, and utilities",
+                    systemImage: "shippingbox.fill",
+                    action: { isShowingInfrastructureDemo = true }
                 )
-                componentDivider
+                divider
                 componentRow(
-                    title: "Paywall",
-                    subtitle: "Compare two StoreKit-powered styles",
+                    title: "Paywalls",
+                    subtitle: "Compare the current PaywallView with legacy layouts",
                     systemImage: "creditcard.fill",
                     action: { isShowingPaywallStylePicker = true }
                 )
-                componentDivider
+                divider
                 componentRow(
                     title: "Themes",
                     subtitle: "Persistent selection and timed Pro previews",
                     systemImage: "paintpalette.fill",
                     action: { isShowingThemeDemo = true }
                 )
-                componentDivider
+                divider
                 componentRow(
-                    title: "Settings",
-                    subtitle: "Purchases, support, and legal links",
+                    title: "Onboarding",
+                    subtitle: "Preview the reusable onboarding flow",
+                    systemImage: "rectangle.stack.fill",
+                    action: { isShowingOnboarding = true }
+                )
+                divider
+                componentRow(
+                    title: "Legacy Settings",
+                    subtitle: "Existing all-in-one settings view for migration testing",
                     systemImage: "slider.horizontal.3",
                     action: { isShowingSettings = true }
-                )
-                componentDivider
-                componentRow(
-                    title: "Core",
-                    subtitle: "Verified entitlements and pure logic",
-                    systemImage: "checkmark.seal.fill"
                 )
             }
         }
@@ -252,49 +241,40 @@ struct HomeView: View {
         title: String,
         subtitle: String,
         systemImage: String,
-        action: (() -> Void)? = nil
+        action: @escaping () -> Void
     ) -> some View {
-        let content = HStack(spacing: 14) {
-            Image(systemName: systemImage)
-                .font(.body.weight(.semibold))
-                .foregroundStyle(DemoConfiguration.theme.primary)
-                .frame(width: 42, height: 42)
-                .background(
-                    DemoConfiguration.theme.primary.opacity(0.10),
-                    in: RoundedRectangle(cornerRadius: 13)
-                )
+        Button(action: action) {
+            HStack(spacing: 14) {
+                Image(systemName: systemImage)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(DemoConfiguration.theme.primary)
+                    .frame(width: 42, height: 42)
+                    .background(
+                        DemoConfiguration.theme.primary.opacity(0.10),
+                        in: RoundedRectangle(cornerRadius: 13)
+                    )
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.headline)
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title).font(.headline)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
 
-            Spacer(minLength: 8)
-
-            if action != nil {
+                Spacer(minLength: 8)
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(.tertiary)
             }
+            .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
+            .contentShape(Rectangle())
         }
-        .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
-        .contentShape(Rectangle())
-
-        if let action {
-            Button(action: action) { content }
-                .buttonStyle(.plain)
-        } else {
-            content
-        }
+        .buttonStyle(.plain)
     }
 
-    private var componentDivider: some View {
-        Divider()
-            .padding(.leading, 56)
+    private var divider: some View {
+        Divider().padding(.leading, 56)
     }
 
     private func technologyBadge(_ title: String, systemImage: String) -> some View {
@@ -308,12 +288,9 @@ struct HomeView: View {
 
     private var entitlementTitle: String {
         switch purchases.entitlementState {
-        case .checking:
-            "Checking premium access"
-        case .inactive:
-            "Free plan"
-        case .active:
-            "Demo Pro is active"
+        case .checking: "Checking premium access"
+        case .inactive: "Free plan"
+        case .active: "Demo Pro is active"
         }
     }
 
@@ -325,9 +302,9 @@ struct HomeView: View {
             #if DEBUG
             purchases.isUsingSimulatedPurchases
                 ? "Open the paywall to test purchases without App Store Connect."
-                : "Open the sample paywall to test StoreKit purchases."
+                : "Open the current paywall to test StoreKit purchases."
             #else
-            "Open the sample paywall to test StoreKit purchases."
+            "Open the current paywall to test StoreKit purchases."
             #endif
         case .active:
             #if DEBUG
@@ -342,23 +319,17 @@ struct HomeView: View {
 
     private var entitlementIcon: String {
         switch purchases.entitlementState {
-        case .checking:
-            "clock.arrow.circlepath"
-        case .inactive:
-            "lock.fill"
-        case .active:
-            "crown.fill"
+        case .checking: "clock.arrow.circlepath"
+        case .inactive: "lock.fill"
+        case .active: "crown.fill"
         }
     }
 
     private var entitlementColor: Color {
         switch purchases.entitlementState {
-        case .checking:
-            .secondary
-        case .inactive:
-            DemoConfiguration.theme.primary
-        case .active:
-            .orange
+        case .checking: .secondary
+        case .inactive: DemoConfiguration.theme.primary
+        case .active: .orange
         }
     }
 }
@@ -368,52 +339,58 @@ private struct PaywallStylePickerView: View {
 
     var body: some View {
         List {
-            Section {
-                Button {
-                    onSelect(.standard)
-                } label: {
-                    Label {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Gradient Paywall")
-                                .font(.headline)
-                            Text("A bold gradient design with feature cards and plan rows.")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                    } icon: {
-                        Image(systemName: "sparkles.rectangle.stack")
-                            .foregroundStyle(DemoConfiguration.theme.primary)
-                    }
-                }
+            Section("Recommended") {
+                styleButton(
+                    title: "PaywallView",
+                    subtitle: "Current neutral, theme-aware monthly/yearly paywall.",
+                    systemImage: "rectangle.split.2x1",
+                    style: .current
+                )
+            }
 
-                Button {
-                    onSelect(.claude)
-                } label: {
-                    Label {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("ClaudePaywall")
-                                .font(.headline)
-                            Text("A compact plan-focused layout with side-by-side options.")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                    } icon: {
-                        Image(systemName: "rectangle.split.2x1")
-                            .foregroundStyle(DemoConfiguration.theme.primary)
-                    }
-                }
-            } header: {
-                Text("Choose a paywall style")
+            Section("Migration previews") {
+                styleButton(
+                    title: "FoundationPaywallView",
+                    subtitle: "Legacy gradient layout retained for existing apps.",
+                    systemImage: "sparkles.rectangle.stack",
+                    style: .legacyGradient
+                )
+                styleButton(
+                    title: "ClaudePaywallView",
+                    subtitle: "Legacy compact layout retained for comparison.",
+                    systemImage: "rectangle.grid.2x2",
+                    style: .legacyClaude
+                )
             }
         }
         .navigationTitle("Paywall Styles")
         .navigationBarTitleDisplayMode(.inline)
     }
+
+    private func styleButton(
+        title: String,
+        subtitle: String,
+        systemImage: String,
+        style: PaywallStyle
+    ) -> some View {
+        Button { onSelect(style) } label: {
+            Label {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title).font(.headline)
+                    Text(subtitle).font(.subheadline).foregroundStyle(.secondary)
+                }
+            } icon: {
+                Image(systemName: systemImage)
+                    .foregroundStyle(DemoConfiguration.theme.primary)
+            }
+        }
+    }
 }
 
 private enum PaywallStyle: String, Identifiable {
-    case standard
-    case claude
+    case current
+    case legacyGradient
+    case legacyClaude
 
     var id: String { rawValue }
 }

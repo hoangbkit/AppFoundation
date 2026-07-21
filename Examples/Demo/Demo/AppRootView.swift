@@ -6,7 +6,17 @@ struct AppRootView: View {
 
     var body: some View {
         if hasCompletedOnboarding {
-            HomeView()
+            TabView {
+                HomeView()
+                    .tabItem {
+                        Label("Showcase", systemImage: "square.stack.3d.up.fill")
+                    }
+
+                PurchaseUpsellDemoView()
+                    .tabItem {
+                        Label("Upsells", systemImage: "crown.fill")
+                    }
+            }
         } else {
             FoundationOnboardingView(
                 pages: DemoConfiguration.onboardingPages

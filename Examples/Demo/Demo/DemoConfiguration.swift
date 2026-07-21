@@ -138,6 +138,20 @@ enum DemoConfiguration {
         termsURL: URL(string: "https://example.com/terms")
     )
 
+    static let limitReachedUpsell = LimitReachedUpsellConfiguration(
+        title: "Free limit reached",
+        message: "The Demo free plan has reached its sample creation limit. Existing content remains available, or you can unlock Demo Pro for unlimited access.",
+        symbolName: "shippingbox.and.arrow.backward.fill",
+        rows: [
+            LimitReachedComparisonRow(feature: "Projects", freeValue: "Up to 3", proValue: "Unlimited"),
+            LimitReachedComparisonRow(feature: "Exports", freeValue: "3 / week", proValue: "Unlimited"),
+            LimitReachedComparisonRow(feature: "Themes", freeValue: "1", proValue: "All"),
+            LimitReachedComparisonRow(feature: "Backup history", freeValue: "Latest", proValue: "Complete"),
+        ],
+        unlockButtonTitle: "Unlock Demo Pro",
+        comparisonAccessibilityLabel: "Demo Free and Demo Pro comparison"
+    )
+
     static let legacyPaywall = FoundationPaywallConfiguration(
         title: "Make every app premium",
         subtitle: "Weekly, monthly, yearly, and lifetime plans in the gradient style.",
@@ -187,6 +201,12 @@ enum DemoConfiguration {
         supportURL: URL(string: "https://github.com/hoangbkit"),
         privacyURL: URL(string: "https://example.com/privacy"),
         termsURL: URL(string: "https://example.com/terms"),
-        shareURL: URL(string: "https://github.com/hoangbkit/AppFoundation")
+        shareURL: URL(string: "https://github.com/hoangbkit/AppFoundation"),
+        proPlanConfiguration: ProPlanSettingsConfiguration(
+            sectionTitle: "Demo Pro",
+            activePlanTitle: "Demo Pro",
+            unlockTitle: "Unlock Demo Pro"
+        ),
+        paywallConfiguration: modernPaywall
     )
 }

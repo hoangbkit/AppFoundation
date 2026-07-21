@@ -167,10 +167,10 @@ public struct AsyncButton<Label: View>: View {
                     try await action()
                 } catch let userError as UserFacingError {
                     error = userError
-                } catch {
-                    error = UserFacingError(
+                } catch let caughtError {
+                    self.error = UserFacingError(
                         title: "Something went wrong",
-                        message: error.localizedDescription
+                        message: caughtError.localizedDescription
                     )
                 }
             }

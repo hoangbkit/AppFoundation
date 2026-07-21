@@ -5,24 +5,43 @@ import XCTest
 
 @MainActor
 final class DemoTests: XCTestCase {
-    func testPurchaseConfigurationUsesMonthlyThenYearly() {
+    func testPurchaseConfigurationUsesAllSupportedPlansInOrder() {
         XCTAssertEqual(
             DemoConfiguration.purchases.productIDs,
             [
-                "com.hoangbkit.appfoundationdemo.pro.monthly",
-                "com.hoangbkit.appfoundationdemo.pro.yearly",
+                DemoConfiguration.weeklyProductID,
+                DemoConfiguration.monthlyProductID,
+                DemoConfiguration.yearlyProductID,
+                DemoConfiguration.lifetimeProductID,
             ]
         )
         XCTAssertEqual(
             DemoConfiguration.purchases.preferredProductID,
-            "com.hoangbkit.appfoundationdemo.pro.yearly"
+            DemoConfiguration.yearlyProductID
         )
     }
 
-    func testModernPaywallPrefersYearlyProduct() {
+    func testSimulatedCatalogContainsWeeklyAndLifetimePlans() {
+        let weekly = DemoConfiguration.simulatedProducts.first {
+            $0.id == DemoConfiguration.weeklyProductID
+        }
+        let lifetime = DemoConfiguration.simulatedProducts.first {
+            $0.id == DemoConfiguration.lifetimeProductID
+        }
+
+        XCTAssertEqual(weekly?.subscriptionPeriod, .init(value: 1, unit: .week))
+        XCTAssertTrue(lifetime?.isLifetime == true)
+        XCTAssertNil(lifetime?.subscriptionPeriod)
+    }
+
+    func testModernPaywallPrefersAndHighlightsYearlyProduct() {
         XCTAssertEqual(
             DemoConfiguration.modernPaywall.preferredProductID,
             DemoConfiguration.purchases.preferredProductID
+        )
+        XCTAssertEqual(
+            DemoConfiguration.modernPaywall.highlightedProductID,
+            DemoConfiguration.yearlyProductID
         )
         XCTAssertFalse(DemoConfiguration.modernPaywall.features.isEmpty)
     }

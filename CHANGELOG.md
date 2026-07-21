@@ -11,6 +11,7 @@
 - Added optional alternate app-icon application support.
 - Added portable catalog/resolver tests and iOS theme-manager tests.
 - Added a Debug-only in-process purchase simulator for CLI-deployed prototypes.
+- Added `PurchaseController` simulation configuration with `simulated: Bool = false` and runtime switching through `setSimulatedPurchasesEnabled(_:)`.
 - Updated the Demo for explicit `mycli --billing simulated` opt-in while preserving local `.storekit` testing in Xcode's Run action.
 
 ## 1.0.0 - 2026-07-16

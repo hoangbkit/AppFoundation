@@ -8,6 +8,8 @@ public struct FoundationSettingsConfiguration {
     public let privacyURL: URL?
     public let termsURL: URL?
     public let shareURL: URL?
+    public let proPlanConfiguration: ProPlanSettingsConfiguration
+    public let paywallConfiguration: PaywallConfiguration?
 
     /// Retained for source compatibility with callers that explicitly provide
     /// a fixed `FoundationTheme`.
@@ -26,6 +28,8 @@ public struct FoundationSettingsConfiguration {
         privacyURL: URL? = nil,
         termsURL: URL? = nil,
         shareURL: URL? = nil,
+        proPlanConfiguration: ProPlanSettingsConfiguration? = nil,
+        paywallConfiguration: PaywallConfiguration? = nil,
         themeOverride: AppTheme? = nil
     ) {
         self.appName = appName
@@ -33,6 +37,12 @@ public struct FoundationSettingsConfiguration {
         self.privacyURL = privacyURL
         self.termsURL = termsURL
         self.shareURL = shareURL
+        self.proPlanConfiguration = proPlanConfiguration ?? ProPlanSettingsConfiguration(
+            sectionTitle: "\(appName) Pro",
+            activePlanTitle: "\(appName) Pro",
+            unlockTitle: "Unlock \(appName) Pro"
+        )
+        self.paywallConfiguration = paywallConfiguration
         self.theme = .indigo
         self.themeOverride = themeOverride
         self.followsActiveTheme = true
@@ -45,6 +55,8 @@ public struct FoundationSettingsConfiguration {
         privacyURL: URL? = nil,
         termsURL: URL? = nil,
         shareURL: URL? = nil,
+        proPlanConfiguration: ProPlanSettingsConfiguration? = nil,
+        paywallConfiguration: PaywallConfiguration? = nil,
         theme: FoundationTheme
     ) {
         self.appName = appName
@@ -52,6 +64,12 @@ public struct FoundationSettingsConfiguration {
         self.privacyURL = privacyURL
         self.termsURL = termsURL
         self.shareURL = shareURL
+        self.proPlanConfiguration = proPlanConfiguration ?? ProPlanSettingsConfiguration(
+            sectionTitle: "\(appName) Pro",
+            activePlanTitle: "\(appName) Pro",
+            unlockTitle: "Unlock \(appName) Pro"
+        )
+        self.paywallConfiguration = paywallConfiguration
         self.theme = theme
         self.themeOverride = nil
         self.followsActiveTheme = false
@@ -67,7 +85,7 @@ public struct FoundationSettingsView: View {
     private let configuration: FoundationSettingsConfiguration
     private let metadata: AppMetadata
 
-    @State private var restoreMessage: String?
+    @State private var isShowingPaywall = false
 
     public init(
         purchases: PurchaseController? = nil,
@@ -114,12 +132,13 @@ public struct FoundationSettingsView: View {
             .toolbarBackground(.hidden, for: .navigationBar)
             .tint(accent)
             .preferredColorScheme(preferredColorScheme)
-            .alert("Restore Purchases", isPresented: restoreAlertBinding) {
-                Button("OK", role: .cancel) {
-                    restoreMessage = nil
+            .sheet(isPresented: $isShowingPaywall) {
+                if let purchases, let paywallConfiguration = configuration.paywallConfiguration {
+                    PaywallView(
+                        purchaseManager: purchases,
+                        configuration: paywallConfiguration
+                    )
                 }
-            } message: {
-                Text(restoreMessage ?? "")
             }
         }
     }
@@ -134,36 +153,18 @@ public struct FoundationSettingsView: View {
     }
 
     private func purchaseSection(_ purchases: PurchaseController) -> some View {
-        Section("Purchases") {
-            Button {
-                Task {
-                    let outcome = await purchases.restorePurchases()
-                    switch outcome {
-                    case .restored:
-                        restoreMessage = "Your purchases have been restored."
-                    case .nothingToRestore:
-                        restoreMessage = "No previous purchases were found."
-                    case .failed(let failure):
-                        restoreMessage = failure.message
-                        purchases.clearActivity()
-                    }
-                }
-            } label: {
-                HStack {
-                    Label("Restore Purchases", systemImage: "arrow.clockwise")
-                    Spacer()
-                    if case .restoring = purchases.activity {
-                        ProgressView()
-                    }
-                }
-            }
-            .disabled(purchases.isBusy)
-
-            if purchases.isEntitled {
-                Label("Premium is active", systemImage: "checkmark.seal.fill")
-                    .foregroundStyle(accent)
-            }
+        let onUpgrade: (() -> Void)?
+        if configuration.paywallConfiguration != nil {
+            onUpgrade = { isShowingPaywall = true }
+        } else {
+            onUpgrade = nil
         }
+
+        return ProPlanSettingsSection(
+            purchaseManager: purchases,
+            configuration: configuration.proPlanConfiguration,
+            onUpgrade: onUpgrade
+        )
         .listRowBackground(surface)
     }
 
@@ -233,17 +234,6 @@ public struct FoundationSettingsView: View {
         configuration.followsActiveTheme
             ? activeTheme.appearance.preferredColorScheme.colorScheme
             : nil
-    }
-
-    private var restoreAlertBinding: Binding<Bool> {
-        Binding(
-            get: { restoreMessage != nil },
-            set: { isPresented in
-                if !isPresented {
-                    restoreMessage = nil
-                }
-            }
-        )
     }
 }
 #endif

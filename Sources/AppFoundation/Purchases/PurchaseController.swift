@@ -13,13 +13,34 @@ public final class PurchaseController {
 
     public let configuration: PurchaseConfiguration
 
-    @ObservationIgnored private let service: any PurchaseServing
+    @ObservationIgnored private var service: any PurchaseServing
+    @ObservationIgnored private let simulatedProducts: [StoreProduct]
+    @ObservationIgnored private let simulatedPersistenceKey: String?
+    @ObservationIgnored private let simulatedOperationDelay: Duration
     @ObservationIgnored private var updateTask: Task<Void, Never>?
     @ObservationIgnored private var hasPrepared = false
 
-    public init(configuration: PurchaseConfiguration) {
+    /// Creates a purchase controller backed by live StoreKit by default.
+    ///
+    /// Set `simulated` to `true` in a Debug build to use AppFoundation's
+    /// in-process simulator. Release builds always fall back to live StoreKit.
+    public init(
+        configuration: PurchaseConfiguration,
+        simulated: Bool = false,
+        simulatedProducts: [StoreProduct] = [],
+        simulatedPersistenceKey: String? = nil,
+        simulatedOperationDelay: Duration = .milliseconds(250)
+    ) {
         self.configuration = configuration
-        self.service = LiveStoreKitService()
+        self.simulatedProducts = simulatedProducts
+        self.simulatedPersistenceKey = simulatedPersistenceKey
+        self.simulatedOperationDelay = simulatedOperationDelay
+        self.service = PurchaseServiceFactory.make(
+            mode: simulated ? .simulated : .live,
+            simulatedProducts: simulatedProducts,
+            simulatedPersistenceKey: simulatedPersistenceKey,
+            simulatedOperationDelay: simulatedOperationDelay
+        )
     }
 
     public init(
@@ -27,6 +48,9 @@ public final class PurchaseController {
         service: any PurchaseServing
     ) {
         self.configuration = configuration
+        self.simulatedProducts = []
+        self.simulatedPersistenceKey = nil
+        self.simulatedOperationDelay = .milliseconds(250)
         self.service = service
     }
 
@@ -178,6 +202,30 @@ public final class PurchaseController {
     }
 
     #if DEBUG
+    /// Switches this controller between live StoreKit and the in-process simulator.
+    /// The configured simulator products, persistence key, and delay are reused.
+    public func setSimulatedPurchasesEnabled(_ enabled: Bool) async {
+        guard isUsingSimulatedPurchases != enabled else {
+            return
+        }
+
+        updateTask?.cancel()
+        updateTask = nil
+        service = PurchaseServiceFactory.make(
+            mode: enabled ? .simulated : .live,
+            simulatedProducts: simulatedProducts,
+            simulatedPersistenceKey: simulatedPersistenceKey,
+            simulatedOperationDelay: simulatedOperationDelay
+        )
+        hasPrepared = false
+        products = []
+        productLoadingState = .idle
+        entitlementState = .checking
+        activity = .idle
+
+        await prepare()
+    }
+
     /// Clears simulator state and refreshes the observable entitlement state.
     public func resetSimulatedPurchases() async {
         guard let simulatedService = service as? SimulatedPurchaseService else {

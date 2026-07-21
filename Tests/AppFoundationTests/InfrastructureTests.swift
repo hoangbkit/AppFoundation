@@ -6,20 +6,8 @@ final class InfrastructureTests: XCTestCase {
     func testExistingContentRemainsAccessibleAfterExpiry() {
         let feature = PremiumFeature(id: "themes", title: "Premium themes")
         let policy = PremiumAccessPolicy()
-
-        XCTAssertEqual(
-            policy.decision(
-                for: feature,
-                requirement: .pro,
-                hasPro: false,
-                isExistingContent: true
-            ),
-            .allowed
-        )
-        XCTAssertEqual(
-            policy.decision(for: feature, requirement: .pro, hasPro: false),
-            .requiresPro(feature: feature)
-        )
+        XCTAssertEqual(policy.decision(for: feature, requirement: .pro, hasPro: false, isExistingContent: true), .allowed)
+        XCTAssertEqual(policy.decision(for: feature, requirement: .pro, hasPro: false), .requiresPro(feature: feature))
     }
 
     func testExportFilenameSanitizesUnsafeCharacters() {
@@ -27,12 +15,24 @@ final class InfrastructureTests: XCTestCase {
         XCTAssertEqual(ExportFilename.sanitized("   "), "Export")
     }
 
-    func testBackupPackageRoundTrip() async throws {
-        struct Payload: Codable, Sendable, Equatable {
-            let name: String
-            let count: Int
+    func testExportRenderPreflight() throws {
+        XCTAssertNoThrow(try ExportRenderRequest(width: 1200, height: 1200).validate())
+        XCTAssertThrowsError(
+            try ExportRenderRequest(
+                width: 10_000,
+                height: 10_000,
+                maximumPixelCount: 1_000_000
+            ).validate()
+        ) { error in
+            XCTAssertEqual(
+                error as? ExportError,
+                .exceedsPixelLimit(requested: 100_000_000, maximum: 1_000_000)
+            )
         }
+    }
 
+    func testBackupPackageRoundTrip() async throws {
+        struct Payload: Codable, Sendable, Equatable { let name: String; let count: Int }
         let configuration = BackupPackageConfiguration(
             format: "test.backup",
             version: 1,
@@ -47,28 +47,17 @@ final class InfrastructureTests: XCTestCase {
             appBuild: "1",
             payload: Payload(name: "Hello", count: 2)
         )
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
 
         let url = try await BackupPackageWriter().write(
             envelope: envelope,
             configuration: configuration,
-            assets: [
-                BackupAsset(
-                    relativePath: "images/one.bin",
-                    data: Data([1, 2, 3])
-                )
-            ],
+            assets: [BackupAsset(relativePath: "images/one.bin", data: Data([1, 2, 3]))],
             destinationDirectory: directory
         )
-        let result = try await BackupPackageReader().read(
-            Payload.self,
-            from: url,
-            configuration: configuration
-        )
-
+        let result = try await BackupPackageReader().read(Payload.self, from: url, configuration: configuration)
         XCTAssertEqual(result.payload, envelope.payload)
         XCTAssertEqual(result.assets["images/one.bin"], Data([1, 2, 3]))
     }
@@ -103,48 +92,16 @@ final class InfrastructureTests: XCTestCase {
     }
 
     func testReviewRequestPolicy() {
-        let policy = ReviewRequestPolicy(
-            minimumMeaningfulActions: 3,
-            minimumDaysBetweenRequests: 30
-        )
+        let policy = ReviewRequestPolicy(minimumMeaningfulActions: 3, minimumDaysBetweenRequests: 30)
         let now = Date(timeIntervalSince1970: 4_000_000)
-
-        XCTAssertFalse(
-            policy.shouldRequest(
-                meaningfulActionCount: 2,
-                lastRequestDate: nil,
-                now: now
-            )
-        )
-        XCTAssertTrue(
-            policy.shouldRequest(
-                meaningfulActionCount: 3,
-                lastRequestDate: nil,
-                now: now
-            )
-        )
-        XCTAssertFalse(
-            policy.shouldRequest(
-                meaningfulActionCount: 3,
-                lastRequestDate: now.addingTimeInterval(-10 * 86_400),
-                now: now
-            )
-        )
-        XCTAssertTrue(
-            policy.shouldRequest(
-                meaningfulActionCount: 3,
-                lastRequestDate: now.addingTimeInterval(-31 * 86_400),
-                now: now
-            )
-        )
+        XCTAssertFalse(policy.shouldRequest(meaningfulActionCount: 2, lastRequestDate: nil, now: now))
+        XCTAssertTrue(policy.shouldRequest(meaningfulActionCount: 3, lastRequestDate: nil, now: now))
+        XCTAssertFalse(policy.shouldRequest(meaningfulActionCount: 3, lastRequestDate: now.addingTimeInterval(-10 * 86_400), now: now))
+        XCTAssertTrue(policy.shouldRequest(meaningfulActionCount: 3, lastRequestDate: now.addingTimeInterval(-31 * 86_400), now: now))
     }
 
     func testSharedDeepLink() {
-        let link = SharedDeepLink(
-            scheme: "milove",
-            host: "event",
-            pathComponents: ["123"]
-        )
+        let link = SharedDeepLink(scheme: "milove", host: "event", pathComponents: ["123"])
         XCTAssertEqual(link.url?.absoluteString, "milove://event/123")
     }
 }

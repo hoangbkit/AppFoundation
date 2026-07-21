@@ -11,7 +11,10 @@
 - Added premium gates, badges, premium buttons, locked overlays, and a composable subscription settings section.
 - Made `PaywallView`, `FoundationPaywallView`, and `ClaudePaywallView` follow the active `AppTheme`, including backgrounds, surfaces, foregrounds, borders, shadows, corner radii, accents, and preferred color scheme.
 - Added optional full-theme overrides while retaining the legacy fixed `FoundationTheme` initializer for source compatibility.
-- Preserved live StoreKit verification, transaction observation, restore behavior, and Debug-only simulation.
+- Added weekly, monthly, yearly, and lifetime plan presentation across all paywall styles.
+- Added `PurchasePlanKind`, plan labels, billing descriptions, recurring/lifetime helpers, and catalog-aware legal disclosure.
+- Updated paywall layouts to show the complete configured product catalog and use one column at accessibility text sizes.
+- Preserved live StoreKit verification, transaction observation, restore behavior, non-consumable lifetime entitlements, and Debug-only simulation.
 
 ### Shared infrastructure
 
@@ -20,7 +23,7 @@
 - Added typed App Group snapshots, shared deep links, and widget reload throttling.
 - Added local notification authorization, scheduling, replacement, and cancellation helpers.
 - Added `UserFacingError`, `AppInfo`, safe file replacement, async debouncing, review policy, logging, haptics, and `AsyncButton`.
-- Added portable tests covering access policy, export filenames and render preflight, backup round trips and unsafe paths, review policy, and deep links.
+- Added portable tests covering access policy, export filenames and render preflight, backup round trips and unsafe paths, review policy, deep links, weekly plans, and lifetime entitlements.
 - Added a Swift 6.2 GitHub Actions workflow for package manifest and test validation.
 
 ### Demo app
@@ -30,7 +33,8 @@
 - Updated all Demo paywall configurations to follow live theme changes and added configuration coverage for that behavior.
 - Made the complete Demo theme-aware: first-launch onboarding, Home, package browser, paywall picker, settings, navigation chrome, list rows, cards, statuses, and exported preview artwork now follow `ThemeManager.effectiveTheme`.
 - Made reusable onboarding and settings views follow the active app theme by default while preserving explicit fixed `FoundationTheme` initializers.
-- Added Demo configuration tests for the modern paywall, theme-aware settings, backup package, and stable deep link.
+- Added weekly, monthly, yearly, and non-consumable lifetime products to both the in-process simulator and the Demo StoreKit configuration.
+- Added Demo configuration tests for all four plans, the modern paywall, theme-aware settings, backup package, and stable deep link.
 
 ### Existing theme and simulation work
 

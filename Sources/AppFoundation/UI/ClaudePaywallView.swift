@@ -23,58 +23,54 @@ public struct ClaudePaywallView: View {
     }
 
     public var body: some View {
-        ZStack {
-            PaywallThemeBackground(tokens: theme)
+        NavigationStack {
+            ZStack {
+                PaywallThemeBackground(tokens: theme)
 
-            ScrollView {
-                VStack(spacing: 28) {
-                    header
-                    planCard
-                    legalFooter
+                ScrollView {
+                    VStack(spacing: 28) {
+                        header
+                        planCard
+                        legalFooter
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                    .padding(.bottom, 32)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
-                .padding(.bottom, 32)
+                .scrollIndicators(.hidden)
             }
-            .scrollIndicators(.hidden)
+            .foregroundStyle(theme.primaryForeground)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close", systemImage: "xmark") {
+                        dismiss()
+                    }
+                    .labelStyle(.iconOnly)
+                }
+            }
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .task {
+                if purchases.products.isEmpty {
+                    await purchases.loadProducts(force: true)
+                }
+                selectDefaultPlanIfNeeded()
+            }
+            .onChange(of: purchases.products) { _, _ in
+                selectDefaultPlanIfNeeded()
+            }
+            .alert("Purchase", isPresented: purchaseErrorBinding) {
+                Button("OK", role: .cancel) { purchases.clearActivity() }
+            } message: {
+                Text(purchaseFailure?.message ?? PurchaseFailure.unknown.message)
+            }
+            .alert("Restore Purchases", isPresented: restoreAlertBinding) {
+                Button("OK", role: .cancel) { restoreMessage = nil }
+            } message: {
+                Text(restoreMessage ?? "")
+            }
         }
-        .foregroundStyle(theme.primaryForeground)
         .tint(theme.accent)
         .preferredColorScheme(theme.preferredColorScheme)
-        .overlay(alignment: .topLeading) { closeButton }
-        .task {
-            if purchases.products.isEmpty {
-                await purchases.loadProducts(force: true)
-            }
-            selectDefaultPlanIfNeeded()
-        }
-        .onChange(of: purchases.products) { _, _ in
-            selectDefaultPlanIfNeeded()
-        }
-        .alert("Purchase", isPresented: purchaseErrorBinding) {
-            Button("OK", role: .cancel) { purchases.clearActivity() }
-        } message: {
-            Text(purchaseFailure?.message ?? PurchaseFailure.unknown.message)
-        }
-        .alert("Restore Purchases", isPresented: restoreAlertBinding) {
-            Button("OK", role: .cancel) { restoreMessage = nil }
-        } message: {
-            Text(restoreMessage ?? "")
-        }
-    }
-
-    private var closeButton: some View {
-        Button { dismiss() } label: {
-            Image(systemName: "xmark")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(theme.primaryForeground)
-                .frame(width: 36, height: 36)
-                .background(theme.elevatedSurface.opacity(0.94), in: Circle())
-                .overlay { Circle().strokeBorder(theme.border) }
-        }
-        .padding(.leading, 4)
-        .padding(.top, 8)
-        .accessibilityLabel("Close")
     }
 
     private var header: some View {
@@ -86,7 +82,6 @@ public struct ClaudePaywallView: View {
                 .font(.title3)
                 .foregroundStyle(theme.secondaryForeground)
         }
-        .padding(.top, 36)
         .multilineTextAlignment(.center)
     }
 

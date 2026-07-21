@@ -16,8 +16,8 @@ enum DemoConfiguration {
         preferredProductID: "com.hoangbkit.appfoundationdemo.pro.yearly"
     )
 
-    static let simulatedProducts: [StoreProduct] = [
-        StoreProduct(
+    static let simulatedProducts: [PurchaseProduct] = [
+        PurchaseProduct(
             id: "com.hoangbkit.appfoundationdemo.pro.monthly",
             displayName: "Demo Pro Monthly",
             description: "Monthly access to every Demo Pro feature.",
@@ -25,7 +25,7 @@ enum DemoConfiguration {
             price: 2.99,
             subscriptionPeriod: .init(value: 1, unit: .month)
         ),
-        StoreProduct(
+        PurchaseProduct(
             id: "com.hoangbkit.appfoundationdemo.pro.yearly",
             displayName: "Demo Pro Yearly",
             description: "Annual access to every Demo Pro feature.",
@@ -37,6 +37,27 @@ enum DemoConfiguration {
 
     static let purchaseServiceMode = PurchaseServiceFactory.effectiveMode(
         for: PurchaseServiceMode.fromEnvironment(fallback: .live)
+    )
+
+    static let premiumExportFeature = PremiumFeature(
+        id: "premium-export",
+        title: "Premium export"
+    )
+
+    static let backupConfiguration = BackupPackageConfiguration(
+        format: "com.hoangbkit.appfoundationdemo.backup",
+        version: 1,
+        appIdentifier: "com.hoangbkit.appfoundationdemo",
+        fileExtension: "afdemo"
+    )
+
+    static let sharedSuiteName = "appfoundation.demo.shared-preview"
+
+    static let sampleDeepLink = SharedDeepLink(
+        scheme: "appfoundation-demo",
+        host: "showcase",
+        pathComponents: ["exports", "latest"],
+        queryItems: [URLQueryItem(name: "source", value: "widget")]
     )
 
     static let onboardingPages: [FoundationOnboardingPage] = [
@@ -57,20 +78,52 @@ enum DemoConfiguration {
                 "Entitlements are verified from StoreKit, observed for changes, and exposed as simple observable state for SwiftUI."
         ),
         FoundationOnboardingPage(
-            id: "components",
-            systemImage: "wand.and.stars",
-            eyebrow: "Beautiful components",
-            title: "A consistent design language",
+            id: "infrastructure",
+            systemImage: "shippingbox.fill",
+            eyebrow: "Shared infrastructure",
+            title: "Export, backup, widgets, and reminders",
             message:
-                "Compose onboarding, paywalls, settings, cards, buttons, and backgrounds while keeping every app brandable."
+                "Use the same safe building blocks across apps while each product keeps its own data models and visual identity."
         ),
     ]
 
-    static let paywall = FoundationPaywallConfiguration(
-        title: "Make every app premium",
+    static let modernPaywall = PaywallConfiguration(
+        title: "Unlock Demo Pro",
         subtitle: purchaseServiceMode == .simulated
-            ? "This Debug build uses AppFoundation's in-process purchase simulator."
-            : "This sample uses StoreKit. Replace the product identifiers and copy for each real app.",
+            ? "This Debug build uses the in-process purchase simulator."
+            : "Choose monthly or yearly access through StoreKit.",
+        planTitle: "Demo Pro",
+        planSubtitle: "One entitlement for every premium showcase",
+        features: [
+            PaywallFeature(
+                id: "exports",
+                systemImage: "square.and.arrow.up",
+                title: "Premium exports",
+                message: "Exercise image rendering, rounded PNG output, and sharing."
+            ),
+            PaywallFeature(
+                id: "backups",
+                systemImage: "archivebox",
+                title: "Validated backups",
+                message: "Create and verify versioned packages with assets and checksums."
+            ),
+            PaywallFeature(
+                id: "themes",
+                systemImage: "paintpalette",
+                title: "Pro themes",
+                message: "Try the existing reusable theme preview and entitlement flow."
+            ),
+        ],
+        preferredProductID: purchases.preferredProductID,
+        purchaseButtonTitle: "Unlock Demo Pro",
+        privacyURL: URL(string: "https://example.com/privacy"),
+        termsURL: URL(string: "https://example.com/terms"),
+        tint: theme.primary
+    )
+
+    static let legacyPaywall = FoundationPaywallConfiguration(
+        title: "Make every app premium",
+        subtitle: "Legacy gradient paywall retained for migration testing.",
         features: [
             FoundationPaywallFeature(
                 id: "storekit",
@@ -84,21 +137,15 @@ enum DemoConfiguration {
                 title: "Automatic refresh",
                 message: "Refreshes at launch, after transactions, restores, and app activation."
             ),
-            FoundationPaywallFeature(
-                id: "customizable",
-                systemImage: "paintpalette.fill",
-                title: "Fully brandable",
-                message: "Change colors, benefits, legal links, and product ordering per app."
-            ),
         ],
         purchaseButtonTitle: "Unlock Demo Pro",
-        highlightedProductID: "com.hoangbkit.appfoundationdemo.pro.yearly",
+        highlightedProductID: purchases.preferredProductID,
         theme: theme
     )
 
-    static let claudePaywall = FoundationPaywallConfiguration(
+    static let legacyClaudePaywall = FoundationPaywallConfiguration(
         title: "Get more Demo",
-        subtitle: "Choose the plan that's right for you",
+        subtitle: "Legacy compact layout retained for comparison",
         features: [
             FoundationPaywallFeature(
                 id: "pro-features",
@@ -112,26 +159,18 @@ enum DemoConfiguration {
                 title: "Updates",
                 message: "Priority access to new updates"
             ),
-            FoundationPaywallFeature(
-                id: "limits",
-                systemImage: "checkmark",
-                title: "Limits",
-                message: "Remove usage limits"
-            ),
         ],
         purchaseButtonTitle: "Get Pro plan",
         privacyURL: URL(string: "https://example.com/privacy"),
-        termsURL: URL(string: "https://example.com/terms"),
-        theme: FoundationTheme(
-            primary: .black,
-            secondary: .black
-        )
+        termsURL: URL(string: "https://example.com/terms")
     )
 
     static let settings = FoundationSettingsConfiguration(
         appName: "Demo",
         supportURL: URL(string: "https://github.com/hoangbkit"),
-        shareURL: URL(string: "https://github.com/hoangbkit"),
+        privacyURL: URL(string: "https://example.com/privacy"),
+        termsURL: URL(string: "https://example.com/terms"),
+        shareURL: URL(string: "https://github.com/hoangbkit/AppFoundation"),
         theme: theme
     )
 }

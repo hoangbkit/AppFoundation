@@ -72,8 +72,6 @@ public struct FoundationPaywallConfiguration {
     }
 
     /// Creates a paywall with the older fixed `FoundationTheme` treatment.
-    ///
-    /// Existing calls that pass `theme:` keep their previous visual override.
     public init(
         badge: String = "UNLOCK EVERYTHING",
         title: String,
@@ -101,7 +99,7 @@ public struct FoundationPaywallConfiguration {
     }
 }
 
-/// The original gradient paywall, now theme-aware by default.
+/// The original gradient paywall, supporting all configured recurring and lifetime plans.
 public struct FoundationPaywallView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appFoundationTheme) private var environmentTheme
@@ -142,17 +140,13 @@ public struct FoundationPaywallView: View {
             .foregroundStyle(theme.primaryForeground)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        dismiss()
-                    } label: {
+                    Button { dismiss() } label: {
                         Image(systemName: "xmark")
                             .font(.subheadline.weight(.bold))
                             .foregroundStyle(theme.primaryForeground)
                             .frame(width: 34, height: 34)
                             .background(theme.elevatedSurface.opacity(0.94), in: Circle())
-                            .overlay {
-                                Circle().strokeBorder(theme.border)
-                            }
+                            .overlay { Circle().strokeBorder(theme.border) }
                     }
                     .accessibilityLabel("Close")
                 }
@@ -168,16 +162,12 @@ public struct FoundationPaywallView: View {
                 selectDefaultProductIfNeeded()
             }
             .alert("Purchase", isPresented: purchaseErrorBinding) {
-                Button("OK", role: .cancel) {
-                    purchases.clearActivity()
-                }
+                Button("OK", role: .cancel) { purchases.clearActivity() }
             } message: {
                 Text(purchaseFailure?.message ?? PurchaseFailure.unknown.message)
             }
             .alert("Restore Purchases", isPresented: restoreAlertBinding) {
-                Button("OK", role: .cancel) {
-                    restoreMessage = nil
-                }
+                Button("OK", role: .cancel) { restoreMessage = nil }
             } message: {
                 Text(restoreMessage ?? "")
             }
@@ -271,9 +261,7 @@ public struct FoundationPaywallView: View {
                         .foregroundStyle(theme.secondaryForeground)
                         .multilineTextAlignment(.center)
                     Button("Try Again") {
-                        Task {
-                            await purchases.loadProducts(force: true)
-                        }
+                        Task { await purchases.loadProducts(force: true) }
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(theme.accent)
@@ -322,8 +310,13 @@ public struct FoundationPaywallView: View {
                         }
                     }
 
-                    if let period = product.subscriptionPeriod {
-                        Text("Billed every \(period.shortLabel)")
+                    HStack(spacing: 6) {
+                        Text(product.planLabel)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(theme.accent)
+                        Text("•")
+                            .foregroundStyle(theme.secondaryForeground)
+                        Text(product.billingDescription)
                             .font(.caption)
                             .foregroundStyle(theme.secondaryForeground)
                     }
@@ -355,20 +348,15 @@ public struct FoundationPaywallView: View {
 
     private var purchaseButton: some View {
         Button {
-            guard let selectedProduct else {
-                return
-            }
+            guard let selectedProduct else { return }
             Task {
                 await purchases.purchase(selectedProduct)
-                if purchases.isEntitled {
-                    dismiss()
-                }
+                if purchases.isEntitled { dismiss() }
             }
         } label: {
             HStack(spacing: 10) {
                 if purchases.isBusy {
-                    ProgressView()
-                        .tint(.white)
+                    ProgressView().tint(.white)
                 }
                 Text(buttonTitle)
                 Image(systemName: "arrow.right")
@@ -381,23 +369,10 @@ public struct FoundationPaywallView: View {
 
     private var legalFooter: some View {
         VStack(spacing: 14) {
-            Button("Restore Purchases") {
-                Task {
-                    let outcome = await purchases.restorePurchases()
-                    switch outcome {
-                    case .restored:
-                        restoreMessage = "Your purchases have been restored."
-                    case .nothingToRestore:
-                        restoreMessage = "No previous purchases were found."
-                    case .failed(let failure):
-                        restoreMessage = failure.message
-                        purchases.clearActivity()
-                    }
-                }
-            }
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(theme.accent)
-            .disabled(purchases.isBusy)
+            Button("Restore Purchases") { restore() }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(theme.accent)
+                .disabled(purchases.isBusy)
 
             HStack(spacing: 18) {
                 if let privacyURL = configuration.privacyURL {
@@ -410,7 +385,7 @@ public struct FoundationPaywallView: View {
             .font(.caption)
             .foregroundStyle(theme.accent)
 
-            Text("Payment is charged to your Apple ID. Subscriptions renew automatically unless cancelled in App Store settings.")
+            Text(PurchasePlanDisclosure.text(for: purchases.products))
                 .font(.caption2)
                 .foregroundStyle(theme.secondaryForeground)
                 .multilineTextAlignment(.center)
@@ -426,17 +401,11 @@ public struct FoundationPaywallView: View {
             .padding(20)
             .background(
                 theme.surface,
-                in: RoundedRectangle(
-                    cornerRadius: theme.cardCornerRadius,
-                    style: .continuous
-                )
+                in: RoundedRectangle(cornerRadius: theme.cardCornerRadius, style: .continuous)
             )
             .overlay {
-                RoundedRectangle(
-                    cornerRadius: theme.cardCornerRadius,
-                    style: .continuous
-                )
-                .strokeBorder(theme.border)
+                RoundedRectangle(cornerRadius: theme.cardCornerRadius, style: .continuous)
+                    .strokeBorder(theme.border)
             }
             .shadow(color: theme.shadow, radius: 18, y: 10)
     }
@@ -462,32 +431,36 @@ public struct FoundationPaywallView: View {
         return configuration.purchaseButtonTitle
     }
 
-    private var purchaseFailure: PurchaseFailure? {
-        if case .failed(let failure) = purchases.activity {
-            return failure
+    private func restore() {
+        Task {
+            switch await purchases.restorePurchases() {
+            case .restored:
+                restoreMessage = "Your purchases have been restored."
+            case .nothingToRestore:
+                restoreMessage = "No previous purchases were found."
+            case .failed(let failure):
+                restoreMessage = failure.message
+                purchases.clearActivity()
+            }
         }
+    }
+
+    private var purchaseFailure: PurchaseFailure? {
+        if case .failed(let failure) = purchases.activity { return failure }
         return nil
     }
 
     private var purchaseErrorBinding: Binding<Bool> {
         Binding(
             get: { purchaseFailure != nil },
-            set: { isPresented in
-                if !isPresented {
-                    purchases.clearActivity()
-                }
-            }
+            set: { if !$0 { purchases.clearActivity() } }
         )
     }
 
     private var restoreAlertBinding: Binding<Bool> {
         Binding(
             get: { restoreMessage != nil },
-            set: { isPresented in
-                if !isPresented {
-                    restoreMessage = nil
-                }
-            }
+            set: { if !$0 { restoreMessage = nil } }
         )
     }
 

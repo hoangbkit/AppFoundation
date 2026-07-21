@@ -8,17 +8,18 @@
 - Added the simple `hasPro` entitlement property.
 - Added `PremiumFeature`, `PremiumAccessPolicy`, and safe post-expiry access decisions for existing user content.
 - Added the primary compact `PaywallView` and neutral paywall configuration API.
-- Added premium gates, badges, locked overlays, and a composable subscription settings section.
+- Added premium gates, badges, premium buttons, locked overlays, and a composable subscription settings section.
 - Preserved live StoreKit verification, transaction observation, restore behavior, and Debug-only simulation.
 
 ### Shared infrastructure
 
-- Added ExportKit safe filenames, atomic temporary files, PNG/JPEG definitions, and exact-size SwiftUI image rendering.
-- Added versioned folder-based backup packages with manifests, checksums, assets, validation, and path-traversal protection.
+- Added ExportKit safe filenames and extensions, atomic temporary files, PNG/JPEG definitions, pixel-count preflight, rounded exact-size SwiftUI rendering, and a reusable share sheet.
+- Added versioned folder-based backup packages with manifests, metadata, checksums, optional assets, security-scoped URL access, duplicate and missing-asset detection, and path-traversal protection.
 - Added typed App Group snapshots, shared deep links, and widget reload throttling.
 - Added local notification authorization, scheduling, replacement, and cancellation helpers.
 - Added `UserFacingError`, `AppInfo`, safe file replacement, async debouncing, review policy, logging, haptics, and `AsyncButton`.
-- Added portable tests covering access policy, export filenames, backup round trips, unsafe paths, review policy, and deep links.
+- Added portable tests covering access policy, export filenames and render preflight, backup round trips and unsafe paths, review policy, and deep links.
+- Added a Swift 6.2 GitHub Actions workflow for package manifest and test validation.
 
 ### Existing theme and simulation work
 

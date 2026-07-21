@@ -9,8 +9,7 @@ struct AppRootView: View {
             HomeView()
         } else {
             FoundationOnboardingView(
-                pages: DemoConfiguration.onboardingPages,
-                theme: DemoConfiguration.theme
+                pages: DemoConfiguration.onboardingPages
             ) {
                 hasCompletedOnboarding = true
             }

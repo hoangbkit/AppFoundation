@@ -27,6 +27,17 @@ final class DemoTests: XCTestCase {
         XCTAssertFalse(DemoConfiguration.modernPaywall.features.isEmpty)
     }
 
+    func testAllPaywallsFollowActiveThemeByDefault() {
+        XCTAssertNil(DemoConfiguration.modernPaywall.tint)
+        XCTAssertNil(DemoConfiguration.modernPaywall.themeOverride)
+
+        XCTAssertTrue(DemoConfiguration.legacyPaywall.followsActiveTheme)
+        XCTAssertNil(DemoConfiguration.legacyPaywall.themeOverride)
+
+        XCTAssertTrue(DemoConfiguration.legacyClaudePaywall.followsActiveTheme)
+        XCTAssertNil(DemoConfiguration.legacyClaudePaywall.themeOverride)
+    }
+
     func testBackupConfigurationMatchesDemoBundle() {
         XCTAssertEqual(
             DemoConfiguration.backupConfiguration.appIdentifier,

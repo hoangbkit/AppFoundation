@@ -90,52 +90,56 @@ public struct PaywallView: View {
     }
 
     public var body: some View {
-        ZStack {
-            PaywallThemeBackground(tokens: theme)
+        NavigationStack {
+            ZStack {
+                PaywallThemeBackground(tokens: theme)
 
-            ScrollView {
-                VStack(spacing: 24) {
-                    header
-                    planContainer
-                    legalFooter
+                ScrollView {
+                    VStack(spacing: 24) {
+                        header
+                        planContainer
+                        legalFooter
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 28)
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 28)
+                .scrollIndicators(.hidden)
             }
-            .scrollIndicators(.hidden)
+            .foregroundStyle(theme.primaryForeground)
+            .toolbar {
+                if configuration.showsCloseButton {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Close", systemImage: "xmark") {
+                            dismiss()
+                        }
+                        .labelStyle(.iconOnly)
+                        .accessibilityIdentifier("paywall.close")
+                    }
+                }
+            }
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .task {
+                if purchaseManager.products.isEmpty {
+                    await purchaseManager.loadProducts(force: true)
+                }
+                selectDefaultProduct()
+            }
+            .onChange(of: purchaseManager.products) { _, _ in
+                selectDefaultProduct()
+            }
+            .alert("Restore Purchases", isPresented: restoreAlertBinding) {
+                Button("OK", role: .cancel) { restoreMessage = nil }
+            } message: {
+                Text(restoreMessage ?? "")
+            }
+            .alert("Purchase", isPresented: purchaseErrorBinding) {
+                Button("OK", role: .cancel) { purchaseManager.clearActivity() }
+            } message: {
+                Text(purchaseFailure?.message ?? PurchaseFailure.unknown.message)
+            }
         }
-        .foregroundStyle(theme.primaryForeground)
         .tint(theme.accent)
         .preferredColorScheme(theme.preferredColorScheme)
-        .overlay(alignment: .topLeading) {
-            if configuration.showsCloseButton {
-                Button("Close", systemImage: "xmark") { dismiss() }
-                    .labelStyle(.iconOnly)
-                    .foregroundStyle(theme.primaryForeground)
-                    .frame(width: 36, height: 36)
-                    .background(theme.elevatedSurface.opacity(0.94), in: Circle())
-                    .overlay { Circle().strokeBorder(theme.border) }
-                    .padding(12)
-                    .accessibilityIdentifier("paywall.close")
-            }
-        }
-        .task {
-            if purchaseManager.products.isEmpty {
-                await purchaseManager.loadProducts(force: true)
-            }
-            selectDefaultProduct()
-        }
-        .onChange(of: purchaseManager.products) { _, _ in selectDefaultProduct() }
-        .alert("Restore Purchases", isPresented: restoreAlertBinding) {
-            Button("OK", role: .cancel) { restoreMessage = nil }
-        } message: {
-            Text(restoreMessage ?? "")
-        }
-        .alert("Purchase", isPresented: purchaseErrorBinding) {
-            Button("OK", role: .cancel) { purchaseManager.clearActivity() }
-        } message: {
-            Text(purchaseFailure?.message ?? PurchaseFailure.unknown.message)
-        }
     }
 
     private var header: some View {
@@ -148,7 +152,6 @@ public struct PaywallView: View {
                 .foregroundStyle(theme.secondaryForeground)
         }
         .multilineTextAlignment(.center)
-        .padding(.top, configuration.showsCloseButton ? 28 : 0)
     }
 
     private var planContainer: some View {

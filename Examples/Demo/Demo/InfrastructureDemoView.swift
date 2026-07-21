@@ -3,6 +3,7 @@ import SwiftUI
 
 struct InfrastructureDemoView: View {
     @Environment(PurchaseManager.self) private var purchases
+    @Environment(\.appFoundationTheme) private var theme
 
     @State private var isShowingPaywall = false
     @State private var sharePayload: DemoSharePayload?
@@ -14,20 +15,32 @@ struct InfrastructureDemoView: View {
     private let accessPolicy = PremiumAccessPolicy()
 
     var body: some View {
-        List {
-            commerceSection
-            SubscriptionSettingsSection(
-                purchaseManager: purchases,
-                onUpgrade: { isShowingPaywall = true }
-            )
-            exportSection
-            backupSection
-            sharedPlatformSection
-            notificationSection
-            utilitiesSection
+        ZStack {
+            AppThemeBackground(theme: theme)
+
+            List {
+                commerceSection
+
+                SubscriptionSettingsSection(
+                    purchaseManager: purchases,
+                    onUpgrade: { isShowingPaywall = true }
+                )
+                .listRowBackground(theme.surfaceColor)
+
+                exportSection
+                backupSection
+                sharedPlatformSection
+                notificationSection
+                utilitiesSection
+            }
+            .scrollContentBackground(.hidden)
+            .foregroundStyle(theme.primaryForegroundColor)
         }
         .navigationTitle("New APIs")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .tint(theme.accentColor)
+        .animation(.smooth, value: theme.id)
         .sheet(isPresented: $isShowingPaywall) {
             PaywallView(
                 purchaseManager: purchases,
@@ -64,11 +77,18 @@ struct InfrastructureDemoView: View {
 
             PremiumGate(decision: premiumDecision) {
                 Label("Premium editor unlocked", systemImage: "checkmark.seal.fill")
+                    .foregroundStyle(theme.primaryForegroundColor)
                     .frame(maxWidth: .infinity, minHeight: 88)
+                    .background(theme.elevatedSurfaceColor)
             } locked: { feature in
                 LockedFeatureOverlay(feature: feature) {
                     isShowingPaywall = true
                 }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(theme.borderColor)
             }
             .frame(height: 104)
 
@@ -77,19 +97,25 @@ struct InfrastructureDemoView: View {
                 value: existingContentDecision == .allowed ? "Accessible" : "Locked"
             )
         }
+        .listRowBackground(theme.surfaceColor)
     }
 
     private var exportSection: some View {
         Section("ExportKit") {
-            DemoExportArtwork()
+            DemoExportArtwork(theme: theme)
                 .aspectRatio(1200 / 630, contentMode: .fit)
                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(theme.borderColor)
+                }
                 .accessibilityLabel("Preview of the image exported by ExportKit")
 
-            Button("Export rounded PNG", systemImage: "square.and.arrow.up") {
+            Button("Export current theme as rounded PNG", systemImage: "square.and.arrow.up") {
                 exportPreview()
             }
         }
+        .listRowBackground(theme.surfaceColor)
     }
 
     private var backupSection: some View {
@@ -99,6 +125,7 @@ struct InfrastructureDemoView: View {
                 runBackupRoundTrip()
             }
         }
+        .listRowBackground(theme.surfaceColor)
     }
 
     private var sharedPlatformSection: some View {
@@ -114,6 +141,7 @@ struct InfrastructureDemoView: View {
                 runSharedSnapshotRoundTrip()
             }
         }
+        .listRowBackground(theme.surfaceColor)
     }
 
     private var notificationSection: some View {
@@ -129,6 +157,7 @@ struct InfrastructureDemoView: View {
                 }
             }
         }
+        .listRowBackground(theme.surfaceColor)
     }
 
     private var utilitiesSection: some View {
@@ -151,6 +180,7 @@ struct InfrastructureDemoView: View {
                 Label("Run AsyncButton", systemImage: "hourglass")
             }
         }
+        .listRowBackground(theme.surfaceColor)
     }
 
     private var premiumDecision: PremiumAccessDecision {
@@ -175,7 +205,7 @@ struct InfrastructureDemoView: View {
         Task { @MainActor in
             do {
                 let data = try ViewImageExporter.render(
-                    DemoExportArtwork(),
+                    DemoExportArtwork(theme: theme),
                     size: CGSize(width: 1200, height: 630),
                     scale: 1,
                     cornerRadius: 72,
@@ -184,7 +214,7 @@ struct InfrastructureDemoView: View {
                 )
                 let file = try await ExportFileWriter().write(
                     data,
-                    filename: "AppFoundation Demo Export",
+                    filename: "AppFoundation \(theme.title) Demo Export",
                     fileExtension: ExportImageFormat.png.fileExtension
                 )
                 sharePayload = DemoSharePayload(files: [file])
@@ -211,7 +241,7 @@ struct InfrastructureDemoView: View {
                     appVersion: info.version,
                     appBuild: info.build,
                     payload: payload,
-                    metadata: ["source": "Examples/Demo"]
+                    metadata: ["source": "Examples/Demo", "theme": theme.id]
                 )
                 let asset = BackupAsset(
                     relativePath: "notes/readme.txt",
@@ -294,25 +324,32 @@ struct InfrastructureDemoView: View {
 }
 
 private struct DemoExportArtwork: View {
+    let theme: AppTheme
+
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [DemoConfiguration.theme.primary, DemoConfiguration.theme.secondary],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
+            theme.backgroundColor
+            theme.gradient.opacity(0.94)
+
+            RadialGradient(
+                colors: [theme.accentColor.opacity(0.28), .clear],
+                center: .topTrailing,
+                startRadius: 10,
+                endRadius: 620
             )
 
             VStack(alignment: .leading, spacing: 18) {
                 Label("APPFOUNDATION", systemImage: "square.stack.3d.up.fill")
                     .font(.headline)
+                    .foregroundStyle(theme.accentColor)
                 Spacer()
                 Text("Shared infrastructure\nfor every app")
                     .font(.system(size: 54, weight: .bold, design: .rounded))
-                Text("Rendered with ViewImageExporter")
+                    .foregroundStyle(theme.primaryForegroundColor)
+                Text("Rendered with the \(theme.title) theme")
                     .font(.title3)
-                    .opacity(0.82)
+                    .foregroundStyle(theme.secondaryForegroundColor)
             }
-            .foregroundStyle(.white)
             .padding(54)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         }

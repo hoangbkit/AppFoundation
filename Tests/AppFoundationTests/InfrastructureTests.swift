@@ -45,7 +45,8 @@ final class InfrastructureTests: XCTestCase {
             appIdentifier: configuration.appIdentifier,
             appVersion: "1.0",
             appBuild: "1",
-            payload: Payload(name: "Hello", count: 2)
+            payload: Payload(name: "Hello", count: 2),
+            metadata: ["source": "test"]
         )
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -60,6 +61,7 @@ final class InfrastructureTests: XCTestCase {
         let result = try await BackupPackageReader().read(Payload.self, from: url, configuration: configuration)
         XCTAssertEqual(result.payload, envelope.payload)
         XCTAssertEqual(result.assets["images/one.bin"], Data([1, 2, 3]))
+        XCTAssertEqual(result.manifest.metadata["source"], "test")
     }
 
     func testBackupRejectsUnsafeAssetPath() async throws {

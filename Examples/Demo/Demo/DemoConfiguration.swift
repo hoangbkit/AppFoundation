@@ -3,11 +3,6 @@ import SwiftUI
 
 @MainActor
 enum DemoConfiguration {
-    static let theme = FoundationTheme(
-        primary: Color(red: 0.20, green: 0.35, blue: 0.98),
-        secondary: Color(red: 0.82, green: 0.27, blue: 0.87)
-    )
-
     static let purchases = PurchaseConfiguration(
         productIDs: [
             "com.hoangbkit.appfoundationdemo.pro.monthly",
@@ -168,7 +163,6 @@ enum DemoConfiguration {
         supportURL: URL(string: "https://github.com/hoangbkit"),
         privacyURL: URL(string: "https://example.com/privacy"),
         termsURL: URL(string: "https://example.com/terms"),
-        shareURL: URL(string: "https://github.com/hoangbkit/AppFoundation"),
-        theme: theme
+        shareURL: URL(string: "https://github.com/hoangbkit/AppFoundation")
     )
 }

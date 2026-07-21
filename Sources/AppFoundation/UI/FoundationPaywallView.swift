@@ -31,8 +31,20 @@ public struct FoundationPaywallConfiguration {
     public let highlightedProductBadge: String
     public let privacyURL: URL?
     public let termsURL: URL?
+
+    /// Retained for source compatibility with configurations that explicitly
+    /// supplied a `FoundationTheme`.
     public let theme: FoundationTheme
 
+    /// A full `AppTheme` override. When nil, the paywall follows the active
+    /// theme supplied through `.appFoundationTheme(_:)`.
+    public let themeOverride: AppTheme?
+
+    /// True for the theme-aware initializer and false for the legacy
+    /// `FoundationTheme` override initializer.
+    public let followsActiveTheme: Bool
+
+    /// Creates a paywall that follows the active app theme.
     public init(
         badge: String = "UNLOCK EVERYTHING",
         title: String,
@@ -43,7 +55,36 @@ public struct FoundationPaywallConfiguration {
         highlightedProductBadge: String = "BEST VALUE",
         privacyURL: URL? = nil,
         termsURL: URL? = nil,
-        theme: FoundationTheme = .indigo
+        themeOverride: AppTheme? = nil
+    ) {
+        self.badge = badge
+        self.title = title
+        self.subtitle = subtitle
+        self.features = features
+        self.purchaseButtonTitle = purchaseButtonTitle
+        self.highlightedProductID = highlightedProductID
+        self.highlightedProductBadge = highlightedProductBadge
+        self.privacyURL = privacyURL
+        self.termsURL = termsURL
+        self.theme = .indigo
+        self.themeOverride = themeOverride
+        self.followsActiveTheme = true
+    }
+
+    /// Creates a paywall with the older fixed `FoundationTheme` treatment.
+    ///
+    /// Existing calls that pass `theme:` keep their previous visual override.
+    public init(
+        badge: String = "UNLOCK EVERYTHING",
+        title: String,
+        subtitle: String,
+        features: [FoundationPaywallFeature],
+        purchaseButtonTitle: String = "Continue",
+        highlightedProductID: String? = nil,
+        highlightedProductBadge: String = "BEST VALUE",
+        privacyURL: URL? = nil,
+        termsURL: URL? = nil,
+        theme: FoundationTheme
     ) {
         self.badge = badge
         self.title = title
@@ -55,11 +96,15 @@ public struct FoundationPaywallConfiguration {
         self.privacyURL = privacyURL
         self.termsURL = termsURL
         self.theme = theme
+        self.themeOverride = nil
+        self.followsActiveTheme = false
     }
 }
 
+/// The original gradient paywall, now theme-aware by default.
 public struct FoundationPaywallView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appFoundationTheme) private var environmentTheme
 
     private let purchases: PurchaseController
     private let configuration: FoundationPaywallConfiguration
@@ -78,7 +123,7 @@ public struct FoundationPaywallView: View {
     public var body: some View {
         NavigationStack {
             ZStack {
-                FoundationBackground(theme: configuration.theme)
+                PaywallThemeBackground(tokens: theme)
 
                 ScrollView {
                     VStack(spacing: 24) {
@@ -94,6 +139,7 @@ public struct FoundationPaywallView: View {
                 }
                 .scrollIndicators(.hidden)
             }
+            .foregroundStyle(theme.primaryForeground)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -101,8 +147,12 @@ public struct FoundationPaywallView: View {
                     } label: {
                         Image(systemName: "xmark")
                             .font(.subheadline.weight(.bold))
+                            .foregroundStyle(theme.primaryForeground)
                             .frame(width: 34, height: 34)
-                            .background(.thinMaterial, in: Circle())
+                            .background(theme.elevatedSurface.opacity(0.94), in: Circle())
+                            .overlay {
+                                Circle().strokeBorder(theme.border)
+                            }
                     }
                     .accessibilityLabel("Close")
                 }
@@ -132,34 +182,37 @@ public struct FoundationPaywallView: View {
                 Text(restoreMessage ?? "")
             }
         }
+        .tint(theme.accent)
+        .preferredColorScheme(theme.preferredColorScheme)
     }
 
     private var hero: some View {
         VStack(spacing: 16) {
             ZStack {
                 Circle()
-                    .fill(configuration.theme.primary.opacity(0.16))
+                    .fill(theme.accent.opacity(0.16))
                     .frame(width: 132, height: 132)
 
                 Image(systemName: "crown.fill")
                     .font(.system(size: 56, weight: .semibold))
                     .symbolRenderingMode(.palette)
-                    .foregroundStyle(configuration.theme.primary, configuration.theme.secondary)
+                    .foregroundStyle(theme.accent, theme.secondaryAccent)
             }
 
             FoundationPill(
                 configuration.badge,
                 systemImage: "sparkles",
-                tint: configuration.theme.primary
+                tint: theme.accent
             )
 
             Text(configuration.title)
                 .font(.system(size: 38, weight: .bold, design: .rounded))
+                .foregroundStyle(theme.primaryForeground)
                 .multilineTextAlignment(.center)
 
             Text(configuration.subtitle)
                 .font(.body)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.secondaryForeground)
                 .multilineTextAlignment(.center)
                 .lineSpacing(4)
                 .padding(.horizontal, 8)
@@ -167,22 +220,26 @@ public struct FoundationPaywallView: View {
     }
 
     private var features: some View {
-        FoundationCard(theme: configuration.theme) {
+        themedCard {
             VStack(spacing: 18) {
                 ForEach(configuration.features) { feature in
                     HStack(spacing: 14) {
                         Image(systemName: feature.systemImage)
                             .font(.title3.weight(.semibold))
-                            .foregroundStyle(configuration.theme.primary)
+                            .foregroundStyle(theme.accent)
                             .frame(width: 42, height: 42)
-                            .background(configuration.theme.primary.opacity(0.11), in: RoundedRectangle(cornerRadius: 13))
+                            .background(
+                                theme.accent.opacity(0.11),
+                                in: RoundedRectangle(cornerRadius: 13, style: .continuous)
+                            )
 
                         VStack(alignment: .leading, spacing: 3) {
                             Text(feature.title)
                                 .font(.headline)
+                                .foregroundStyle(theme.primaryForeground)
                             Text(feature.message)
                                 .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(theme.secondaryForeground)
                         }
 
                         Spacer(minLength: 0)
@@ -196,22 +253,22 @@ public struct FoundationPaywallView: View {
     private var products: some View {
         switch purchases.productLoadingState {
         case .idle, .loading:
-            FoundationCard(theme: configuration.theme) {
+            themedCard {
                 HStack(spacing: 12) {
                     ProgressView()
                     Text("Loading purchase options…")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.secondaryForeground)
                     Spacer()
                 }
             }
         case .failed(let failure):
-            FoundationCard(theme: configuration.theme) {
+            themedCard {
                 VStack(spacing: 14) {
                     Label("Unable to load plans", systemImage: "wifi.exclamationmark")
                         .font(.headline)
                     Text(failure.message)
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.secondaryForeground)
                         .multilineTextAlignment(.center)
                     Button("Try Again") {
                         Task {
@@ -219,7 +276,7 @@ public struct FoundationPaywallView: View {
                         }
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(configuration.theme.primary)
+                    .tint(theme.accent)
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -235,6 +292,7 @@ public struct FoundationPaywallView: View {
     private func productRow(_ product: StoreProduct) -> some View {
         let isSelected = selectedProductID == product.id
         let isHighlighted = configuration.highlightedProductID == product.id
+        let rowRadius = min(theme.cardCornerRadius, 20)
 
         return Button {
             withAnimation(.snappy) {
@@ -244,28 +302,30 @@ public struct FoundationPaywallView: View {
             HStack(spacing: 14) {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.title2)
-                    .foregroundStyle(isSelected ? configuration.theme.primary : Color.secondary.opacity(0.45))
+                    .foregroundStyle(
+                        isSelected ? theme.accent : theme.secondaryForeground.opacity(0.55)
+                    )
 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 8) {
                         Text(product.displayName)
                             .font(.headline)
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(theme.primaryForeground)
 
                         if isHighlighted {
                             Text(configuration.highlightedProductBadge)
                                 .font(.caption2.bold())
-                                .foregroundStyle(configuration.theme.primary)
+                                .foregroundStyle(theme.accent)
                                 .padding(.horizontal, 7)
                                 .padding(.vertical, 4)
-                                .background(configuration.theme.primary.opacity(0.12), in: Capsule())
+                                .background(theme.accent.opacity(0.12), in: Capsule())
                         }
                     }
 
                     if let period = product.subscriptionPeriod {
                         Text("Billed every \(period.shortLabel)")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(theme.secondaryForeground)
                     }
                 }
 
@@ -273,17 +333,21 @@ public struct FoundationPaywallView: View {
 
                 Text(product.displayPrice)
                     .font(.title3.bold())
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(theme.primaryForeground)
             }
             .padding(18)
             .background(
-                isSelected ? configuration.theme.primary.opacity(0.10) : Color(uiColor: .secondarySystemBackground),
-                in: RoundedRectangle(cornerRadius: 20)
+                isSelected ? theme.accent.opacity(0.12) : theme.surface,
+                in: RoundedRectangle(cornerRadius: rowRadius, style: .continuous)
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(isSelected ? configuration.theme.primary : Color.clear, lineWidth: 2)
+                RoundedRectangle(cornerRadius: rowRadius, style: .continuous)
+                    .strokeBorder(
+                        isSelected ? theme.accent : theme.border,
+                        lineWidth: isSelected ? 2 : 1
+                    )
             }
+            .shadow(color: theme.shadow.opacity(0.55), radius: 10, y: 5)
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
@@ -310,7 +374,7 @@ public struct FoundationPaywallView: View {
                 Image(systemName: "arrow.right")
             }
         }
-        .buttonStyle(FoundationPrimaryButtonStyle(theme: configuration.theme))
+        .buttonStyle(FoundationPrimaryButtonStyle(theme: theme.foundationTheme))
         .disabled(selectedProduct == nil || purchases.isBusy)
         .opacity(selectedProduct == nil ? 0.55 : 1)
     }
@@ -332,6 +396,7 @@ public struct FoundationPaywallView: View {
                 }
             }
             .font(.subheadline.weight(.semibold))
+            .foregroundStyle(theme.accent)
             .disabled(purchases.isBusy)
 
             HStack(spacing: 18) {
@@ -343,15 +408,44 @@ public struct FoundationPaywallView: View {
                 }
             }
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(theme.accent)
 
             Text("Payment is charged to your Apple ID. Subscriptions renew automatically unless cancelled in App Store settings.")
                 .font(.caption2)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(theme.secondaryForeground)
                 .multilineTextAlignment(.center)
                 .lineSpacing(2)
         }
         .padding(.horizontal, 10)
+    }
+
+    private func themedCard<Content: View>(
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        content()
+            .padding(20)
+            .background(
+                theme.surface,
+                in: RoundedRectangle(
+                    cornerRadius: theme.cardCornerRadius,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: theme.cardCornerRadius,
+                    style: .continuous
+                )
+                .strokeBorder(theme.border)
+            }
+            .shadow(color: theme.shadow, radius: 18, y: 10)
+    }
+
+    private var theme: PaywallThemeTokens {
+        PaywallThemeTokens(
+            appTheme: configuration.themeOverride ?? environmentTheme,
+            foundationOverride: configuration.followsActiveTheme ? nil : configuration.theme
+        )
     }
 
     private var selectedProduct: StoreProduct? {
@@ -398,7 +492,9 @@ public struct FoundationPaywallView: View {
     }
 
     private func selectDefaultProductIfNeeded() {
-        guard selectedProductID == nil || purchases.product(withID: selectedProductID ?? "") == nil else {
+        guard selectedProductID == nil
+            || purchases.product(withID: selectedProductID ?? "") == nil
+        else {
             return
         }
         selectedProductID = purchases.preferredProduct?.id

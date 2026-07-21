@@ -72,6 +72,54 @@ public struct BackupPackageManifest: Codable, Sendable, Equatable {
     public let createdAt: Date
     public let payloadChecksum: String
     public let assetPaths: [String]
+    public let metadata: [String: String]
+
+    public init(
+        format: String,
+        version: Int,
+        appIdentifier: String,
+        appVersion: String,
+        appBuild: String,
+        createdAt: Date,
+        payloadChecksum: String,
+        assetPaths: [String],
+        metadata: [String: String] = [:]
+    ) {
+        self.format = format
+        self.version = version
+        self.appIdentifier = appIdentifier
+        self.appVersion = appVersion
+        self.appBuild = appBuild
+        self.createdAt = createdAt
+        self.payloadChecksum = payloadChecksum
+        self.assetPaths = assetPaths
+        self.metadata = metadata
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case format
+        case version
+        case appIdentifier
+        case appVersion
+        case appBuild
+        case createdAt
+        case payloadChecksum
+        case assetPaths
+        case metadata
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        format = try container.decode(String.self, forKey: .format)
+        version = try container.decode(Int.self, forKey: .version)
+        appIdentifier = try container.decode(String.self, forKey: .appIdentifier)
+        appVersion = try container.decode(String.self, forKey: .appVersion)
+        appBuild = try container.decode(String.self, forKey: .appBuild)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        payloadChecksum = try container.decode(String.self, forKey: .payloadChecksum)
+        assetPaths = try container.decode([String].self, forKey: .assetPaths)
+        metadata = try container.decodeIfPresent([String: String].self, forKey: .metadata) ?? [:]
+    }
 }
 
 public struct BackupReadResult<Payload: Sendable>: Sendable {
@@ -82,6 +130,7 @@ public struct BackupReadResult<Payload: Sendable>: Sendable {
 
 public enum BackupError: Error, Sendable, Equatable {
     case invalidFormat
+    case invalidFileExtension
     case unsupportedVersion(Int)
     case wrongApplication(String)
     case missingManifest
@@ -89,6 +138,7 @@ public enum BackupError: Error, Sendable, Equatable {
     case corruptPayload
     case checksumMismatch
     case unsafeAssetPath(String)
+    case missingAsset(String)
     case fileOperationFailed(String)
 }
 
@@ -129,18 +179,25 @@ public actor BackupPackageWriter {
         guard envelope.appIdentifier == configuration.appIdentifier else {
             throw BackupError.wrongApplication(envelope.appIdentifier)
         }
+        guard let safeExtension = ExportFilename.sanitizedExtension(configuration.fileExtension) else {
+            throw BackupError.invalidFileExtension
+        }
 
-        for asset in assets where !Self.isSafe(relativePath: asset.relativePath) {
+        for asset in assets where !BackupPathValidator.isSafe(asset.relativePath) {
             throw BackupError.unsafeAssetPath(asset.relativePath)
+        }
+        guard Set(assets.map(\.relativePath)).count == assets.count else {
+            throw BackupError.fileOperationFailed("Backup asset paths must be unique.")
         }
 
         let safeName = ExportFilename.sanitized(filename, fallback: "Backup")
         let staging = destinationDirectory.appendingPathComponent(".backup-\(UUID().uuidString)", isDirectory: true)
         let finalURL = destinationDirectory
             .appendingPathComponent("\(safeName)-\(UUID().uuidString)", isDirectory: true)
-            .appendingPathExtension(configuration.fileExtension)
+            .appendingPathExtension(safeExtension)
 
         do {
+            try fileManager.createDirectory(at: destinationDirectory, withIntermediateDirectories: true)
             try fileManager.createDirectory(at: staging, withIntermediateDirectories: true)
             let payloadData = try encoder.encode(envelope.payload)
             try payloadData.write(to: staging.appendingPathComponent("payload.json"), options: .atomic)
@@ -163,7 +220,8 @@ public actor BackupPackageWriter {
                 appBuild: envelope.appBuild,
                 createdAt: envelope.createdAt,
                 payloadChecksum: BackupChecksum.value(for: payloadData),
-                assetPaths: assets.map(\.relativePath).sorted()
+                assetPaths: assets.map(\.relativePath).sorted(),
+                metadata: envelope.metadata
             )
             try encoder.encode(manifest).write(
                 to: staging.appendingPathComponent("manifest.json"),
@@ -178,11 +236,6 @@ public actor BackupPackageWriter {
             try? fileManager.removeItem(at: staging)
             throw BackupError.fileOperationFailed(error.localizedDescription)
         }
-    }
-
-    private static func isSafe(relativePath: String) -> Bool {
-        guard !relativePath.isEmpty, !relativePath.hasPrefix("/"), !relativePath.contains("\\") else { return false }
-        return !relativePath.split(separator: "/").contains("..")
     }
 }
 
@@ -228,6 +281,7 @@ public actor BackupPackageReader {
             for path in manifest.assetPaths {
                 guard BackupPathValidator.isSafe(path) else { throw BackupError.unsafeAssetPath(path) }
                 let url = packageURL.appendingPathComponent("assets").appendingPathComponent(path)
+                guard fileManager.fileExists(atPath: url.path) else { throw BackupError.missingAsset(path) }
                 assets[path] = try Data(contentsOf: url)
             }
             return BackupReadResult(manifest: manifest, payload: payload, assets: assets)
@@ -242,6 +296,33 @@ public actor BackupPackageReader {
 private enum BackupPathValidator {
     static func isSafe(_ relativePath: String) -> Bool {
         guard !relativePath.isEmpty, !relativePath.hasPrefix("/"), !relativePath.contains("\\") else { return false }
-        return !relativePath.split(separator: "/").contains("..")
+        let components = relativePath.split(separator: "/", omittingEmptySubsequences: false)
+        return !components.contains(where: { $0.isEmpty || $0 == "." || $0 == ".." })
     }
 }
+
+#if os(iOS) || os(macOS) || os(tvOS) || os(visionOS)
+public enum SecurityScopedURLAccess {
+    public static func withAccess<Result>(
+        to url: URL,
+        operation: (URL) throws -> Result
+    ) rethrows -> Result {
+        let started = url.startAccessingSecurityScopedResource()
+        defer {
+            if started { url.stopAccessingSecurityScopedResource() }
+        }
+        return try operation(url)
+    }
+
+    public static func withAccess<Result: Sendable>(
+        to url: URL,
+        operation: (URL) async throws -> Result
+    ) async rethrows -> Result {
+        let started = url.startAccessingSecurityScopedResource()
+        defer {
+            if started { url.stopAccessingSecurityScopedResource() }
+        }
+        return try await operation(url)
+    }
+}
+#endif

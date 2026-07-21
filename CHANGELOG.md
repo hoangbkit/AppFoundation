@@ -14,6 +14,7 @@
 - Added weekly, monthly, yearly, and lifetime plan presentation across all paywall styles.
 - Added `PurchasePlanKind`, plan labels, billing descriptions, recurring/lifetime helpers, and catalog-aware legal disclosure.
 - Updated paywall layouts to show the complete configured product catalog and use one column at accessibility text sizes.
+- Replaced custom floating and styled paywall close controls with native navigation toolbar cancellation buttons.
 - Preserved live StoreKit verification, transaction observation, restore behavior, non-consumable lifetime entitlements, and Debug-only simulation.
 
 ### Shared infrastructure
@@ -34,6 +35,8 @@
 - Made the complete Demo theme-aware: first-launch onboarding, Home, package browser, paywall picker, settings, navigation chrome, list rows, cards, statuses, and exported preview artwork now follow `ThemeManager.effectiveTheme`.
 - Made reusable onboarding and settings views follow the active app theme by default while preserving explicit fixed `FoundationTheme` initializers.
 - Added weekly, monthly, yearly, and non-consumable lifetime products to both the in-process simulator and the Demo StoreKit configuration.
+- Standardized the settings sheet and all Demo paywall presentations on native toolbar close buttons.
+- Changed only the Demo app's installed display name to `AF`; target, scheme, module, and bundle identifiers remain unchanged.
 - Added Demo configuration tests for all four plans, the modern paywall, theme-aware settings, backup package, and stable deep link.
 
 ### Existing theme and simulation work

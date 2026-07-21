@@ -367,7 +367,7 @@ private struct PaywallStylePickerView: View {
                 Section("Recommended") {
                     styleButton(
                         title: "PaywallView",
-                        subtitle: "Current neutral, theme-aware monthly/yearly paywall.",
+                        subtitle: "Current theme-aware weekly, monthly, yearly, and lifetime paywall.",
                         systemImage: "rectangle.split.2x1",
                         style: .current
                     )

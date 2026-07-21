@@ -2,17 +2,35 @@
 
 ## Unreleased
 
+### Commerce
+
+- Added `PurchaseManager` as the preferred source-compatible name for `PurchaseController`.
+- Added the simple `hasPro` entitlement property.
+- Added `PremiumFeature`, `PremiumAccessPolicy`, and safe post-expiry access decisions for existing user content.
+- Added the primary compact `PaywallView` and neutral paywall configuration API.
+- Added premium gates, badges, locked overlays, and a composable subscription settings section.
+- Preserved live StoreKit verification, transaction observation, restore behavior, and Debug-only simulation.
+
+### Shared infrastructure
+
+- Added ExportKit safe filenames, atomic temporary files, PNG/JPEG definitions, and exact-size SwiftUI image rendering.
+- Added versioned folder-based backup packages with manifests, checksums, assets, validation, and path-traversal protection.
+- Added typed App Group snapshots, shared deep links, and widget reload throttling.
+- Added local notification authorization, scheduling, replacement, and cancellation helpers.
+- Added `UserFacingError`, `AppInfo`, safe file replacement, async debouncing, review policy, logging, haptics, and `AsyncButton`.
+- Added portable tests covering access policy, export filenames, backup round trips, unsafe paths, review policy, and deep links.
+
+### Existing theme and simulation work
+
 - Added a reusable monetized theme system modeled on MiLove's production behavior.
 - Added Rose, Sunset, Lavender, Midnight, Paper, and Champagne default themes.
 - Added immutable theme catalogs that support excluding, replacing, reordering, and appending themes.
-- Added persisted selected-theme state, free fallback resolution, and app-group-compatible widget state.
+- Added persisted selected-theme state, free fallback resolution, and App Group-compatible widget state.
 - Added five-minute Pro theme previews, shared preview expiry when switching themes, promotion on unlock, and selected Pro theme preservation after entitlement loss.
 - Added a customizable SwiftUI theme picker, environment integration, themed background/card primitives, and bridges to existing `FoundationTheme` components.
 - Added optional alternate app-icon application support.
-- Added portable catalog/resolver tests and iOS theme-manager tests.
 - Added a Debug-only in-process purchase simulator for CLI-deployed prototypes.
 - Added `PurchaseController` simulation configuration with `simulated: Bool = false` and runtime switching through `setSimulatedPurchasesEnabled(_:)`.
-- Updated the Demo for explicit `mycli --billing simulated` opt-in while preserving local `.storekit` testing in Xcode's Run action.
 
 ## 1.0.0 - 2026-07-16
 

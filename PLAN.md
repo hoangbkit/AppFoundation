@@ -1,5 +1,11 @@
 # AppFoundation Development Plan
 
+## Implementation status
+
+All five phases in this plan were implemented on `develop` on July 21, 2026. The branch includes the public APIs, portable tests, adoption documentation, changelog entries, and continuous Swift package validation described below.
+
+Apple-platform-only UI, StoreKit, WidgetKit, and UserNotifications code still requires the normal Xcode 26 build and simulator/device validation before a tagged release.
+
 ## Purpose
 
 AppFoundation is the shared production infrastructure for Hoang's iOS apps. It should remove repeated engineering work without forcing MiLove, Milesto, ShotVault, Altself, AppReel, MyApps, Onlink, Spokio, or future apps to share the same product design, navigation, or domain models.
@@ -46,7 +52,7 @@ Make purchases the strongest and simplest public capability.
 - Preserve live StoreKit verification, transaction updates, product retry, restore, and Debug-only simulation.
 - Add `PremiumFeature`, `PremiumAccessPolicy`, and access decisions that keep existing user content accessible after expiry.
 - Add the primary compact `PaywallView` for monthly/yearly subscriptions.
-- Add reusable `PremiumGate`, `PremiumBadge`, `LockedFeatureOverlay`, and `SubscriptionSettingsSection` components.
+- Add reusable `PremiumGate`, `PremiumBadge`, `PremiumButton`, `LockedFeatureOverlay`, and `SubscriptionSettingsSection` components.
 - Keep localized prices and product ordering app-configured.
 - Keep app names, legal URLs, feature copy, and tint app-owned.
 
@@ -64,13 +70,15 @@ Centralize reliable image/data export used by MiLove, Altself, AppReel, ShotVaul
 
 ## Deliverables
 
-- Safe filename normalization
+- Safe filename and file-extension normalization
 - Atomic temporary-file creation and cleanup
 - PNG and JPEG output definitions
 - SwiftUI view-to-image rendering at exact dimensions and scale
-- Transparent PNG and JPEG quality support
+- Transparent PNG, rounded output, and JPEG quality support
+- Pixel-count preflight to avoid excessive render allocations
 - Predictable suggested filenames
-- Neutral errors for rendering, encoding, and file writes
+- Reusable file share sheet
+- Neutral errors for rendering, encoding, validation, and file writes
 
 App-specific artwork and layout remain in each app.
 
@@ -85,12 +93,13 @@ Provide versioned, validated backup packages while keeping every app responsible
 ## Deliverables
 
 - Generic `BackupEnvelope<Payload>`
-- Manifest with format, version, app identifier, app version/build, creation date, checksum, and asset paths
+- Manifest with format, version, app identifier, app version/build, creation date, checksum, metadata, and asset paths
 - Folder-based custom backup packages with payload and optional assets
 - Atomic staging and move into the final package
 - Checksum validation and corrupt-payload rejection
 - Unsupported-version and cross-app rejection
-- Path traversal protection for imported assets
+- Extension, duplicate-path, missing-asset, and path-traversal validation
+- Security-scoped URL helpers for Files imports
 - Generic reader and writer actors
 
 Each app still owns its custom extension, migrations, duplicate handling, replace/merge behavior, and restore confirmation UI.
@@ -135,7 +144,7 @@ Finish the package with small production utilities and clear adoption guidance.
 - Structured logging helper
 - Haptic helper
 - Reusable `AsyncButton`
-- Portable tests covering access policy, export filenames, backup round trips, deep links, and review policy
+- Portable tests covering access policy, export filenames and preflight, backup round trips and validation, deep links, and review policy
 - README integration examples and migration guidance
 - Changelog updates
 - GitHub Actions Swift package validation

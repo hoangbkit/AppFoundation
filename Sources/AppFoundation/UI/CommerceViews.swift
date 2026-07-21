@@ -28,6 +28,7 @@ public struct PaywallConfiguration {
     public var termsURL: URL?
     public var showsCloseButton: Bool
     public var tint: Color?
+    public var themeOverride: AppTheme?
     public var planDetail: (PurchaseProduct) -> String?
 
     public init(
@@ -42,6 +43,7 @@ public struct PaywallConfiguration {
         termsURL: URL? = nil,
         showsCloseButton: Bool = true,
         tint: Color? = nil,
+        themeOverride: AppTheme? = nil,
         planDetail: @escaping (PurchaseProduct) -> String? = { _ in nil }
     ) {
         self.title = title
@@ -55,14 +57,20 @@ public struct PaywallConfiguration {
         self.termsURL = termsURL
         self.showsCloseButton = showsCloseButton
         self.tint = tint
+        self.themeOverride = themeOverride
         self.planDetail = planDetail
     }
 }
 
 /// The primary compact monthly/yearly paywall provided by AppFoundation.
+///
+/// The view follows the active theme installed with `.appFoundationTheme(_:)`.
+/// Set `PaywallConfiguration.themeOverride` for an isolated full-theme override,
+/// or `tint` when only the accent should differ.
 public struct PaywallView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
+    @Environment(\.appFoundationTheme) private var environmentTheme
 
     private let purchaseManager: PurchaseManager
     private let configuration: PaywallConfiguration
@@ -76,23 +84,33 @@ public struct PaywallView: View {
     }
 
     public var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                header
-                planContainer
-                legalFooter
+        ZStack {
+            PaywallThemeBackground(tokens: theme)
+
+            ScrollView {
+                VStack(spacing: 24) {
+                    header
+                    planContainer
+                    legalFooter
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 28)
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 28)
+            .scrollIndicators(.hidden)
         }
-        .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
-        .tint(configuration.tint)
+        .foregroundStyle(theme.primaryForeground)
+        .tint(theme.accent)
+        .preferredColorScheme(theme.preferredColorScheme)
         .overlay(alignment: .topLeading) {
             if configuration.showsCloseButton {
                 Button("Close", systemImage: "xmark") { dismiss() }
                     .labelStyle(.iconOnly)
+                    .foregroundStyle(theme.primaryForeground)
                     .frame(width: 36, height: 36)
-                    .background(.thinMaterial, in: Circle())
+                    .background(theme.elevatedSurface.opacity(0.94), in: Circle())
+                    .overlay {
+                        Circle().strokeBorder(theme.border)
+                    }
                     .padding(12)
                     .accessibilityIdentifier("paywall.close")
             }
@@ -120,9 +138,10 @@ public struct PaywallView: View {
         VStack(spacing: 10) {
             Text(configuration.title)
                 .font(.largeTitle.weight(.semibold))
+                .foregroundStyle(theme.primaryForeground)
             Text(configuration.subtitle)
                 .font(.title3)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.secondaryForeground)
         }
         .multilineTextAlignment(.center)
         .padding(.top, configuration.showsCloseButton ? 28 : 0)
@@ -131,33 +150,55 @@ public struct PaywallView: View {
     private var planContainer: some View {
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(configuration.planTitle).font(.title2.weight(.semibold))
-                Text(configuration.planSubtitle).font(.subheadline).foregroundStyle(.secondary)
+                Text(configuration.planTitle)
+                    .font(.title2.weight(.semibold))
+                Text(configuration.planSubtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(theme.secondaryForeground)
             }
 
             productContent
             purchaseButton
+
             Divider()
+                .overlay(theme.border)
+
             featureList
         }
         .padding(20)
-        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 24))
+        .background(
+            theme.surface,
+            in: RoundedRectangle(
+                cornerRadius: theme.cardCornerRadius,
+                style: .continuous
+            )
+        )
         .overlay {
-            RoundedRectangle(cornerRadius: 24)
-                .strokeBorder(Color.primary.opacity(0.08))
+            RoundedRectangle(
+                cornerRadius: theme.cardCornerRadius,
+                style: .continuous
+            )
+            .strokeBorder(theme.border)
         }
+        .shadow(color: theme.shadow, radius: 18, y: 10)
     }
 
     @ViewBuilder
     private var productContent: some View {
         switch purchaseManager.productLoadingState {
         case .idle, .loading:
-            ProgressView().frame(maxWidth: .infinity).padding(.vertical, 28)
+            ProgressView()
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 28)
         case .failed(let failure):
             VStack(spacing: 12) {
-                Text(failure.message).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                Button("Try Again") { Task { await purchaseManager.loadProducts(force: true) } }
-                    .buttonStyle(.bordered)
+                Text(failure.message)
+                    .foregroundStyle(theme.secondaryForeground)
+                    .multilineTextAlignment(.center)
+                Button("Try Again") {
+                    Task { await purchaseManager.loadProducts(force: true) }
+                }
+                .buttonStyle(.bordered)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
@@ -172,24 +213,44 @@ public struct PaywallView: View {
 
     private func planOption(_ product: PurchaseProduct) -> some View {
         let selected = selectedProductID == product.id
+        let optionRadius = min(theme.cardCornerRadius, 18)
+
         return Button {
-            selectedProductID = product.id
+            withAnimation(.snappy) {
+                selectedProductID = product.id
+            }
         } label: {
             VStack(alignment: .leading, spacing: 9) {
                 Image(systemName: selected ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
-                Text(product.displayName).font(.headline).lineLimit(2)
-                Text(product.displayPrice).font(.title3.weight(.bold))
-                if let detail = configuration.planDetail(product) ?? product.subscriptionPeriod.map({ "Billed every \($0.shortLabel)" }) {
-                    Text(detail).font(.caption).foregroundStyle(.secondary)
+                    .foregroundStyle(selected ? theme.accent : theme.secondaryForeground)
+                Text(product.displayName)
+                    .font(.headline)
+                    .foregroundStyle(theme.primaryForeground)
+                    .lineLimit(2)
+                Text(product.displayPrice)
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(theme.primaryForeground)
+
+                if let detail = configuration.planDetail(product)
+                    ?? product.subscriptionPeriod.map({ "Billed every \($0.shortLabel)" }) {
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(theme.secondaryForeground)
                 }
             }
             .frame(maxWidth: .infinity, minHeight: 126, alignment: .topLeading)
             .padding(14)
-            .background(selected ? Color.accentColor.opacity(0.10) : Color(uiColor: .tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+            .background(
+                selected ? theme.accent.opacity(0.12) : theme.elevatedSurface,
+                in: RoundedRectangle(cornerRadius: optionRadius, style: .continuous)
+            )
             .overlay {
-                RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(selected ? Color.accentColor : Color.primary.opacity(0.08), lineWidth: selected ? 1.5 : 1)
+                RoundedRectangle(cornerRadius: optionRadius, style: .continuous)
+                    .strokeBorder(
+                        selected ? theme.accent : theme.border,
+                        lineWidth: selected ? 1.5 : 1
+                    )
             }
         }
         .buttonStyle(.plain)
@@ -207,12 +268,14 @@ public struct PaywallView: View {
         } label: {
             HStack {
                 if purchaseManager.isBusy { ProgressView() }
-                Text(configuration.purchaseButtonTitle).font(.headline)
+                Text(configuration.purchaseButtonTitle)
+                    .font(.headline)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 15)
         }
         .buttonStyle(.borderedProminent)
+        .tint(theme.accent)
         .clipShape(Capsule())
         .disabled(selectedProduct == nil || purchaseManager.isBusy)
         .accessibilityIdentifier("paywall.purchase")
@@ -224,10 +287,14 @@ public struct PaywallView: View {
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: feature.systemImage)
                         .frame(width: 24)
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(theme.accent)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(feature.title).font(.subheadline.weight(.semibold))
-                        Text(feature.message).font(.subheadline).foregroundStyle(.secondary)
+                        Text(feature.title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(theme.primaryForeground)
+                        Text(feature.message)
+                            .font(.subheadline)
+                            .foregroundStyle(theme.secondaryForeground)
                     }
                 }
             }
@@ -239,18 +306,32 @@ public struct PaywallView: View {
             HStack(spacing: 16) {
                 Button("Restore Purchases") { restore() }
                 Button("Manage Subscription") {
-                    if let url = URL(string: "https://apps.apple.com/account/subscriptions") { openURL(url) }
+                    if let url = URL(string: "https://apps.apple.com/account/subscriptions") {
+                        openURL(url)
+                    }
                 }
-                if let termsURL = configuration.termsURL { Link("Terms", destination: termsURL) }
-                if let privacyURL = configuration.privacyURL { Link("Privacy", destination: privacyURL) }
+                if let termsURL = configuration.termsURL {
+                    Link("Terms", destination: termsURL)
+                }
+                if let privacyURL = configuration.privacyURL {
+                    Link("Privacy", destination: privacyURL)
+                }
             }
             .font(.caption)
+            .foregroundStyle(theme.accent)
 
             Text("Subscriptions renew automatically unless cancelled in App Store settings.")
                 .font(.caption2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.secondaryForeground)
                 .multilineTextAlignment(.center)
         }
+    }
+
+    private var theme: PaywallThemeTokens {
+        PaywallThemeTokens(
+            appTheme: configuration.themeOverride ?? environmentTheme,
+            accentOverride: configuration.tint
+        )
     }
 
     private var subscriptionProducts: [PurchaseProduct] {
@@ -259,11 +340,17 @@ public struct PaywallView: View {
     }
 
     private var selectedProduct: PurchaseProduct? {
-        selectedProductID.flatMap(purchaseManager.product(withID:)) ?? purchaseManager.preferredProduct
+        selectedProductID.flatMap(purchaseManager.product(withID:))
+            ?? purchaseManager.preferredProduct
     }
 
     private func selectDefaultProduct() {
-        guard selectedProductID == nil || purchaseManager.product(withID: selectedProductID ?? "") == nil else { return }
+        guard selectedProductID == nil
+            || purchaseManager.product(withID: selectedProductID ?? "") == nil
+        else {
+            return
+        }
+
         selectedProductID = configuration.preferredProductID
             .flatMap(purchaseManager.product(withID:))?.id
             ?? purchaseManager.preferredProduct?.id
@@ -272,8 +359,10 @@ public struct PaywallView: View {
     private func restore() {
         Task {
             switch await purchaseManager.restorePurchases() {
-            case .restored: restoreMessage = "Your purchases have been restored."
-            case .nothingToRestore: restoreMessage = "No previous purchases were found."
+            case .restored:
+                restoreMessage = "Your purchases have been restored."
+            case .nothingToRestore:
+                restoreMessage = "No previous purchases were found."
             case .failed(let failure):
                 restoreMessage = failure.message
                 purchaseManager.clearActivity()
@@ -287,11 +376,17 @@ public struct PaywallView: View {
     }
 
     private var purchaseErrorBinding: Binding<Bool> {
-        Binding(get: { purchaseFailure != nil }, set: { if !$0 { purchaseManager.clearActivity() } })
+        Binding(
+            get: { purchaseFailure != nil },
+            set: { if !$0 { purchaseManager.clearActivity() } }
+        )
     }
 
     private var restoreAlertBinding: Binding<Bool> {
-        Binding(get: { restoreMessage != nil }, set: { if !$0 { restoreMessage = nil } })
+        Binding(
+            get: { restoreMessage != nil },
+            set: { if !$0 { restoreMessage = nil } }
+        )
     }
 }
 
@@ -411,7 +506,9 @@ public struct SubscriptionSettingsSection: View {
             Button("Restore Purchases", systemImage: "arrow.clockwise") { restore() }
                 .disabled(purchaseManager.isBusy)
             Button("Manage Subscription", systemImage: "creditcard") {
-                if let url = URL(string: "https://apps.apple.com/account/subscriptions") { openURL(url) }
+                if let url = URL(string: "https://apps.apple.com/account/subscriptions") {
+                    openURL(url)
+                }
             }
         }
         .alert("Restore Purchases", isPresented: Binding(

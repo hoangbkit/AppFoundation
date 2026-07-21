@@ -117,13 +117,12 @@ enum DemoConfiguration {
         preferredProductID: purchases.preferredProductID,
         purchaseButtonTitle: "Unlock Demo Pro",
         privacyURL: URL(string: "https://example.com/privacy"),
-        termsURL: URL(string: "https://example.com/terms"),
-        tint: theme.primary
+        termsURL: URL(string: "https://example.com/terms")
     )
 
     static let legacyPaywall = FoundationPaywallConfiguration(
         title: "Make every app premium",
-        subtitle: "Legacy gradient paywall retained for migration testing.",
+        subtitle: "Gradient style following the currently selected app theme.",
         features: [
             FoundationPaywallFeature(
                 id: "storekit",
@@ -139,13 +138,12 @@ enum DemoConfiguration {
             ),
         ],
         purchaseButtonTitle: "Unlock Demo Pro",
-        highlightedProductID: purchases.preferredProductID,
-        theme: theme
+        highlightedProductID: purchases.preferredProductID
     )
 
     static let legacyClaudePaywall = FoundationPaywallConfiguration(
         title: "Get more Demo",
-        subtitle: "Legacy compact layout retained for comparison",
+        subtitle: "Compact style following the currently selected app theme",
         features: [
             FoundationPaywallFeature(
                 id: "pro-features",

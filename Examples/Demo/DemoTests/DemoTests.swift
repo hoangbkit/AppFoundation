@@ -19,6 +19,29 @@ final class DemoTests: XCTestCase {
         )
     }
 
+    func testModernPaywallPrefersYearlyProduct() {
+        XCTAssertEqual(
+            DemoConfiguration.modernPaywall.preferredProductID,
+            DemoConfiguration.purchases.preferredProductID
+        )
+        XCTAssertFalse(DemoConfiguration.modernPaywall.features.isEmpty)
+    }
+
+    func testBackupConfigurationMatchesDemoBundle() {
+        XCTAssertEqual(
+            DemoConfiguration.backupConfiguration.appIdentifier,
+            "com.hoangbkit.appfoundationdemo"
+        )
+        XCTAssertEqual(DemoConfiguration.backupConfiguration.fileExtension, "afdemo")
+    }
+
+    func testSampleDeepLinkIsStable() {
+        XCTAssertEqual(
+            DemoConfiguration.sampleDeepLink.url?.absoluteString,
+            "appfoundation-demo://showcase/exports/latest?source=widget"
+        )
+    }
+
     func testOnboardingHasStableUniqueIdentifiers() {
         let identifiers = DemoConfiguration.onboardingPages.map(\.id)
         XCTAssertEqual(Set(identifiers).count, identifiers.count)

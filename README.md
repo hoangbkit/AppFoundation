@@ -1,37 +1,65 @@
 # AppFoundation
 
-A focused Swift package for shared iOS infrastructure that is expensive to get wrong in every app. It targets **iOS 26.0+** and uses **Swift 6** strict concurrency.
+Shared production infrastructure for Hoang's iOS apps. AppFoundation targets **iOS 26+** and **Swift 6.2 strict concurrency**.
+
+The package centralizes behavior that is expensive to reimplement correctly while keeping each app's navigation, data models, copy, and visual identity app-owned.
 
 ## Included
 
-### Purchases
+### Commerce
 
-- StoreKit 2 purchase controller with verified in-memory entitlement state
-- Debug-only in-process purchase simulation for CLI-deployed prototypes
+- StoreKit 2 product loading, purchase, restore, and verified entitlement state
 - Transaction update observation and foreground refresh support
-- Product loading retry, restore, pending purchase, and error states
-- Pure entitlement evaluation that can be unit tested without StoreKit
-- Reusable paywall mechanics and default paywall views
+- Debug-only in-process purchase simulation
+- `PurchaseManager` as the preferred app-facing API
+- Simple `hasPro` entitlement access
+- Compact monthly/yearly `PaywallView`
+- Premium feature gates and subscription settings components
+- Access policy that can keep existing user-created content available after expiry
 
 ### Themes
 
-- Six polished defaults: Rose, Sunset, Lavender, Midnight, Paper, and Champagne
-- One free fallback theme and configurable Pro themes
-- App-owned catalogs that can remove, replace, reorder, or add themes
-- Persisted selection with safe fallback when a theme is removed
-- MiLove-style timed Pro previews with one shared countdown session
-- Optional promotion of the previewed theme after Pro is unlocked
-- Selected Pro theme preservation when a subscription expires
-- App-group-compatible state for widgets and extensions
-- Reusable horizontal theme picker with custom preview rendering
-- SwiftUI environment, background, card, and legacy `FoundationTheme` bridges
+- Existing reusable theme catalog and manager
+- Rose, Sunset, Lavender, Midnight, Paper, and Champagne defaults
+- Free fallback themes and timed Pro previews
+- App Group-compatible persisted theme state
+- SwiftUI environment integration and theme picker
 - Optional alternate app-icon helper
 
-### Existing UI and project support
+### ExportKit
 
-- Brandable onboarding, paywall, settings, cards, backgrounds, pills, and buttons
-- XcodeGen-powered Demo app using a local StoreKit configuration
-- Privacy manifest and package/app tests
+- Safe filenames and predictable suggested filenames
+- Atomic temporary-file writing and cleanup
+- PNG and JPEG definitions
+- SwiftUI view rendering at exact dimensions and scale
+- Transparent PNG and JPEG quality support
+
+### BackupKit
+
+- Generic versioned `BackupEnvelope<Payload>`
+- Folder-based custom backup packages
+- Manifest, payload checksum, and optional assets
+- Cross-app and unsupported-version rejection
+- Corrupt-payload and path-traversal protection
+- Actor-isolated package reader and writer
+
+### Platform support
+
+- Typed App Group snapshot storage
+- Schema version and update metadata
+- Shared deep-link construction
+- Widget reload throttling
+- Local notification authorization, scheduling, replacement, and cancellation
+
+### Utilities
+
+- `UserFacingError`
+- `AppInfo`
+- Atomic file replacement
+- Async debouncing
+- Review-request policy
+- Structured logging and haptics
+- Reusable `AsyncButton`
 
 ## Requirements
 
@@ -42,7 +70,7 @@ A focused Swift package for shared iOS infrastructure that is expensive to get w
 
 ## Add the package
 
-Add this repository as a Swift package, then link the `AppFoundation` product to your app target.
+Add this repository as a Swift package and link the `AppFoundation` product to the app target.
 
 ```swift
 import AppFoundation
@@ -51,7 +79,7 @@ import SwiftUI
 @main
 @MainActor
 struct MyApp: App {
-    @State private var purchases = PurchaseController(
+    @State private var purchaseManager = PurchaseManager(
         configuration: PurchaseConfiguration(
             productIDs: [
                 "com.example.app.pro.yearly",
@@ -61,322 +89,229 @@ struct MyApp: App {
         )
     )
 
-    @State private var themes = ThemeManager(
-        catalog: .foundationDefaults,
-        stateStore: UserDefaultsThemeStateStore(
-            storageKey: "com.example.app.theme-state"
-        )
-    )
-
     var body: some Scene {
         WindowGroup {
             RootView()
-                .environment(purchases)
-                .environment(themes)
-                .managesPurchases(purchases)
-                .appFoundationTheme(themes)
-                .synchronizesThemeAccess(
-                    themes,
-                    hasPro: purchases.isEntitled
-                )
+                .environment(purchaseManager)
+                .managesPurchases(purchaseManager)
         }
     }
 }
 ```
 
-`PurchaseController.entitlementState` is derived from verified StoreKit transactions. Do not mirror it into UserDefaults as an access-control source of truth.
+`PurchaseManager` is a source-compatible preferred name for the existing `PurchaseController`. Existing apps do not need an immediate migration.
 
-The theme state stores `lastKnownHasPro` only so widgets and extensions can render consistently. It is presentation state, not trusted purchase authorization.
+Verified StoreKit transactions remain the source of truth. Do not mirror `hasPro` into UserDefaults as an authorization source.
 
-## Default theme catalog
-
-`ThemeCatalog.foundationDefaults` contains:
-
-| Theme | Default access | Appearance |
-| --- | --- | --- |
-| Rose | Free fallback | Dark rose |
-| Sunset | Pro | Dark orange and coral |
-| Lavender | Pro | Dark violet |
-| Midnight | Pro | Deep indigo |
-| Paper | Pro | Warm light neutral |
-| Champagne | Pro | Warm light gold |
-
-The fallback theme is always normalized to free access so an app can never lock every usable appearance behind Pro.
-
-### Remove, replace, or add themes
+## Present the primary paywall
 
 ```swift
-let catalog = ThemeCatalog.foundationDefaults
-    .excluding(ids: ["sunset", "champagne"])
-    .replacing(
-        FoundationThemes.paper
-            .withTitle("Parchment")
-            .withAccess(.free)
-    )
-    .appending(MyThemes.graphite)
-    .withFallbackThemeID("paper")
-```
-
-A custom theme is a normal value:
-
-```swift
-let graphite = AppTheme(
-    id: "graphite",
-    title: "Graphite",
-    symbolName: "circle.lefthalf.filled",
-    access: .pro,
-    appearance: ThemeAppearance(
-        background: ThemeColor(hex: 0x090A0D),
-        gradientStart: ThemeColor(hex: 0x30343B),
-        gradientEnd: ThemeColor(hex: 0x111318),
-        accent: ThemeColor(hex: 0x8EA4C7),
-        primaryForeground: .white,
-        secondaryForeground: .white.withAlpha(0.68),
-        surface: .white.withAlpha(0.06),
-        elevatedSurface: .white.withAlpha(0.10),
-        border: .white.withAlpha(0.12),
-        preferredColorScheme: .dark
-    )
-)
-```
-
-Themes are identified by stable string IDs. Adding a later definition with the same ID replaces the earlier definition without changing its catalog position.
-
-## Theme picker
-
-Use the polished default picker:
-
-```swift
-@Environment(ThemeManager.self) private var themes
-@State private var showPaywall = false
-
-ThemePickerView(
-    manager: themes,
-    onRequestUpgrade: { showPaywall = true }
-)
-```
-
-The default interaction follows MiLove:
-
-- free themes select immediately
-- a free user tapping a Pro theme starts a five-minute preview
-- switching between Pro themes keeps the original expiry time
-- the picker shows a live countdown and End action
-- unlocking Pro during a preview permanently selects that theme
-- when Pro expires, the selected Pro theme is remembered while the app renders its free fallback
-
-Disable previews when an app should open the paywall immediately:
-
-```swift
-let manager = ThemeManager(
-    catalog: catalog,
-    previewBehavior: .disabled
-)
-```
-
-Supply an app-specific preview without replacing the picker behavior:
-
-```swift
-ThemePickerView(manager: themes) { theme in
-    MyThemePreview(theme: theme)
-}
-```
-
-## Apply the active theme
-
-The root modifier injects the active theme, tint, and preferred color scheme:
-
-```swift
-RootView()
-    .appFoundationTheme(themes)
-```
-
-Read it in any child view:
-
-```swift
-@Environment(\.appFoundationTheme) private var theme
-```
-
-Ready-to-use primitives are also included:
-
-```swift
-ZStack {
-    AppThemeBackground(theme: themes.effectiveTheme)
-
-    AppThemeCard(theme: themes.effectiveTheme) {
-        Text("Themed content")
-    }
-}
-```
-
-Existing components accept `AppTheme` directly:
-
-```swift
-FoundationBackground(theme: themes.effectiveTheme)
-FoundationCard(theme: themes.effectiveTheme) { content }
-FoundationPrimaryButtonStyle(theme: themes.effectiveTheme)
-```
-
-## Widgets and app groups
-
-Use the same suite name in the app and widget:
-
-```swift
-let store = UserDefaultsThemeStateStore(
-    storageKey: "com.example.app.theme-state",
-    suiteName: "group.com.example.app"
-)
-```
-
-A widget resolves the same effective theme without creating a `ThemeManager`:
-
-```swift
-let state = store.load()
-let resolution = ThemeResolver.resolve(
-    catalog: MyThemeCatalog.value,
-    state: state
-)
-
-let theme = resolution.effectiveTheme
-let previewExpiry = resolution.nextAutomaticChangeDate
-```
-
-When `previewExpiry` exists, add a widget timeline entry at that date using the fallback theme. In the app, use `stateDidChange` to reload timelines:
-
-```swift
-let manager = ThemeManager(
-    catalog: catalog,
-    stateStore: store,
-    stateDidChange: { _ in
-        WidgetCenter.shared.reloadAllTimelines()
-    }
-)
-```
-
-## Alternate app icons
-
-Theme definitions may carry app-owned icon metadata:
-
-```swift
-let midnight = FoundationThemes.midnight
-    .withAlternateIconName("AppIconMidnight")
-    .withPreviewImageName("AppIconMidnightPreview")
-```
-
-Apply it explicitly after a theme change:
-
-```swift
-try await ThemeAppIconManager.apply(themes.effectiveTheme)
-```
-
-AppFoundation does not ship icon assets. Each app remains responsible for adding and configuring its alternate icons.
-
-## Prototype purchases without StoreKit
-
-Debug builds can use an in-process simulator while keeping the same controller and paywall UI:
-
-```swift
-let mode = PurchaseServiceMode.fromEnvironment(fallback: .live)
-let service = PurchaseServiceFactory.make(
-    mode: mode,
-    simulatedProducts: products,
-    simulatedPersistenceKey: "com.example.app.simulated-purchases"
-)
-
-let purchases = PurchaseController(
-    configuration: configuration,
-    service: service
-)
-```
-
-`SimulatedPurchaseService` loads app-defined products, grants local entitlements, supports restore persistence, and can simulate pending, cancelled, catalog-failure, purchase-failure, and restore-failure states. Its implementation is excluded from Release builds; `PurchaseServiceFactory` always returns `LiveStoreKitService` in Release.
-
-Set `APPFOUNDATION_PURCHASE_MODE` to `live` or `simulated` at launch. With `devicectl`, prefix the variable with `DEVICECTL_CHILD_` in the calling environment.
-
-## Present the paywall
-
-```swift
-FoundationPaywallView(
-    purchases: purchases,
-    configuration: FoundationPaywallConfiguration(
+PaywallView(
+    purchaseManager: purchaseManager,
+    configuration: PaywallConfiguration(
         title: "Unlock Pro",
         subtitle: "Get every premium feature.",
         features: [
-            FoundationPaywallFeature(
+            PaywallFeature(
                 id: "unlimited",
                 systemImage: "infinity",
                 title: "Unlimited access",
                 message: "Remove all free-plan limits."
             )
         ],
+        preferredProductID: "com.example.app.pro.yearly",
         privacyURL: privacyURL,
-        termsURL: termsURL,
-        theme: .indigo
+        termsURL: termsURL
     )
 )
 ```
 
-For a compact paywall with side-by-side plan cards, use `ClaudePaywallView`.
+The paywall uses semantic system backgrounds and the app's tint. Product prices and billing periods come from the StoreKit product catalog. Copy, legal URLs, preferred product, and optional plan detail remain app-configured.
 
-## Run the Demo
+The older `ClaudePaywallView` and `FoundationPaywallView` remain available for compatibility, but new integrations should use `PaywallView`.
 
-```bash
-brew install xcodegen
-cd Examples/Demo
-make open
+## Gate premium actions safely
+
+```swift
+let feature = PremiumFeature(
+    id: "premiumThemes",
+    title: "Premium themes"
+)
+
+let decision = PremiumAccessPolicy().decision(
+    for: feature,
+    requirement: .pro,
+    hasPro: purchaseManager.hasPro
+)
+
+PremiumGate(decision: decision) {
+    PremiumThemePicker()
+} locked: { feature in
+    LockedFeatureOverlay(feature: feature) {
+        showPaywall = true
+    }
+}
 ```
 
-The generated project uses:
+For apps containing user-created data, pass `isExistingContent: true` when the user is viewing, exporting, sharing, or deleting content created before expiry. The default policy keeps that content accessible while still allowing creation and premium editing to be gated.
 
-- Team ID `J458WW3452`
-- Bundle identifier `com.hoangbkit.demo`
-- iOS deployment target `26.0`
-- Local `Configuration.storekit` attached to the shared scheme
+## Debug purchase simulation
 
-## Testing
+```swift
+let purchaseManager = PurchaseManager(
+    configuration: configuration,
+    simulated: true,
+    simulatedProducts: products,
+    simulatedPersistenceKey: "com.example.app.simulated-purchases"
+)
+```
 
-Run package tests:
+Simulation code is Debug-only. Release builds always use live StoreKit. Existing runtime switching remains available through `setSimulatedPurchasesEnabled(_:)` in Debug builds.
+
+## Export a SwiftUI view
+
+```swift
+let data = try ViewImageExporter.render(
+    HeroCardView(),
+    size: CGSize(width: 1200, height: 1200),
+    scale: 1,
+    opaque: false,
+    format: .png
+)
+
+let file = try await ExportFileWriter().write(
+    data,
+    filename: "MiLove Hero",
+    fileExtension: ExportImageFormat.png.fileExtension
+)
+```
+
+AppFoundation handles rendering and file creation. The app still owns the actual hero, card, screenshot, or promotional design.
+
+## Create a custom backup package
+
+```swift
+struct AppBackup: Codable, Sendable {
+    let records: [Record]
+}
+
+let configuration = BackupPackageConfiguration(
+    format: "com.example.app.backup",
+    version: 1,
+    appIdentifier: "com.example.app",
+    fileExtension: "examplebackup"
+)
+
+let envelope = BackupEnvelope(
+    format: configuration.format,
+    version: configuration.version,
+    appIdentifier: configuration.appIdentifier,
+    appVersion: "1.0",
+    appBuild: "1",
+    payload: AppBackup(records: records)
+)
+
+let packageURL = try await BackupPackageWriter().write(
+    envelope: envelope,
+    configuration: configuration,
+    assets: imageAssets,
+    filename: "My App Backup"
+)
+```
+
+Restore only after reading and validating the package:
+
+```swift
+let result = try await BackupPackageReader().read(
+    AppBackup.self,
+    from: packageURL,
+    configuration: configuration
+)
+```
+
+Each app remains responsible for migrations, duplicate handling, replace-versus-merge behavior, restore confirmation, and transactional mutation of its own database.
+
+## Share data with widgets
+
+```swift
+struct WidgetSnapshot: Codable, Sendable {
+    let title: String
+    let date: Date
+}
+
+let store = try AppGroupStore<WidgetSnapshot>(
+    suiteName: "group.com.example.app",
+    key: "widget.snapshot"
+)
+
+try await store.save(WidgetSnapshot(title: "Anniversary", date: date))
+```
+
+Use `WidgetReloadCoordinator` to avoid repeatedly reloading the same widget kind during bursts of changes.
+
+## Schedule local notifications
+
+```swift
+let manager = LocalNotificationManager()
+let granted = try await manager.requestAuthorization()
+
+if granted {
+    try await manager.replace(
+        LocalNotificationRequest(
+            id: "event.\(eventID)",
+            title: event.title,
+            body: "Your event is coming up.",
+            date: reminderDate
+        )
+    )
+}
+```
+
+The app decides what deserves a reminder and when. AppFoundation only handles permission and reliable scheduling mechanics.
+
+## Use the existing theme system
+
+```swift
+@State private var themes = ThemeManager(
+    catalog: .foundationDefaults,
+    stateStore: UserDefaultsThemeStateStore(
+        storageKey: "com.example.app.theme-state"
+    )
+)
+
+RootView()
+    .environment(themes)
+    .appFoundationTheme(themes)
+    .synchronizesThemeAccess(themes, hasPro: purchaseManager.hasPro)
+```
+
+Apps may exclude, replace, reorder, or append themes. AppFoundation does not require every app to use the shared themes or design primitives.
+
+## Validation
+
+Run portable package validation:
 
 ```bash
 swift test
 ```
 
-Run all portable validation available outside Xcode:
+Run the existing project validation script:
 
 ```bash
 make validate
 ```
 
-Run the Demo simulator tests on macOS with Xcode 26:
+The Demo simulator build still requires macOS with Xcode 26.
 
-```bash
-cd Examples/Demo
-make test
-```
+## Migration notes
 
-## Production checklist
+- Prefer `PurchaseManager` over `PurchaseController` in new code.
+- Prefer `hasPro` over `isEntitled` for normal feature checks.
+- Prefer `PaywallView` and `PaywallConfiguration` for new paywalls.
+- Existing purchase, theme, onboarding, settings, and legacy paywall APIs remain available.
+- Move only low-level shared infrastructure into AppFoundation; keep app-specific models and presentation in each app.
 
-Before using this in a released app:
-
-1. Replace Demo product identifiers with products created in App Store Connect.
-2. Provide real privacy, terms, support, and share URLs.
-3. Give every theme a stable ID and keep migration aliases when renaming IDs.
-4. Configure an app-group theme store when widgets need the active theme.
-5. Add app-owned alternate icon assets before assigning `alternateIconName`.
-6. Test preview expiry while the app is backgrounded and while widgets are visible.
-7. Test purchases, restore, upgrades, downgrades, expiry, billing retry, revocation, Ask to Buy, and interrupted network flows.
-8. Keep feature authorization tied to `PurchaseController.entitlementState`, not cached theme state.
-
-## Structure
-
-```text
-Sources/AppFoundation/Core       Pure models and entitlement rules
-Sources/AppFoundation/Purchases  StoreKit 2 service and observable controller
-Sources/AppFoundation/Themes     Theme definitions, catalog, state, and resolver
-Sources/AppFoundation/UI         SwiftUI components, picker, and theme bridges
-Tests/AppFoundationTests         Portable and iOS-only tests
-Examples/Demo                    XcodeGen sample app
-```
+See [PLAN.md](PLAN.md) for the package boundary and development phases.
 
 ## License
 

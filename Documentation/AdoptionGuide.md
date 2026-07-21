@@ -14,7 +14,27 @@ Use AppFoundation for infrastructure whose behavior should remain consistent acr
 
 Create a `PurchaseConfiguration` per app. Product order is preserved and controls paywall order. The optional preferred product becomes the initial paywall selection.
 
-Call `prepare()` through `.managesPurchases` or manually from the app lifecycle. Read `entitlementState.isActive` or `isEntitled` wherever premium access is required.
+Recurring products use their StoreKit subscription period, including weekly, monthly, and yearly durations. A configured entitlement product without a subscription period is presented as lifetime access; in App Store Connect this should normally be a non-consumable in-app purchase.
+
+All configured products belong in `productIDs`, and all should remain in `entitledProductIDs` unless an app intentionally sells a product that does not unlock Pro:
+
+```swift
+let purchases = PurchaseConfiguration(
+    productIDs: [
+        "com.example.app.pro.weekly",
+        "com.example.app.pro.monthly",
+        "com.example.app.pro.yearly",
+        "com.example.app.pro.lifetime",
+    ],
+    preferredProductID: "com.example.app.pro.yearly"
+)
+```
+
+Call `prepare()` through `.managesPurchases` or manually from the app lifecycle. Read `hasPro`, `entitlementState.isActive`, or `isEntitled` wherever premium access is required.
+
+Lifetime does not require a separate entitlement flag. StoreKit returns the verified non-consumable in `Transaction.currentEntitlements` without an expiration date, and the existing evaluator keeps that entitlement active unless it is revoked.
+
+Use `StoreProduct.planKind`, `planLabel`, `billingDescription`, `isRecurring`, and `isLifetime` when building app-owned purchase UI. Use `PurchasePlanDisclosure.text(for:)` instead of showing subscription-renewal wording for lifetime-only catalogs.
 
 ## Theme setup
 
@@ -43,7 +63,7 @@ Create one `ThemeManager` near the app root and synchronize it with verified pur
 RootView()
     .environment(themes)
     .appFoundationTheme(themes)
-    .synchronizesThemeAccess(themes, hasPro: purchases.isEntitled)
+    .synchronizesThemeAccess(themes, hasPro: purchases.hasPro)
 ```
 
 The default `.miLoveStyle` preview behavior gives free users five minutes to try Pro themes. Use `.disabled` when tapping a Pro theme should open the paywall immediately.

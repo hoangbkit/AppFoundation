@@ -70,7 +70,6 @@ final class PurchaseControllerTests: XCTestCase {
         XCTAssertEqual(controller.activity, .idle)
     }
 
-
     func testRestoreReturnsFailureWhenSyncThrows() async {
         let service = MockPurchaseService()
         service.syncFailure = .unknown
@@ -84,6 +83,45 @@ final class PurchaseControllerTests: XCTestCase {
         XCTAssertEqual(outcome, .failed(.unknown))
         XCTAssertEqual(controller.activity, .failed(.unknown))
     }
+
+    #if DEBUG
+    func testSimulationDefaultsToDisabled() {
+        let controller = PurchaseController(
+            configuration: PurchaseConfiguration(productIDs: [Self.monthly.id]),
+            simulatedProducts: [Self.monthly]
+        )
+
+        XCTAssertFalse(controller.isUsingSimulatedPurchases)
+    }
+
+    func testSimulationCanBeConfiguredAtInitialization() async {
+        let controller = PurchaseController(
+            configuration: PurchaseConfiguration(productIDs: [Self.monthly.id]),
+            simulated: true,
+            simulatedProducts: [Self.monthly],
+            simulatedOperationDelay: .milliseconds(0)
+        )
+
+        await controller.prepare()
+
+        XCTAssertTrue(controller.isUsingSimulatedPurchases)
+        XCTAssertEqual(controller.products, [Self.monthly])
+    }
+
+    func testSimulationCanBeEnabledAtRuntime() async {
+        let controller = PurchaseController(
+            configuration: PurchaseConfiguration(productIDs: [Self.monthly.id]),
+            simulatedProducts: [Self.monthly],
+            simulatedOperationDelay: .milliseconds(0)
+        )
+
+        await controller.setSimulatedPurchasesEnabled(true)
+
+        XCTAssertTrue(controller.isUsingSimulatedPurchases)
+        XCTAssertEqual(controller.products, [Self.monthly])
+        XCTAssertFalse(controller.isEntitled)
+    }
+    #endif
 
     private static let monthly = StoreProduct(
         id: "pro.monthly",

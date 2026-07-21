@@ -104,10 +104,11 @@ public struct FoundationSettingsView: View {
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close", systemImage: "xmark") {
                         dismiss()
                     }
+                    .labelStyle(.iconOnly)
                 }
             }
             .toolbarBackground(.hidden, for: .navigationBar)

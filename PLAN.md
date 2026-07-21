@@ -51,14 +51,16 @@ Make purchases the strongest and simplest public capability.
 - Expose `hasPro` as the normal entitlement check.
 - Preserve live StoreKit verification, transaction updates, product retry, restore, and Debug-only simulation.
 - Add `PremiumFeature`, `PremiumAccessPolicy`, and access decisions that keep existing user content accessible after expiry.
-- Add the primary compact `PaywallView` for monthly/yearly subscriptions.
+- Add the primary theme-aware `PaywallView` for weekly, monthly, yearly, and lifetime plans.
+- Keep `FoundationPaywallView` and `ClaudePaywallView` compatible while presenting the same complete product catalog.
+- Add normalized recurring/lifetime plan metadata and accurate mixed-catalog legal disclosure.
 - Add reusable `PremiumGate`, `PremiumBadge`, `PremiumButton`, `LockedFeatureOverlay`, and `SubscriptionSettingsSection` components.
 - Keep localized prices and product ordering app-configured.
-- Keep app names, legal URLs, feature copy, and tint app-owned.
+- Keep app names, legal URLs, feature copy, highlighted plan, and tint app-owned.
 
 ## Completion criteria
 
-A consumer app can integrate normal monetization using `PurchaseManager`, `hasPro`, `PaywallView`, and the feature-gating components without writing another StoreKit manager.
+A consumer app can integrate subscription or lifetime monetization using `PurchaseManager`, `hasPro`, `PaywallView`, and the feature-gating components without writing another StoreKit manager.
 
 ---
 
@@ -144,7 +146,7 @@ Finish the package with small production utilities and clear adoption guidance.
 - Structured logging helper
 - Haptic helper
 - Reusable `AsyncButton`
-- Portable tests covering access policy, export filenames and preflight, backup round trips and validation, deep links, and review policy
+- Portable tests covering access policy, plan metadata, lifetime entitlements, export filenames and preflight, backup round trips and validation, deep links, and review policy
 - README integration examples and migration guidance
 - Changelog updates
 - GitHub Actions Swift package validation

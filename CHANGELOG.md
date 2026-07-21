@@ -21,6 +21,12 @@
 - Added portable tests covering access policy, export filenames and render preflight, backup round trips and unsafe paths, review policy, and deep links.
 - Added a Swift 6.2 GitHub Actions workflow for package manifest and test validation.
 
+### Demo app
+
+- Updated the Demo to use `PurchaseManager`, `hasPro`, and the current `PaywallView` while retaining legacy paywalls for migration comparison.
+- Added an interactive New APIs showcase for premium gating, subscription settings, rounded PNG export and sharing, backup package verification, shared snapshots and deep links, local notifications, `AppInfo`, review policy, haptics, and `AsyncButton`.
+- Added Demo configuration tests for the modern paywall, backup package, and stable deep link.
+
 ### Existing theme and simulation work
 
 - Added a reusable monetized theme system modeled on MiLove's production behavior.

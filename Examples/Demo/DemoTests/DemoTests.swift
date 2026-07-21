@@ -38,6 +38,18 @@ final class DemoTests: XCTestCase {
         XCTAssertNil(DemoConfiguration.legacyClaudePaywall.themeOverride)
     }
 
+    func testExplicitFoundationThemeRemainsFixed() {
+        let configuration = FoundationPaywallConfiguration(
+            title: "Fixed",
+            subtitle: "Compatibility",
+            features: [],
+            theme: .indigo
+        )
+
+        XCTAssertFalse(configuration.followsActiveTheme)
+        XCTAssertNil(configuration.themeOverride)
+    }
+
     func testBackupConfigurationMatchesDemoBundle() {
         XCTAssertEqual(
             DemoConfiguration.backupConfiguration.appIdentifier,

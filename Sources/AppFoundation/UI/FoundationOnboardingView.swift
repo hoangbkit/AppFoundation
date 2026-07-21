@@ -24,49 +24,55 @@ public struct FoundationOnboardingPage: Identifiable {
 }
 
 public struct FoundationOnboardingView: View {
+    @Environment(\.appFoundationTheme) private var environmentTheme
+
     private let pages: [FoundationOnboardingPage]
-    private let theme: FoundationTheme
+    private let fixedTheme: FoundationTheme?
     private let completionTitle: String
     private let onCompletion: @MainActor () -> Void
 
     @State private var selectedPage = 0
 
+    /// Creates onboarding that follows the active theme installed with
+    /// `.appFoundationTheme(_:)`.
     public init(
         pages: [FoundationOnboardingPage],
-        theme: FoundationTheme = .indigo,
         completionTitle: String = "Get Started",
         onCompletion: @escaping @MainActor () -> Void
     ) {
-        self.pages = pages.isEmpty
-            ? [
-                FoundationOnboardingPage(
-                    id: "welcome",
-                    systemImage: "sparkles",
-                    eyebrow: "Welcome",
-                    title: "Ready to begin",
-                    message: "Continue to start using the app."
-                )
-            ]
-            : pages
-        self.theme = theme
+        self.pages = Self.normalizedPages(pages)
+        self.fixedTheme = nil
+        self.completionTitle = completionTitle
+        self.onCompletion = onCompletion
+    }
+
+    /// Creates onboarding with a fixed legacy `FoundationTheme` override.
+    public init(
+        pages: [FoundationOnboardingPage],
+        theme: FoundationTheme,
+        completionTitle: String = "Get Started",
+        onCompletion: @escaping @MainActor () -> Void
+    ) {
+        self.pages = Self.normalizedPages(pages)
+        self.fixedTheme = theme
         self.completionTitle = completionTitle
         self.onCompletion = onCompletion
     }
 
     public var body: some View {
         ZStack {
-            FoundationBackground(theme: theme)
+            background
 
             VStack(spacing: 24) {
                 HStack {
-                    FoundationPill("WELCOME", systemImage: "sparkles", tint: theme.primary)
+                    FoundationPill("WELCOME", systemImage: "sparkles", tint: resolvedTheme.primary)
                     Spacer()
                     if selectedPage < pages.count - 1 {
                         Button("Skip") {
                             onCompletion()
                         }
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(secondaryForeground)
                     }
                 }
                 .padding(.horizontal, 24)
@@ -92,10 +98,23 @@ public struct FoundationOnboardingView: View {
                         }
                     }
                 }
-                .buttonStyle(FoundationPrimaryButtonStyle(theme: theme))
+                .buttonStyle(FoundationPrimaryButtonStyle(theme: resolvedTheme))
                 .padding(.horizontal, 24)
                 .padding(.bottom, 18)
             }
+        }
+        .foregroundStyle(primaryForeground)
+        .tint(resolvedTheme.primary)
+        .preferredColorScheme(preferredColorScheme)
+        .animation(.smooth, value: animationThemeID)
+    }
+
+    @ViewBuilder
+    private var background: some View {
+        if fixedTheme == nil {
+            AppThemeBackground(theme: environmentTheme)
+        } else {
+            FoundationBackground(theme: resolvedTheme)
         }
     }
 
@@ -107,7 +126,7 @@ public struct FoundationOnboardingView: View {
                 Circle()
                     .fill(
                         LinearGradient(
-                            colors: [theme.primary.opacity(0.24), theme.secondary.opacity(0.12)],
+                            colors: [resolvedTheme.primary.opacity(0.24), resolvedTheme.secondary.opacity(0.12)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -118,46 +137,97 @@ public struct FoundationOnboardingView: View {
                 Image(systemName: page.systemImage)
                     .font(.system(size: 78, weight: .medium))
                     .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(theme.primary)
+                    .foregroundStyle(resolvedTheme.primary)
                     .contentTransition(.symbolEffect(.replace))
             }
 
-            FoundationCard(theme: theme) {
-                VStack(spacing: 14) {
-                    Text(page.eyebrow.uppercased())
-                        .font(.caption.weight(.bold))
-                        .tracking(1.6)
-                        .foregroundStyle(theme.primary)
-
-                    Text(page.title)
-                        .font(.largeTitle.bold())
-                        .multilineTextAlignment(.center)
-                        .foregroundStyle(.primary)
-
-                    Text(page.message)
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .lineSpacing(4)
-                }
-                .frame(maxWidth: .infinity)
-            }
+            pageCard(page)
 
             Spacer(minLength: 8)
         }
+    }
+
+    @ViewBuilder
+    private func pageCard(_ page: FoundationOnboardingPage) -> some View {
+        if fixedTheme == nil {
+            AppThemeCard(theme: environmentTheme) {
+                pageCardContent(page)
+            }
+        } else {
+            FoundationCard(theme: resolvedTheme) {
+                pageCardContent(page)
+            }
+        }
+    }
+
+    private func pageCardContent(_ page: FoundationOnboardingPage) -> some View {
+        VStack(spacing: 14) {
+            Text(page.eyebrow.uppercased())
+                .font(.caption.weight(.bold))
+                .tracking(1.6)
+                .foregroundStyle(resolvedTheme.primary)
+
+            Text(page.title)
+                .font(.largeTitle.bold())
+                .multilineTextAlignment(.center)
+                .foregroundStyle(primaryForeground)
+
+            Text(page.message)
+                .font(.body)
+                .foregroundStyle(secondaryForeground)
+                .multilineTextAlignment(.center)
+                .lineSpacing(4)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     private var pageIndicator: some View {
         HStack(spacing: 8) {
             ForEach(pages.indices, id: \.self) { index in
                 Capsule()
-                    .fill(index == selectedPage ? theme.primary : Color.secondary.opacity(0.22))
+                    .fill(index == selectedPage ? resolvedTheme.primary : secondaryForeground.opacity(0.22))
                     .frame(width: index == selectedPage ? 28 : 8, height: 8)
                     .animation(.snappy, value: selectedPage)
             }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Page \(selectedPage + 1) of \(pages.count)")
+    }
+
+    private var resolvedTheme: FoundationTheme {
+        fixedTheme ?? FoundationTheme(environmentTheme)
+    }
+
+    private var primaryForeground: Color {
+        fixedTheme == nil ? environmentTheme.primaryForegroundColor : .primary
+    }
+
+    private var secondaryForeground: Color {
+        fixedTheme == nil ? environmentTheme.secondaryForegroundColor : .secondary
+    }
+
+    private var preferredColorScheme: ColorScheme? {
+        fixedTheme == nil ? environmentTheme.appearance.preferredColorScheme.colorScheme : nil
+    }
+
+    private var animationThemeID: String {
+        fixedTheme == nil ? environmentTheme.id : "fixed"
+    }
+
+    private static func normalizedPages(
+        _ pages: [FoundationOnboardingPage]
+    ) -> [FoundationOnboardingPage] {
+        pages.isEmpty
+            ? [
+                FoundationOnboardingPage(
+                    id: "welcome",
+                    systemImage: "sparkles",
+                    eyebrow: "Welcome",
+                    title: "Ready to begin",
+                    message: "Continue to start using the app."
+                )
+            ]
+            : pages
     }
 }
 #endif

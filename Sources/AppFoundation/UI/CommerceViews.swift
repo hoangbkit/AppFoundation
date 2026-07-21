@@ -162,7 +162,7 @@ public struct PaywallView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
         case .loaded:
-            HStack(alignment: .stretch, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
                 ForEach(subscriptionProducts.prefix(2)) { product in
                     planOption(product)
                 }
@@ -320,6 +320,7 @@ public struct PremiumGate<Content: View, Locked: View>: View {
 
 public struct PremiumBadge: View {
     public init() {}
+
     public var body: some View {
         Text("PRO")
             .font(.caption2.bold())
@@ -327,6 +328,41 @@ public struct PremiumBadge: View {
             .padding(.vertical, 4)
             .background(.thinMaterial, in: Capsule())
             .accessibilityLabel("Requires Pro")
+    }
+}
+
+public struct PremiumButton<Label: View>: View {
+    private let decision: PremiumAccessDecision
+    private let action: () -> Void
+    private let onRequestUpgrade: (PremiumFeature) -> Void
+    private let label: Label
+
+    public init(
+        decision: PremiumAccessDecision,
+        action: @escaping () -> Void,
+        onRequestUpgrade: @escaping (PremiumFeature) -> Void,
+        @ViewBuilder label: () -> Label
+    ) {
+        self.decision = decision
+        self.action = action
+        self.onRequestUpgrade = onRequestUpgrade
+        self.label = label()
+    }
+
+    public var body: some View {
+        Button {
+            switch decision {
+            case .allowed:
+                action()
+            case .requiresPro(let feature):
+                onRequestUpgrade(feature)
+            }
+        } label: {
+            HStack(spacing: 8) {
+                label
+                if case .requiresPro = decision { PremiumBadge() }
+            }
+        }
     }
 }
 

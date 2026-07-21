@@ -12,10 +12,12 @@ struct HomeView: View {
     @State private var isShowingInfrastructureDemo = false
     @State private var isShowingSettings = false
 
+    private var theme: AppTheme { themes.effectiveTheme }
+
     var body: some View {
         NavigationStack {
             ZStack {
-                FoundationBackground(theme: DemoConfiguration.theme)
+                AppThemeBackground(theme: theme)
 
                 List {
                     row(top: 8, bottom: 11) { heroCard }
@@ -26,7 +28,9 @@ struct HomeView: View {
                 .scrollContentBackground(.hidden)
                 .scrollIndicators(.hidden)
             }
+            .foregroundStyle(theme.primaryForegroundColor)
             .navigationTitle("AppFoundation")
+            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Settings", systemImage: "gearshape.fill") {
@@ -65,8 +69,7 @@ struct HomeView: View {
             }
             .fullScreenCover(isPresented: $isShowingOnboarding) {
                 FoundationOnboardingView(
-                    pages: DemoConfiguration.onboardingPages,
-                    theme: DemoConfiguration.theme
+                    pages: DemoConfiguration.onboardingPages
                 ) {
                     isShowingOnboarding = false
                 }
@@ -78,7 +81,8 @@ struct HomeView: View {
                 )
             }
         }
-        .tint(themes.effectiveTheme.accentColor)
+        .tint(theme.accentColor)
+        .animation(.smooth, value: theme.id)
     }
 
     private func row<Content: View>(
@@ -96,27 +100,35 @@ struct HomeView: View {
     }
 
     private var heroCard: some View {
-        FoundationCard(theme: DemoConfiguration.theme) {
+        AppThemeCard(theme: theme) {
             VStack(alignment: .leading, spacing: 20) {
                 HStack {
                     FoundationPill(
                         "SHARED INFRASTRUCTURE",
                         systemImage: "square.stack.3d.up.fill",
-                        tint: DemoConfiguration.theme.primary
+                        tint: theme.accentColor
                     )
                     Spacer()
                     Image(systemName: "swift")
                         .font(.title2.weight(.semibold))
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(theme.accentColor)
                         .frame(width: 42, height: 42)
-                        .background(.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 13))
+                        .background(
+                            theme.elevatedSurfaceColor,
+                            in: RoundedRectangle(cornerRadius: 13, style: .continuous)
+                        )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                                .strokeBorder(theme.borderColor)
+                        }
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Build the app.\nSkip the boilerplate.")
                         .font(.system(size: 32, weight: .bold, design: .rounded))
+                        .foregroundStyle(theme.primaryForegroundColor)
                     Text("Explore purchases, themes, export, backup, widget storage, notifications, and production utilities in one Demo app.")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.secondaryForegroundColor)
                         .lineSpacing(4)
                 }
 
@@ -131,19 +143,19 @@ struct HomeView: View {
     }
 
     private var entitlementCard: some View {
-        FoundationCard(theme: DemoConfiguration.theme) {
+        AppThemeCard(theme: theme) {
             VStack(alignment: .leading, spacing: 16) {
                 Text("PREMIUM STATUS")
                     .font(.caption2.weight(.bold))
                     .tracking(1.2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryForegroundColor)
 
                 #if DEBUG
                 if purchases.isUsingSimulatedPurchases {
                     FoundationPill(
                         "SIMULATED BILLING",
                         systemImage: "hammer.fill",
-                        tint: .orange
+                        tint: theme.accentColor
                     )
                 }
                 #endif
@@ -153,13 +165,18 @@ struct HomeView: View {
                         .font(.title2.weight(.semibold))
                         .foregroundStyle(entitlementColor)
                         .frame(width: 46, height: 46)
-                        .background(entitlementColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 14))
+                        .background(
+                            entitlementColor.opacity(0.12),
+                            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        )
 
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(entitlementTitle).font(.headline)
+                        Text(entitlementTitle)
+                            .font(.headline)
+                            .foregroundStyle(theme.primaryForegroundColor)
                         Text(entitlementMessage)
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(theme.secondaryForegroundColor)
                     }
                     Spacer()
                 }
@@ -174,7 +191,7 @@ struct HomeView: View {
                             Image(systemName: "arrow.right")
                         }
                     }
-                    .buttonStyle(FoundationPrimaryButtonStyle(theme: DemoConfiguration.theme))
+                    .buttonStyle(FoundationPrimaryButtonStyle(theme: theme))
                 }
 
                 #if DEBUG
@@ -190,12 +207,12 @@ struct HomeView: View {
     }
 
     private var componentsCard: some View {
-        FoundationCard(theme: DemoConfiguration.theme) {
+        AppThemeCard(theme: theme) {
             VStack(alignment: .leading, spacing: 0) {
                 Text("EXPLORE THE PACKAGE")
                     .font(.caption2.weight(.bold))
                     .tracking(1.2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryForegroundColor)
                     .padding(.bottom, 10)
 
                 componentRow(
@@ -236,7 +253,6 @@ struct HomeView: View {
         }
     }
 
-    @ViewBuilder
     private func componentRow(
         title: String,
         subtitle: String,
@@ -247,25 +263,27 @@ struct HomeView: View {
             HStack(spacing: 14) {
                 Image(systemName: systemImage)
                     .font(.body.weight(.semibold))
-                    .foregroundStyle(DemoConfiguration.theme.primary)
+                    .foregroundStyle(theme.accentColor)
                     .frame(width: 42, height: 42)
                     .background(
-                        DemoConfiguration.theme.primary.opacity(0.10),
-                        in: RoundedRectangle(cornerRadius: 13)
+                        theme.elevatedSurfaceColor,
+                        in: RoundedRectangle(cornerRadius: 13, style: .continuous)
                     )
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(title).font(.headline)
+                    Text(title)
+                        .font(.headline)
+                        .foregroundStyle(theme.primaryForegroundColor)
                     Text(subtitle)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.secondaryForegroundColor)
                         .lineLimit(2)
                 }
 
                 Spacer(minLength: 8)
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.bold))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(theme.secondaryForegroundColor.opacity(0.7))
             }
             .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
             .contentShape(Rectangle())
@@ -274,16 +292,19 @@ struct HomeView: View {
     }
 
     private var divider: some View {
-        Divider().padding(.leading, 56)
+        Divider()
+            .overlay(theme.borderColor)
+            .padding(.leading, 56)
     }
 
     private func technologyBadge(_ title: String, systemImage: String) -> some View {
         Label(title, systemImage: systemImage)
             .font(.caption2.weight(.semibold))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(theme.secondaryForegroundColor)
             .padding(.horizontal, 9)
             .padding(.vertical, 7)
-            .background(Color.primary.opacity(0.055), in: Capsule())
+            .background(theme.elevatedSurfaceColor, in: Capsule())
+            .overlay { Capsule().strokeBorder(theme.borderColor) }
     }
 
     private var entitlementTitle: String {
@@ -327,44 +348,55 @@ struct HomeView: View {
 
     private var entitlementColor: Color {
         switch purchases.entitlementState {
-        case .checking: .secondary
-        case .inactive: DemoConfiguration.theme.primary
-        case .active: .orange
+        case .checking: theme.secondaryForegroundColor
+        case .inactive, .active: theme.accentColor
         }
     }
 }
 
 private struct PaywallStylePickerView: View {
+    @Environment(\.appFoundationTheme) private var theme
+
     let onSelect: (PaywallStyle) -> Void
 
     var body: some View {
-        List {
-            Section("Recommended") {
-                styleButton(
-                    title: "PaywallView",
-                    subtitle: "Current neutral, theme-aware monthly/yearly paywall.",
-                    systemImage: "rectangle.split.2x1",
-                    style: .current
-                )
-            }
+        ZStack {
+            AppThemeBackground(theme: theme)
 
-            Section("Migration previews") {
-                styleButton(
-                    title: "FoundationPaywallView",
-                    subtitle: "Legacy gradient layout retained for existing apps.",
-                    systemImage: "sparkles.rectangle.stack",
-                    style: .legacyGradient
-                )
-                styleButton(
-                    title: "ClaudePaywallView",
-                    subtitle: "Legacy compact layout retained for comparison.",
-                    systemImage: "rectangle.grid.2x2",
-                    style: .legacyClaude
-                )
+            List {
+                Section("Recommended") {
+                    styleButton(
+                        title: "PaywallView",
+                        subtitle: "Current neutral, theme-aware monthly/yearly paywall.",
+                        systemImage: "rectangle.split.2x1",
+                        style: .current
+                    )
+                }
+                .listRowBackground(theme.surfaceColor)
+
+                Section("Migration previews") {
+                    styleButton(
+                        title: "FoundationPaywallView",
+                        subtitle: "Legacy gradient layout retained for existing apps.",
+                        systemImage: "sparkles.rectangle.stack",
+                        style: .legacyGradient
+                    )
+                    styleButton(
+                        title: "ClaudePaywallView",
+                        subtitle: "Legacy compact layout retained for comparison.",
+                        systemImage: "rectangle.grid.2x2",
+                        style: .legacyClaude
+                    )
+                }
+                .listRowBackground(theme.surfaceColor)
             }
+            .scrollContentBackground(.hidden)
+            .foregroundStyle(theme.primaryForegroundColor)
         }
         .navigationTitle("Paywall Styles")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .tint(theme.accentColor)
     }
 
     private func styleButton(
@@ -376,12 +408,16 @@ private struct PaywallStylePickerView: View {
         Button { onSelect(style) } label: {
             Label {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(title).font(.headline)
-                    Text(subtitle).font(.subheadline).foregroundStyle(.secondary)
+                    Text(title)
+                        .font(.headline)
+                        .foregroundStyle(theme.primaryForegroundColor)
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(theme.secondaryForegroundColor)
                 }
             } icon: {
                 Image(systemName: systemImage)
-                    .foregroundStyle(DemoConfiguration.theme.primary)
+                    .foregroundStyle(theme.accentColor)
             }
         }
     }

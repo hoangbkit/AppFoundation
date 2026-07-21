@@ -1,0 +1,30 @@
+name: Swift Package
+
+on:
+  push:
+    branches:
+      - master
+      - develop
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  portable-tests:
+    name: Swift 6.2 portable tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Swift
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.2"
+
+      - name: Validate package manifest
+        run: swift package dump-package >/dev/null
+
+      - name: Run package tests
+        run: swift test

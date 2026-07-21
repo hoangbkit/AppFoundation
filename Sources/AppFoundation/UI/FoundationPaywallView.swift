@@ -139,16 +139,11 @@ public struct FoundationPaywallView: View {
             }
             .foregroundStyle(theme.primaryForeground)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark")
-                            .font(.subheadline.weight(.bold))
-                            .foregroundStyle(theme.primaryForeground)
-                            .frame(width: 34, height: 34)
-                            .background(theme.elevatedSurface.opacity(0.94), in: Circle())
-                            .overlay { Circle().strokeBorder(theme.border) }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close", systemImage: "xmark") {
+                        dismiss()
                     }
-                    .accessibilityLabel("Close")
+                    .labelStyle(.iconOnly)
                 }
             }
             .toolbarBackground(.hidden, for: .navigationBar)

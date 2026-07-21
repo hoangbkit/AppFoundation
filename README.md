@@ -13,7 +13,7 @@ The package centralizes behavior that is expensive to reimplement correctly whil
 - Debug-only in-process purchase simulation
 - `PurchaseManager` as the preferred app-facing API
 - Simple `hasPro` entitlement access
-- Compact monthly/yearly `PaywallView`
+- Theme-aware paywalls supporting weekly, monthly, yearly, and lifetime plans
 - Premium feature gates and subscription settings components
 - Access policy that can keep existing user-created content available after expiry
 
@@ -82,8 +82,10 @@ struct MyApp: App {
     @State private var purchaseManager = PurchaseManager(
         configuration: PurchaseConfiguration(
             productIDs: [
-                "com.example.app.pro.yearly",
+                "com.example.app.pro.weekly",
                 "com.example.app.pro.monthly",
+                "com.example.app.pro.yearly",
+                "com.example.app.pro.lifetime",
             ],
             preferredProductID: "com.example.app.pro.yearly"
         )
@@ -103,6 +105,19 @@ struct MyApp: App {
 
 Verified StoreKit transactions remain the source of truth. Do not mirror `hasPro` into UserDefaults as an authorization source.
 
+## Supported purchase plans
+
+AppFoundation presents every configured entitlement product in `PurchaseConfiguration.productIDs` order:
+
+- A one-week subscription appears as **Weekly**.
+- A one-month subscription appears as **Monthly**.
+- A one-year subscription appears as **Yearly**.
+- A configured entitlement product without a subscription period appears as **Lifetime**.
+
+Use an auto-renewable subscription in App Store Connect for recurring plans. Use a non-consumable in-app purchase for lifetime access. A verified non-consumable transaction has no expiration date, so the existing entitlement evaluator keeps it active permanently unless Apple revokes it.
+
+`StoreProduct.planKind`, `planLabel`, `billingDescription`, `isRecurring`, and `isLifetime` are available for app-owned purchase UI. `PurchasePlanDisclosure` provides accurate renewal and one-time-purchase copy for recurring-only, lifetime-only, and mixed catalogs.
+
 ## Present the primary paywall
 
 ```swift
@@ -110,7 +125,7 @@ PaywallView(
     purchaseManager: purchaseManager,
     configuration: PaywallConfiguration(
         title: "Unlock Pro",
-        subtitle: "Get every premium feature.",
+        subtitle: "Choose a subscription or lifetime access.",
         features: [
             PaywallFeature(
                 id: "unlimited",
@@ -120,15 +135,16 @@ PaywallView(
             )
         ],
         preferredProductID: "com.example.app.pro.yearly",
+        highlightedProductID: "com.example.app.pro.yearly",
         privacyURL: privacyURL,
         termsURL: termsURL
     )
 )
 ```
 
-The paywall uses semantic system backgrounds and the app's tint. Product prices and billing periods come from the StoreKit product catalog. Copy, legal URLs, preferred product, and optional plan detail remain app-configured.
+`PaywallView`, `FoundationPaywallView`, and `ClaudePaywallView` display the full configured catalog. Their layouts adapt from one to multiple columns and fall back to one column at accessibility text sizes. Prices and periods come from StoreKit; lifetime products are described as one-time purchases and never receive subscription-renewal wording.
 
-The older `ClaudePaywallView` and `FoundationPaywallView` remain available for compatibility, but new integrations should use `PaywallView`.
+The paywalls follow the active `AppTheme`. Copy, legal URLs, preferred and highlighted products, optional tint or full-theme overrides, and custom plan details remain app-configured.
 
 ## Gate premium actions safely
 
@@ -158,6 +174,24 @@ For apps containing user-created data, pass `isExistingContent: true` when the u
 ## Debug purchase simulation
 
 ```swift
+let products: [PurchaseProduct] = [
+    PurchaseProduct(
+        id: "com.example.app.pro.weekly",
+        displayName: "Pro Weekly",
+        description: "Weekly access",
+        displayPrice: "$1.99",
+        price: 1.99,
+        subscriptionPeriod: .init(value: 1, unit: .week)
+    ),
+    PurchaseProduct(
+        id: "com.example.app.pro.lifetime",
+        displayName: "Pro Lifetime",
+        description: "Permanent access",
+        displayPrice: "$79.99",
+        price: 79.99
+    ),
+]
+
 let purchaseManager = PurchaseManager(
     configuration: configuration,
     simulated: true,
@@ -308,6 +342,8 @@ The Demo simulator build still requires macOS with Xcode 26.
 - Prefer `PurchaseManager` over `PurchaseController` in new code.
 - Prefer `hasPro` over `isEntitled` for normal feature checks.
 - Prefer `PaywallView` and `PaywallConfiguration` for new paywalls.
+- Existing monthly/yearly configurations continue working without changes.
+- Adding weekly or lifetime only requires adding the StoreKit product identifier to the catalog.
 - Existing purchase, theme, onboarding, settings, and legacy paywall APIs remain available.
 - Move only low-level shared infrastructure into AppFoundation; keep app-specific models and presentation in each app.
 

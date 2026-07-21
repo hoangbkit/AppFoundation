@@ -4,7 +4,7 @@ import SwiftUI
 @main
 @MainActor
 struct DemoApp: App {
-    @State private var purchases = PurchaseController(
+    @State private var purchases = PurchaseManager(
         configuration: DemoConfiguration.purchases,
         simulated: DemoConfiguration.purchaseServiceMode == .simulated,
         simulatedProducts: DemoConfiguration.simulatedProducts,
@@ -25,7 +25,7 @@ struct DemoApp: App {
                 .environment(themes)
                 .managesPurchases(purchases)
                 .appFoundationTheme(themes)
-                .synchronizesThemeAccess(themes, hasPro: purchases.isEntitled)
+                .synchronizesThemeAccess(themes, hasPro: purchases.hasPro)
         }
     }
 }

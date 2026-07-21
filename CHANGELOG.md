@@ -28,7 +28,9 @@
 - Updated the Demo to use `PurchaseManager`, `hasPro`, and the current `PaywallView` while retaining legacy paywalls for migration comparison.
 - Added an interactive New APIs showcase for premium gating, subscription settings, rounded PNG export and sharing, backup package verification, shared snapshots and deep links, local notifications, `AppInfo`, review policy, haptics, and `AsyncButton`.
 - Updated all Demo paywall configurations to follow live theme changes and added configuration coverage for that behavior.
-- Added Demo configuration tests for the modern paywall, backup package, and stable deep link.
+- Made the complete Demo theme-aware: first-launch onboarding, Home, package browser, paywall picker, settings, navigation chrome, list rows, cards, statuses, and exported preview artwork now follow `ThemeManager.effectiveTheme`.
+- Made reusable onboarding and settings views follow the active app theme by default while preserving explicit fixed `FoundationTheme` initializers.
+- Added Demo configuration tests for the modern paywall, theme-aware settings, backup package, and stable deep link.
 
 ### Existing theme and simulation work
 

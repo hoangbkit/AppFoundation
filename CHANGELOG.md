@@ -9,6 +9,8 @@
 - Added `PremiumFeature`, `PremiumAccessPolicy`, and safe post-expiry access decisions for existing user content.
 - Added the primary compact `PaywallView` and neutral paywall configuration API.
 - Added premium gates, badges, premium buttons, locked overlays, and a composable subscription settings section.
+- Made `PaywallView`, `FoundationPaywallView`, and `ClaudePaywallView` follow the active `AppTheme`, including backgrounds, surfaces, foregrounds, borders, shadows, corner radii, accents, and preferred color scheme.
+- Added optional full-theme overrides while retaining the legacy fixed `FoundationTheme` initializer for source compatibility.
 - Preserved live StoreKit verification, transaction observation, restore behavior, and Debug-only simulation.
 
 ### Shared infrastructure
@@ -25,6 +27,7 @@
 
 - Updated the Demo to use `PurchaseManager`, `hasPro`, and the current `PaywallView` while retaining legacy paywalls for migration comparison.
 - Added an interactive New APIs showcase for premium gating, subscription settings, rounded PNG export and sharing, backup package verification, shared snapshots and deep links, local notifications, `AppInfo`, review policy, haptics, and `AsyncButton`.
+- Updated all Demo paywall configurations to follow live theme changes and added configuration coverage for that behavior.
 - Added Demo configuration tests for the modern paywall, backup package, and stable deep link.
 
 ### Existing theme and simulation work

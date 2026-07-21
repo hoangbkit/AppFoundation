@@ -285,7 +285,7 @@ private struct LimitUpsellPrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.headline.bold())
-            .foregroundStyle(theme.accentForegroundColor)
+            .foregroundStyle(buttonForeground)
             .padding(.vertical, 15)
             .background(
                 theme.accentColor.opacity(configuration.isPressed ? 0.78 : 1),
@@ -293,6 +293,12 @@ private struct LimitUpsellPrimaryButtonStyle: ButtonStyle {
             )
             .scaleEffect(configuration.isPressed ? 0.985 : 1)
             .animation(.easeOut(duration: 0.14), value: configuration.isPressed)
+    }
+
+    private var buttonForeground: Color {
+        let accent = theme.appearance.accent
+        let luminance = 0.2126 * accent.red + 0.7152 * accent.green + 0.0722 * accent.blue
+        return luminance > 0.58 ? .black : .white
     }
 }
 

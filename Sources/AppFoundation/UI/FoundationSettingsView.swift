@@ -8,15 +8,44 @@ public struct FoundationSettingsConfiguration {
     public let privacyURL: URL?
     public let termsURL: URL?
     public let shareURL: URL?
+
+    /// Retained for source compatibility with callers that explicitly provide
+    /// a fixed `FoundationTheme`.
     public let theme: FoundationTheme
 
+    /// Optional full `AppTheme` override. When nil, theme-aware configurations
+    /// follow the active theme installed with `.appFoundationTheme(_:)`.
+    public let themeOverride: AppTheme?
+
+    public let followsActiveTheme: Bool
+
+    /// Creates settings that follow the active app theme.
     public init(
         appName: String,
         supportURL: URL? = nil,
         privacyURL: URL? = nil,
         termsURL: URL? = nil,
         shareURL: URL? = nil,
-        theme: FoundationTheme = .indigo
+        themeOverride: AppTheme? = nil
+    ) {
+        self.appName = appName
+        self.supportURL = supportURL
+        self.privacyURL = privacyURL
+        self.termsURL = termsURL
+        self.shareURL = shareURL
+        self.theme = .indigo
+        self.themeOverride = themeOverride
+        self.followsActiveTheme = true
+    }
+
+    /// Creates settings with a fixed legacy `FoundationTheme` override.
+    public init(
+        appName: String,
+        supportURL: URL? = nil,
+        privacyURL: URL? = nil,
+        termsURL: URL? = nil,
+        shareURL: URL? = nil,
+        theme: FoundationTheme
     ) {
         self.appName = appName
         self.supportURL = supportURL
@@ -24,12 +53,15 @@ public struct FoundationSettingsConfiguration {
         self.termsURL = termsURL
         self.shareURL = shareURL
         self.theme = theme
+        self.themeOverride = nil
+        self.followsActiveTheme = false
     }
 }
 
 public struct FoundationSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.requestReview) private var requestReview
+    @Environment(\.appFoundationTheme) private var environmentTheme
 
     private let purchases: PurchaseController?
     private let configuration: FoundationSettingsConfiguration
@@ -49,18 +81,25 @@ public struct FoundationSettingsView: View {
 
     public var body: some View {
         NavigationStack {
-            List {
-                if let purchases {
-                    purchaseSection(purchases)
-                }
+            ZStack {
+                background
 
-                supportSection
-                legalSection
+                List {
+                    if let purchases {
+                        purchaseSection(purchases)
+                    }
 
-                Section("About") {
-                    LabeledContent("Version", value: metadata.versionAndBuild)
-                    LabeledContent("Built with", value: "AppFoundation")
+                    supportSection
+                    legalSection
+
+                    Section("About") {
+                        LabeledContent("Version", value: metadata.versionAndBuild)
+                        LabeledContent("Built with", value: "AppFoundation")
+                    }
+                    .listRowBackground(surface)
                 }
+                .scrollContentBackground(.hidden)
+                .foregroundStyle(primaryForeground)
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
@@ -71,7 +110,9 @@ public struct FoundationSettingsView: View {
                     }
                 }
             }
-            .tint(configuration.theme.primary)
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .tint(accent)
+            .preferredColorScheme(preferredColorScheme)
             .alert("Restore Purchases", isPresented: restoreAlertBinding) {
                 Button("OK", role: .cancel) {
                     restoreMessage = nil
@@ -79,6 +120,15 @@ public struct FoundationSettingsView: View {
             } message: {
                 Text(restoreMessage ?? "")
             }
+        }
+    }
+
+    @ViewBuilder
+    private var background: some View {
+        if configuration.followsActiveTheme {
+            AppThemeBackground(theme: activeTheme)
+        } else {
+            FoundationBackground(theme: configuration.theme)
         }
     }
 
@@ -110,9 +160,10 @@ public struct FoundationSettingsView: View {
 
             if purchases.isEntitled {
                 Label("Premium is active", systemImage: "checkmark.seal.fill")
-                    .foregroundStyle(configuration.theme.primary)
+                    .foregroundStyle(accent)
             }
         }
+        .listRowBackground(surface)
     }
 
     @ViewBuilder
@@ -136,6 +187,7 @@ public struct FoundationSettingsView: View {
                 }
             }
         }
+        .listRowBackground(surface)
     }
 
     @ViewBuilder
@@ -154,7 +206,32 @@ public struct FoundationSettingsView: View {
                     }
                 }
             }
+            .listRowBackground(surface)
         }
+    }
+
+    private var activeTheme: AppTheme {
+        configuration.themeOverride ?? environmentTheme
+    }
+
+    private var accent: Color {
+        configuration.followsActiveTheme ? activeTheme.accentColor : configuration.theme.primary
+    }
+
+    private var primaryForeground: Color {
+        configuration.followsActiveTheme ? activeTheme.primaryForegroundColor : .primary
+    }
+
+    private var surface: Color {
+        configuration.followsActiveTheme
+            ? activeTheme.surfaceColor
+            : Color(uiColor: .secondarySystemGroupedBackground)
+    }
+
+    private var preferredColorScheme: ColorScheme? {
+        configuration.followsActiveTheme
+            ? activeTheme.appearance.preferredColorScheme.colorScheme
+            : nil
     }
 
     private var restoreAlertBinding: Binding<Bool> {

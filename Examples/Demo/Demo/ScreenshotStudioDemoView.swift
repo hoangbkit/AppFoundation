@@ -6,8 +6,10 @@ import SwiftUI
 @Observable
 private final class DemoScreenshotSettings {
   var mood: DemoScreenshotMood = .indigo
+  var backgroundStyle: ScreenshotBackgroundStyle = .aurora
+  var frameStyle: ScreenshotDeviceFrameStyle = .clay
   var showDeviceFrame = true
-  var showTechnicalGrid = false
+  var showSystemChrome = true
 }
 
 private enum DemoScreenshotMood: String, CaseIterable, Identifiable {
@@ -29,11 +31,34 @@ private enum DemoScreenshotMood: String, CaseIterable, Identifiable {
   var background: [Color] {
     switch self {
     case .indigo:
-      [Color(red: 0.08, green: 0.07, blue: 0.20), Color(red: 0.22, green: 0.16, blue: 0.48)]
+      [
+        Color(red: 0.08, green: 0.07, blue: 0.20),
+        Color(red: 0.22, green: 0.16, blue: 0.48),
+        Color(red: 0.45, green: 0.24, blue: 0.82),
+        Color(red: 0.18, green: 0.52, blue: 0.92),
+      ]
     case .rose:
-      [Color(red: 0.23, green: 0.05, blue: 0.12), Color(red: 0.58, green: 0.13, blue: 0.30)]
+      [
+        Color(red: 0.23, green: 0.05, blue: 0.12),
+        Color(red: 0.58, green: 0.13, blue: 0.30),
+        Color(red: 0.96, green: 0.34, blue: 0.58),
+        Color(red: 0.95, green: 0.55, blue: 0.34),
+      ]
     case .midnight:
-      [Color(red: 0.02, green: 0.05, blue: 0.09), Color(red: 0.04, green: 0.20, blue: 0.26)]
+      [
+        Color(red: 0.02, green: 0.05, blue: 0.09),
+        Color(red: 0.04, green: 0.20, blue: 0.26),
+        Color(red: 0.08, green: 0.52, blue: 0.62),
+        Color(red: 0.20, green: 0.30, blue: 0.75),
+      ]
+    }
+  }
+
+  var clayFrame: Color {
+    switch self {
+    case .indigo: Color(red: 0.76, green: 0.73, blue: 0.96)
+    case .rose: Color(red: 0.98, green: 0.72, blue: 0.80)
+    case .midnight: Color(red: 0.44, green: 0.78, blue: 0.82)
     }
   }
 }
@@ -94,6 +119,14 @@ private enum DemoScreenshotCatalog {
       ) {
         DemoNativeStudioScreenshot(settings: settings)
       }
+
+      ScreenshotDefinition(
+        id: "component-kit",
+        title: "Reusable Components",
+        filename: "Reusable screenshot components"
+      ) {
+        DemoComponentsScreenshot(settings: settings)
+      }
     }
   }
 }
@@ -109,8 +142,20 @@ private struct DemoScreenshotControls: View {
       }
     }
 
+    Picker("Background", selection: $settings.backgroundStyle) {
+      ForEach(ScreenshotBackgroundStyle.allCases) { style in
+        Text(style.title).tag(style)
+      }
+    }
+
+    Picker("Device frame", selection: $settings.frameStyle) {
+      ForEach(ScreenshotDeviceFrameStyle.allCases) { style in
+        Text(style.title).tag(style)
+      }
+    }
+
     Toggle("Show device frame", isOn: $settings.showDeviceFrame)
-    Toggle("Show technical grid", isOn: $settings.showTechnicalGrid)
+    Toggle("Show mock system chrome", isOn: $settings.showSystemChrome)
   }
 }
 
@@ -121,39 +166,34 @@ private struct DemoHeroScreenshot: View {
 
   var body: some View {
     GeometryReader { proxy in
-      ZStack {
-        DemoScreenshotBackground(settings: settings)
-
+      ScreenshotBackground(
+        style: settings.backgroundStyle,
+        colors: settings.mood.background
+      ) {
         VStack(alignment: .leading, spacing: 28) {
-          DemoBrandBadge(accent: settings.mood.accent)
+          ScreenshotFeatureBadge(
+            "APPFOUNDATION",
+            systemImage: "swift",
+            tint: settings.mood.accent,
+            foreground: .white
+          )
 
-          VStack(alignment: .leading, spacing: 14) {
-            Text(
-              isVietnamese
-                ? "Xây app.\nBỏ qua boilerplate." : "Build the app.\nSkip the boilerplate."
-            )
-            .font(.system(size: 47, weight: .bold, design: .rounded))
-            .tracking(-1.8)
-            .foregroundStyle(.white)
-
-            Text(
-              isVietnamese
-                ? "Hạ tầng SwiftUI dùng chung cho mọi ứng dụng của bạn."
-                : "Shared SwiftUI infrastructure for every app you ship."
-            )
-            .font(.system(size: 20, weight: .medium, design: .rounded))
-            .foregroundStyle(.white.opacity(0.72))
-            .lineSpacing(4)
-          }
+          ScreenshotHeadline(
+            title: isVietnamese ? "Xây app.\nBỏ qua boilerplate." : "Build the app.\nSkip the boilerplate.",
+            subtitle: isVietnamese
+              ? "Hạ tầng SwiftUI dùng chung cho mọi ứng dụng của bạn."
+              : "Shared SwiftUI infrastructure for every app you ship.",
+            foreground: .white,
+            secondaryForeground: .white.opacity(0.72),
+            accent: settings.mood.accent,
+            titleSize: 47
+          )
 
           Spacer(minLength: 6)
 
-          DemoPhonePreview(
-            accent: settings.mood.accent,
-            framed: settings.showDeviceFrame
-          )
-          .frame(height: proxy.size.height * 0.51)
-          .frame(maxWidth: .infinity)
+          DemoPhonePreview(settings: settings)
+            .frame(height: proxy.size.height * 0.51)
+            .frame(maxWidth: .infinity)
         }
         .padding(.horizontal, 32)
         .padding(.top, 38)
@@ -180,26 +220,28 @@ private struct DemoSystemsScreenshot: View {
   ]
 
   var body: some View {
-    ZStack {
-      DemoScreenshotBackground(settings: settings)
-
+    ScreenshotBackground(
+      style: settings.backgroundStyle,
+      colors: settings.mood.background
+    ) {
       VStack(alignment: .leading, spacing: 26) {
-        DemoBrandBadge(accent: settings.mood.accent)
+        ScreenshotFeatureBadge(
+          "APPFOUNDATION",
+          systemImage: "swift",
+          tint: settings.mood.accent,
+          foreground: .white
+        )
 
-        VStack(alignment: .leading, spacing: 12) {
-          Text(isVietnamese ? "Xây một lần.\nDùng ở mọi nơi." : "Build once.\nReuse everywhere.")
-            .font(.system(size: 45, weight: .bold, design: .rounded))
-            .tracking(-1.6)
-            .foregroundStyle(.white)
-
-          Text(
-            isVietnamese
-              ? "Engine dùng chung, trải nghiệm vẫn thuộc về từng app."
-              : "Share the engine while every app keeps its own experience."
-          )
-          .font(.system(size: 18, weight: .medium, design: .rounded))
-          .foregroundStyle(.white.opacity(0.7))
-        }
+        ScreenshotHeadline(
+          title: isVietnamese ? "Xây một lần.\nDùng ở mọi nơi." : "Build once.\nReuse everywhere.",
+          subtitle: isVietnamese
+            ? "Engine dùng chung, trải nghiệm vẫn thuộc về từng app."
+            : "Share the engine while every app keeps its own experience.",
+          foreground: .white,
+          secondaryForeground: .white.opacity(0.70),
+          accent: settings.mood.accent,
+          titleSize: 45
+        )
 
         LazyVGrid(
           columns: [GridItem(.flexible()), GridItem(.flexible())],
@@ -218,9 +260,27 @@ private struct DemoSystemsScreenshot: View {
         Spacer()
 
         HStack(spacing: 10) {
-          DemoMetric(value: "Swift 6.2", label: "Strict")
-          DemoMetric(value: "iOS 26", label: "Native")
-          DemoMetric(value: "1 package", label: "Shared")
+          ScreenshotMetric(
+            value: "Swift 6.2",
+            label: "Strict",
+            tint: settings.mood.accent,
+            foreground: .white,
+            secondaryForeground: .white.opacity(0.58)
+          )
+          ScreenshotMetric(
+            value: "iOS 26",
+            label: "Native",
+            tint: settings.mood.accent,
+            foreground: .white,
+            secondaryForeground: .white.opacity(0.58)
+          )
+          ScreenshotMetric(
+            value: "1 package",
+            label: "Shared",
+            tint: settings.mood.accent,
+            foreground: .white,
+            secondaryForeground: .white.opacity(0.58)
+          )
         }
       }
       .padding(.horizontal, 30)
@@ -240,30 +300,30 @@ private struct DemoNativeStudioScreenshot: View {
 
   var body: some View {
     GeometryReader { proxy in
-      ZStack {
-        DemoScreenshotBackground(settings: settings)
-
+      ScreenshotBackground(
+        style: settings.backgroundStyle,
+        colors: settings.mood.background
+      ) {
         VStack(alignment: .leading, spacing: 24) {
-          DemoBrandBadge(accent: settings.mood.accent)
+          ScreenshotFeatureBadge(
+            "APPFOUNDATION",
+            systemImage: "swift",
+            tint: settings.mood.accent,
+            foreground: .white
+          )
 
-          VStack(alignment: .leading, spacing: 12) {
-            Text(
-              isVietnamese
-                ? "Thiết kế screenshot\nbằng SwiftUI."
-                : "Design screenshots\nin SwiftUI."
-            )
-            .font(.system(size: 43, weight: .bold, design: .rounded))
-            .tracking(-1.5)
-            .foregroundStyle(.white)
-
-            Text(
-              isVietnamese
-                ? "App đăng ký view. Engine preview và export."
-                : "The app registers views. The engine previews and exports."
-            )
-            .font(.system(size: 18, weight: .medium, design: .rounded))
-            .foregroundStyle(.white.opacity(0.72))
-          }
+          ScreenshotHeadline(
+            title: isVietnamese
+              ? "Thiết kế screenshot\nbằng SwiftUI."
+              : "Design screenshots\nin SwiftUI.",
+            subtitle: isVietnamese
+              ? "App đăng ký view. Engine preview và export."
+              : "The app registers views. The engine previews and exports.",
+            foreground: .white,
+            secondaryForeground: .white.opacity(0.72),
+            accent: settings.mood.accent,
+            titleSize: 43
+          )
 
           ZStack {
             DemoScreenshotSheet(
@@ -271,7 +331,7 @@ private struct DemoNativeStudioScreenshot: View {
               symbol: "square.grid.2x2.fill",
               accent: settings.mood.accent
             )
-            .rotationEffect(.degrees(6))
+            .screenshotTilt(.degrees(6))
             .offset(x: 42, y: 12)
 
             DemoScreenshotSheet(
@@ -279,7 +339,7 @@ private struct DemoNativeStudioScreenshot: View {
               symbol: "paintpalette.fill",
               accent: settings.mood.accent
             )
-            .rotationEffect(.degrees(-4))
+            .screenshotTilt(.degrees(-4))
             .offset(x: -34, y: 3)
 
             DemoScreenshotSheet(
@@ -293,9 +353,12 @@ private struct DemoNativeStudioScreenshot: View {
 
           Spacer()
 
-          Label("1320 × 2868 • Opaque PNG • Batch export", systemImage: "checkmark.seal.fill")
-            .font(.system(size: 15, weight: .semibold, design: .rounded))
-            .foregroundStyle(.white.opacity(0.82))
+          ScreenshotFeatureBadge(
+            "1320 × 2868 • Opaque PNG • Batch export",
+            systemImage: "checkmark.seal.fill",
+            tint: settings.mood.accent,
+            foreground: .white.opacity(0.86)
+          )
         }
         .padding(.horizontal, 30)
         .padding(.vertical, 38)
@@ -309,89 +372,153 @@ private struct DemoNativeStudioScreenshot: View {
 }
 
 @MainActor
-private struct DemoScreenshotBackground: View {
+private struct DemoComponentsScreenshot: View {
+  @Environment(\.locale) private var locale
   let settings: DemoScreenshotSettings
 
   var body: some View {
-    ZStack {
-      LinearGradient(
-        colors: settings.mood.background,
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-      )
+    GeometryReader { proxy in
+      ScreenshotBackground(
+        style: settings.backgroundStyle,
+        colors: settings.mood.background
+      ) {
+        VStack(alignment: .leading, spacing: 22) {
+          ScreenshotFeatureBadge(
+            "SCREENSHOT COMPONENTS",
+            systemImage: "square.3.layers.3d",
+            tint: settings.mood.accent,
+            foreground: .white
+          )
 
-      Circle()
-        .fill(settings.mood.accent.opacity(0.34))
-        .frame(width: 320, height: 320)
-        .blur(radius: 70)
-        .offset(x: 170, y: -330)
+          ScreenshotHeadline(
+            title: isVietnamese
+              ? "Lắp ghép nhanh.\nVẫn hoàn toàn riêng biệt."
+              : "Compose faster.\nStay completely custom.",
+            subtitle: isVietnamese
+              ? "Device frame, chrome, nền và hiệu ứng có thể tái sử dụng."
+              : "Reusable device frames, chrome, backgrounds, and visual effects.",
+            foreground: .white,
+            secondaryForeground: .white.opacity(0.72),
+            accent: settings.mood.accent,
+            titleSize: 39
+          )
 
-      if settings.showTechnicalGrid {
-        Canvas { context, size in
-          let spacing: CGFloat = 28
-          var path = Path()
-          for x in stride(from: CGFloat.zero, through: size.width, by: spacing) {
-            path.move(to: CGPoint(x: x, y: 0))
-            path.addLine(to: CGPoint(x: x, y: size.height))
+          ZStack {
+            DemoMiniDevice(settings: settings, selectedTab: "Home")
+              .frame(height: proxy.size.height * 0.42)
+              .screenshotTilt(.degrees(-7))
+              .offset(x: -62, y: 18)
+
+            DemoMiniDevice(settings: settings, selectedTab: "Themes")
+              .frame(height: proxy.size.height * 0.47)
+              .screenshotTilt(.degrees(5))
+              .offset(x: 58, y: -4)
           }
-          for y in stride(from: CGFloat.zero, through: size.height, by: spacing) {
-            path.move(to: CGPoint(x: 0, y: y))
-            path.addLine(to: CGPoint(x: size.width, y: y))
+          .frame(maxWidth: .infinity)
+          .frame(height: proxy.size.height * 0.48)
+
+          HStack(spacing: 8) {
+            ScreenshotFeatureBadge(
+              "Clay",
+              systemImage: "cube.fill",
+              tint: settings.mood.accent,
+              foreground: .white
+            )
+            ScreenshotFeatureBadge(
+              "Mock UI",
+              systemImage: "rectangle.topthird.inset.filled",
+              tint: settings.mood.accent,
+              foreground: .white
+            )
+            ScreenshotFeatureBadge(
+              "Visuals",
+              systemImage: "sparkles",
+              tint: settings.mood.accent,
+              foreground: .white
+            )
           }
-          context.stroke(path, with: .color(.white.opacity(0.045)), lineWidth: 0.5)
         }
+        .padding(.horizontal, 28)
+        .padding(.vertical, 36)
       }
     }
-    .ignoresSafeArea()
   }
-}
 
-private struct DemoBrandBadge: View {
-  let accent: Color
-
-  var body: some View {
-    HStack(spacing: 9) {
-      Image(systemName: "swift")
-        .font(.system(size: 14, weight: .bold))
-      Text("APPFOUNDATION")
-        .font(.system(size: 12, weight: .bold, design: .rounded))
-        .tracking(1.5)
-    }
-    .foregroundStyle(.white)
-    .padding(.horizontal, 14)
-    .padding(.vertical, 10)
-    .background(accent.opacity(0.42), in: Capsule())
-    .overlay {
-      Capsule().strokeBorder(.white.opacity(0.16))
-    }
+  private var isVietnamese: Bool {
+    locale.language.languageCode?.identifier == "vi"
   }
 }
 
 private struct DemoPhonePreview: View {
-  let accent: Color
-  let framed: Bool
+  let settings: DemoScreenshotSettings
 
   var body: some View {
-    VStack(spacing: 14) {
-      Capsule()
-        .fill(.black.opacity(0.75))
-        .frame(width: 92, height: 25)
-        .padding(.top, 9)
+    ScreenshotDeviceFrame(
+      style: settings.showDeviceFrame ? settings.frameStyle : .frameless,
+      device: .iPhonePortrait,
+      frameColor: settings.mood.clayFrame,
+      rotation: .degrees(-1.5),
+      showsCameraCutout: settings.showDeviceFrame
+    ) {
+      DemoPhoneScreen(
+        accent: settings.mood.accent,
+        showsSystemChrome: settings.showSystemChrome,
+        selectedTab: "Home"
+      )
+    }
+  }
+}
 
-      VStack(alignment: .leading, spacing: 14) {
-        HStack {
-          VStack(alignment: .leading, spacing: 3) {
-            Text("Good evening")
-              .font(.caption)
-              .foregroundStyle(.secondary)
-            Text("Your app, accelerated")
-              .font(.title3.bold())
-          }
-          Spacer()
-          Image(systemName: "crown.fill")
-            .foregroundStyle(accent)
-        }
+private struct DemoMiniDevice: View {
+  let settings: DemoScreenshotSettings
+  let selectedTab: String
 
+  var body: some View {
+    ScreenshotDeviceFrame(
+      style: settings.showDeviceFrame ? settings.frameStyle : .floating,
+      device: .iPhonePortrait,
+      frameColor: settings.mood.clayFrame,
+      showsCameraCutout: settings.showDeviceFrame
+    ) {
+      DemoPhoneScreen(
+        accent: settings.mood.accent,
+        showsSystemChrome: settings.showSystemChrome,
+        selectedTab: selectedTab
+      )
+    }
+  }
+}
+
+private struct DemoPhoneScreen: View {
+  let accent: Color
+  let showsSystemChrome: Bool
+  let selectedTab: String
+
+  private let tabs = [
+    ScreenshotTabBarItem(title: "Home", systemImage: "house.fill"),
+    ScreenshotTabBarItem(title: "Themes", systemImage: "paintpalette.fill"),
+    ScreenshotTabBarItem(title: "Settings", systemImage: "gearshape.fill"),
+  ]
+
+  var body: some View {
+    VStack(spacing: 0) {
+      if showsSystemChrome {
+        ScreenshotStatusBar()
+        ScreenshotNavigationBar(
+          title: "Good evening",
+          subtitle: "Your app, accelerated",
+          trailingItems: [
+            ScreenshotToolbarItem(
+              title: "Pro",
+              systemImage: "crown.fill",
+              isProminent: true
+            )
+          ],
+          tint: accent
+        )
+      }
+
+      VStack(alignment: .leading, spacing: 13) {
         RoundedRectangle(cornerRadius: 22, style: .continuous)
           .fill(
             LinearGradient(
@@ -411,7 +538,7 @@ private struct DemoPhonePreview: View {
             .foregroundStyle(.white)
             .padding(18)
           }
-          .frame(height: 170)
+          .frame(height: 156)
 
         ForEach(["PurchaseManager", "ThemeManager", "ScreenshotStudio"], id: \.self) { item in
           HStack {
@@ -421,24 +548,26 @@ private struct DemoPhonePreview: View {
               .font(.subheadline.weight(.semibold))
             Spacer()
           }
-          .padding(13)
+          .padding(12)
           .background(.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
         }
+
+        Spacer(minLength: 4)
+
+        if showsSystemChrome {
+          ScreenshotTabBar(
+            items: tabs,
+            selectedID: selectedTab,
+            tint: accent
+          )
+          ScreenshotHomeIndicator()
+        }
       }
-      .padding(.horizontal, 18)
-      .padding(.bottom, 18)
+      .padding(.horizontal, 16)
+      .padding(.bottom, 8)
     }
     .foregroundStyle(.primary)
     .background(Color(uiColor: .systemBackground))
-    .clipShape(RoundedRectangle(cornerRadius: framed ? 46 : 28, style: .continuous))
-    .overlay {
-      if framed {
-        RoundedRectangle(cornerRadius: 46, style: .continuous)
-          .strokeBorder(.black.opacity(0.72), lineWidth: 8)
-      }
-    }
-    .shadow(color: .black.opacity(0.28), radius: 24, y: 18)
-    .padding(.horizontal, framed ? 18 : 0)
   }
 }
 
@@ -450,11 +579,12 @@ private struct DemoFeatureCard: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 18) {
-      Image(systemName: systemImage)
-        .font(.system(size: 23, weight: .semibold))
-        .foregroundStyle(accent)
-        .frame(width: 48, height: 48)
-        .background(accent.opacity(0.14), in: RoundedRectangle(cornerRadius: 15))
+      ScreenshotIconBadge(
+        systemImage: systemImage,
+        tint: accent,
+        foreground: .white,
+        size: 48
+      )
 
       VStack(alignment: .leading, spacing: 4) {
         Text(title)
@@ -467,30 +597,7 @@ private struct DemoFeatureCard: View {
     .foregroundStyle(.white)
     .frame(maxWidth: .infinity, minHeight: 150, alignment: .leading)
     .padding(18)
-    .background(.white.opacity(0.09), in: RoundedRectangle(cornerRadius: 24))
-    .overlay {
-      RoundedRectangle(cornerRadius: 24)
-        .strokeBorder(.white.opacity(0.11))
-    }
-  }
-}
-
-private struct DemoMetric: View {
-  let value: String
-  let label: String
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 4) {
-      Text(value)
-        .font(.system(size: 15, weight: .bold, design: .rounded))
-      Text(label)
-        .font(.caption)
-        .foregroundStyle(.white.opacity(0.55))
-    }
-    .foregroundStyle(.white)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(14)
-    .background(.black.opacity(0.16), in: RoundedRectangle(cornerRadius: 17))
+    .screenshotGlass(cornerRadius: 24, borderColor: .white.opacity(0.11))
   }
 }
 
@@ -539,6 +646,6 @@ private struct DemoScreenshotSheet: View {
       RoundedRectangle(cornerRadius: 30)
         .strokeBorder(.white.opacity(0.18))
     }
-    .shadow(color: .black.opacity(0.24), radius: 20, y: 14)
+    .screenshotShadow(.strong)
   }
 }

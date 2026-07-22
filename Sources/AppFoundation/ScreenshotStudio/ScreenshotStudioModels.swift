@@ -248,7 +248,7 @@ public enum ScreenshotFileName {
 
     public init(
       appName: String,
-      presets: [ScreenshotDevicePreset] = .appStoreDefaults,
+      presets: [ScreenshotDevicePreset] = ScreenshotDevicePreset.appStoreDefaults,
       locales: [ScreenshotStudioLocale] = [.english],
       defaultPresetID: String? = nil,
       defaultLocaleID: String? = nil,
@@ -256,7 +256,7 @@ public enum ScreenshotFileName {
       @ScreenshotDefinitionBuilder screenshots: () -> [ScreenshotDefinition]
     ) {
       self.appName = appName
-      self.presets = presets.isEmpty ? .appStoreDefaults : presets
+      self.presets = presets.isEmpty ? ScreenshotDevicePreset.appStoreDefaults : presets
       self.locales = locales.isEmpty ? [.english] : locales
       self.screenshots = screenshots()
       self.defaultPresetID = defaultPresetID

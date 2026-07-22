@@ -1,5 +1,5 @@
 import Testing
-@testable import AppFoundation
+@testable import AppFoundationScreenshotStudio
 
 @Suite("Screenshot Studio")
 struct ScreenshotStudioTests {
@@ -10,6 +10,16 @@ struct ScreenshotStudioTests {
     #expect(preset.pixelSize == ScreenshotPixelSize(width: 1320, height: 2868))
     #expect(preset.pointWidth == 440)
     #expect(preset.pointHeight == 956)
+  }
+
+  @Test("Built-in Mac preset uses 16:10 output")
+  func macPresetDimensions() {
+    let preset = ScreenshotDevicePreset.mac16x10
+
+    #expect(preset.pixelSize == ScreenshotPixelSize(width: 2880, height: 1800))
+    #expect(preset.pointWidth == 1440)
+    #expect(preset.pointHeight == 900)
+    #expect(preset.pixelSize.isLandscape)
   }
 
   @Test("Landscape preset swaps dimensions and preserves scale")

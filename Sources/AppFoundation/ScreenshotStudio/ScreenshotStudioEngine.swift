@@ -1,7 +1,9 @@
-#if canImport(SwiftUI) && canImport(UIKit)
+#if canImport(SwiftUI) && canImport(ImageIO) && canImport(UniformTypeIdentifiers)
+  import CoreGraphics
   import Foundation
+  import ImageIO
   import SwiftUI
-  import UIKit
+  import UniformTypeIdentifiers
 
   public enum ScreenshotStudioColorScheme: String, CaseIterable, Identifiable, Sendable {
     case light
@@ -114,9 +116,8 @@
         locale: locale,
         colorScheme: colorScheme
       )
-      let image = UIImage(cgImage: cgImage, scale: 1, orientation: .up)
 
-      guard let data = image.pngData() else {
+      guard let data = pngData(for: cgImage) else {
         throw ScreenshotStudioError.pngEncodingFailed(screenshot: definition.title)
       }
 
@@ -134,14 +135,15 @@
       catalog: ScreenshotCatalog,
       preset: ScreenshotDevicePreset,
       locale: ScreenshotStudioLocale = .english,
-      colorScheme: ScreenshotStudioColorScheme = .light
+      colorScheme: ScreenshotStudioColorScheme = .light,
+      outputDirectory: URL? = nil
     ) throws -> [ScreenshotExportedFile] {
       let definitions = catalog.screenshots.filter { $0.supports(preset) }
       guard !definitions.isEmpty else {
         throw ScreenshotStudioError.noRegisteredScreenshots
       }
 
-      let directory = try makeOutputDirectory(
+      let directory = try outputDirectory ?? makeOutputDirectory(
         appName: catalog.appName,
         preset: preset
       )
@@ -202,6 +204,22 @@
       return cgImage
     }
 
+    private func pngData(for image: CGImage) -> Data? {
+      let data = NSMutableData()
+      guard let destination = CGImageDestinationCreateWithData(
+        data as CFMutableData,
+        UTType.png.identifier as CFString,
+        1,
+        nil
+      ) else {
+        return nil
+      }
+
+      CGImageDestinationAddImage(destination, image, nil)
+      guard CGImageDestinationFinalize(destination) else { return nil }
+      return data as Data
+    }
+
     private func makeOutputDirectory(
       appName: String,
       preset: ScreenshotDevicePreset
@@ -237,7 +255,7 @@
 
     var body: some View {
       ZStack {
-        Color(uiColor: .systemBackground)
+        colorScheme == .dark ? Color.black : Color.white
         content
       }
       .environment(\.locale, locale)

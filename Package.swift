@@ -5,21 +5,36 @@ import PackageDescription
 let package = Package(
     name: "AppFoundation",
     platforms: [
-        .iOS("26.0")
+        .iOS("26.0"),
+        .macOS("15.0")
     ],
     products: [
         .library(
             name: "AppFoundation",
             targets: ["AppFoundation"]
+        ),
+        .library(
+            name: "AppFoundationScreenshotStudio",
+            targets: ["AppFoundationScreenshotStudio"]
         )
     ],
     targets: [
         .target(
-            name: "AppFoundation"
+            name: "AppFoundationScreenshotStudio",
+            path: "Sources/AppFoundation/ScreenshotStudio"
+        ),
+        .target(
+            name: "AppFoundation",
+            dependencies: ["AppFoundationScreenshotStudio"],
+            path: "Sources/AppFoundation",
+            exclude: ["ScreenshotStudio"]
         ),
         .testTarget(
             name: "AppFoundationTests",
-            dependencies: ["AppFoundation"]
+            dependencies: [
+                "AppFoundation",
+                "AppFoundationScreenshotStudio"
+            ]
         )
     ],
     swiftLanguageModes: [.v6]

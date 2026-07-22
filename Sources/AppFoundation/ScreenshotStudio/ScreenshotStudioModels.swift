@@ -197,8 +197,9 @@ public enum ScreenshotFileName {
   @MainActor
   @resultBuilder
   public enum ScreenshotDefinitionBuilder {
-    public static func buildBlock(_ components: ScreenshotDefinition...) -> [ScreenshotDefinition] {
-      components
+    public static func buildBlock(_ components: [ScreenshotDefinition]...) -> [ScreenshotDefinition]
+    {
+      components.flatMap { $0 }
     }
 
     public static func buildArray(_ components: [[ScreenshotDefinition]]) -> [ScreenshotDefinition]

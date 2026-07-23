@@ -1,4 +1,5 @@
 #if os(iOS) && canImport(SwiftUI)
+  import CoreGraphics
   import Foundation
   import SwiftUI
 
@@ -13,7 +14,7 @@
     }
 
     public var aspectRatio: Double { Double(width) / Double(height) }
-    public var cgSize: CGSize { CGSize(width: width, height: height) }
+    public var cgSize: CGSize { CGSize(width: CGFloat(width), height: CGFloat(height)) }
   }
 
   public struct PromoVideoOutputPreset: Identifiable, Codable, Hashable, Sendable {

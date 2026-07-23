@@ -12,6 +12,11 @@ struct AppRootView: View {
             Label("Showcase", systemImage: "square.stack.3d.up.fill")
           }
 
+        WidgetShowcaseDemoView()
+          .tabItem {
+            Label("Widgets", systemImage: "square.grid.2x2.fill")
+          }
+
         PurchaseUpsellDemoView()
           .tabItem {
             Label("Upsells", systemImage: "crown.fill")

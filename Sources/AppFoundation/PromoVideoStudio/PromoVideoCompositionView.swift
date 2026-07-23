@@ -31,24 +31,35 @@
 
     public var body: some View {
       GeometryReader { proxy in
-        let canvasSize = proxy.size
+        let logicalSize = preset.pointSize
+        let scale = min(
+          proxy.size.width / max(logicalSize.width, 1),
+          proxy.size.height / max(logicalSize.height, 1)
+        )
 
-        ZStack {
-          Color.black
-
-          if let position = project.timelinePosition(at: playhead) {
-            composition(position: position, canvasSize: canvasSize)
-          }
-
-          if showsSafeAreas {
-            PromoVideoSafeAreaOverlay()
-          }
-        }
-        .frame(width: canvasSize.width, height: canvasSize.height)
-        .clipped()
+        canvas(size: logicalSize)
+          .frame(width: logicalSize.width, height: logicalSize.height)
+          .scaleEffect(scale)
+          .frame(width: proxy.size.width, height: proxy.size.height)
       }
       .aspectRatio(CGFloat(preset.pixelSize.aspectRatio), contentMode: .fit)
       .background(Color.black)
+    }
+
+    private func canvas(size: CGSize) -> some View {
+      ZStack {
+        Color.black
+
+        if let position = project.timelinePosition(at: playhead) {
+          composition(position: position, canvasSize: size)
+        }
+
+        if showsSafeAreas {
+          PromoVideoSafeAreaOverlay()
+        }
+      }
+      .frame(width: size.width, height: size.height)
+      .clipped()
     }
 
     @ViewBuilder

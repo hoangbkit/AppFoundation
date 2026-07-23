@@ -100,4 +100,21 @@ final class DemoTests: XCTestCase {
         XCTAssertEqual(Set(identifiers).count, identifiers.count)
         XCTAssertFalse(identifiers.isEmpty)
     }
+
+    func testScreenshotTemplateGalleryRegistersEveryPublicTemplate() {
+        let settings = ScreenshotTemplateDemoSettings()
+        let catalog = ScreenshotTemplateDemoCatalog.make(settings: settings)
+        let identifiers = catalog.screenshots.map(\.id)
+
+        XCTAssertEqual(identifiers, ScreenshotTemplateDemoCatalog.templateIDs)
+        XCTAssertEqual(identifiers.count, 10)
+        XCTAssertEqual(Set(identifiers).count, identifiers.count)
+        XCTAssertEqual(
+            catalog.presets.map(\.id),
+            [
+                ScreenshotDevicePreset.iPhone69Portrait.id,
+                ScreenshotDevicePreset.iPhone65Portrait.id,
+            ]
+        )
+    }
 }

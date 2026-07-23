@@ -31,7 +31,7 @@ public struct WidgetShowcaseView<Background: View>: View {
         NavigationStack(path: $path) {
             GeometryReader { proxy in
                 ZStack {
-                    background.ignoresSafeArea()
+                    styledBackground
 
                     ScrollView {
                         VStack(alignment: .leading, spacing: 28) {
@@ -55,11 +55,19 @@ public struct WidgetShowcaseView<Background: View>: View {
             .foregroundStyle(style.primaryTextColor)
             .navigationTitle(guide.galleryTitle)
             .navigationBarTitleDisplayMode(.large)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .navigationDestination(for: WidgetShowcaseRoute.self) { route in
                 destination(for: route)
             }
         }
         .tint(style.accentColor)
+    }
+
+    private var styledBackground: some View {
+        ZStack {
+            WidgetShowcaseDefaultBackground(style: style)
+            background.ignoresSafeArea()
+        }
     }
 
     private var introCard: some View {
@@ -81,17 +89,19 @@ public struct WidgetShowcaseView<Background: View>: View {
                 Image(systemName: "square.grid.2x2.fill")
                     .font(.title2.weight(.semibold))
                     .foregroundStyle(style.accentColor)
-                    .frame(width: 48, height: 48)
-                    .background(style.elevatedSurfaceColor, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
             }
 
-            HStack(spacing: 8) {
-                metricPill("\(catalog.items.count) designs", systemImage: "sparkles")
-                metricPill("\(catalog.families.count) sizes", systemImage: "rectangle.3.group")
-                if catalog.proItemCount > 0 {
-                    metricPill("\(catalog.proItemCount) Pro", systemImage: "crown.fill")
+            ScrollView(.horizontal) {
+                HStack(spacing: 8) {
+                    metricPill("\(catalog.items.count) designs", systemImage: "sparkles")
+                    metricPill("\(catalog.families.count) sizes", systemImage: "rectangle.3.group")
+                    if catalog.proItemCount > 0 {
+                        metricPill("\(catalog.proItemCount) Pro", systemImage: "crown.fill")
+                    }
                 }
+                .padding(.horizontal, 1)
             }
+            .scrollIndicators(.hidden)
         }
         .widgetShowcaseCard(style: style, padding: 20, cornerRadius: 26)
         .accessibilityElement(children: .combine)
@@ -106,7 +116,10 @@ public struct WidgetShowcaseView<Background: View>: View {
                     .font(.headline)
                     .foregroundStyle(style.accentColor)
                     .frame(width: 44, height: 44)
-                    .background(style.accentColor.opacity(0.13), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .background(
+                        style.accentColor.opacity(0.13),
+                        in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    )
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Add \(guide.appName) to your Home Screen")
@@ -131,7 +144,10 @@ public struct WidgetShowcaseView<Background: View>: View {
         .accessibilityHint("Shows instructions for adding a widget")
     }
 
-    private func familySection(_ family: WidgetShowcaseFamily, availableWidth: Double) -> some View {
+    private func familySection(
+        _ family: WidgetShowcaseFamily,
+        availableWidth: Double
+    ) -> some View {
         let size = family.previewSize(availableWidth: availableWidth)
 
         return VStack(alignment: .leading, spacing: 13) {
@@ -160,7 +176,10 @@ public struct WidgetShowcaseView<Background: View>: View {
         }
     }
 
-    private func widgetButton(_ item: WidgetShowcaseItem, size: WidgetShowcaseSize) -> some View {
+    private func widgetButton(
+        _ item: WidgetShowcaseItem,
+        size: WidgetShowcaseSize
+    ) -> some View {
         Button {
             if item.access == .pro && !hasPro {
                 onRequestUpgrade?()
@@ -195,6 +214,7 @@ public struct WidgetShowcaseView<Background: View>: View {
                                 .padding(9)
                         }
                     }
+                    .shadow(color: style.shadowColor, radius: 12, y: 7)
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(item.title)
@@ -210,13 +230,19 @@ public struct WidgetShowcaseView<Background: View>: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel(for: item))
-        .accessibilityHint(item.access == .pro && !hasPro ? "Requests an upgrade" : "Shows widget details and setup instructions")
+        .accessibilityHint(
+            item.access == .pro && !hasPro
+                ? "Requests an upgrade"
+                : "Shows widget details and setup instructions"
+        )
     }
 
     private func metricPill(_ title: String, systemImage: String) -> some View {
         Label(title, systemImage: systemImage)
             .font(.caption2.weight(.semibold))
             .foregroundStyle(style.secondaryTextColor)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, 9)
             .padding(.vertical, 7)
             .background(style.elevatedSurfaceColor, in: Capsule())
@@ -231,7 +257,7 @@ public struct WidgetShowcaseView<Background: View>: View {
                 goal: .general,
                 configuration: guide,
                 style: style,
-                background: { background }
+                background: { styledBackground }
             )
         case let .widget(id):
             if let item = catalog.item(id: id) {
@@ -241,7 +267,7 @@ public struct WidgetShowcaseView<Background: View>: View {
                     hasPro: hasPro,
                     style: style,
                     onRequestUpgrade: onRequestUpgrade,
-                    background: { background }
+                    background: { styledBackground }
                 )
             } else {
                 ContentUnavailableView("Widget unavailable", systemImage: "square.grid.2x2")
@@ -270,7 +296,7 @@ public extension WidgetShowcaseView where Background == Color {
             hasPro: hasPro,
             style: style,
             onRequestUpgrade: onRequestUpgrade,
-            background: { style.backgroundColor }
+            background: { .clear }
         )
     }
 }
@@ -278,6 +304,33 @@ public extension WidgetShowcaseView where Background == Color {
 private enum WidgetShowcaseRoute: Hashable {
     case guide
     case widget(String)
+}
+
+private struct WidgetShowcaseDefaultBackground: View {
+    let style: WidgetShowcaseStyle
+
+    var body: some View {
+        ZStack {
+            style.backgroundColor
+
+            LinearGradient(
+                colors: [style.gradientStartColor, style.gradientEndColor, .clear],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .blur(radius: 30)
+            .scaleEffect(1.16)
+
+            RadialGradient(
+                colors: [style.accentColor.opacity(0.20), .clear],
+                center: .topTrailing,
+                startRadius: 8,
+                endRadius: 520
+            )
+        }
+        .ignoresSafeArea()
+        .accessibilityHidden(true)
+    }
 }
 
 private extension View {
@@ -288,11 +341,15 @@ private extension View {
     ) -> some View {
         self
             .padding(padding)
-            .background(style.surfaceColor, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .background(
+                style.surfaceColor,
+                in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            )
             .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .strokeBorder(style.borderColor)
             }
+            .shadow(color: style.shadowColor, radius: 18, y: 10)
     }
 }
 #endif

@@ -2,11 +2,11 @@
 
 ## Goal
 
-Give every app a native developer-only workspace for designing and exporting App Store screenshots without moving app-specific visual design into AppFoundation.
+Give every app a native developer-only workspace for designing, previewing, rendering, and exporting App Store screenshots.
 
-The package owns the engine, control surface, and optional reusable canvas primitives. Each app owns the compositions, fixture data, copy, colors, themes, and final art direction.
+AppFoundation owns the renderer, Studio workflow, responsive template layouts, and reusable screenshot components. The host app owns branding, copy, deterministic fixture data, and the feature views placed into templates.
 
-> The engine renders and exports. The app composes and registers.
+> The app supplies content. AppFoundation owns positioning and export.
 
 ## Package boundary
 
@@ -16,100 +16,183 @@ AppFoundation provides:
 - screenshot registration and result-builder APIs
 - live preview at the selected device aspect ratio
 - appearance and locale overrides
-- app-defined control injection
+- separate selected-screenshot and app-configuration controls
 - deterministic opaque PNG rendering with `ImageRenderer`
 - selected and batch export through the system share sheet
+- a rendered full-set carousel preview
 - stable filenames and pixel validation
-- optional device frames, mock chrome, backgrounds, promotional elements, and visual effects
+- responsive strongly typed screenshot template views
+- optional device frames, mock chrome, backgrounds, promotional elements, and effects
 
 The host app provides:
 
-- every screenshot SwiftUI composition
-- app screens, cards, widgets, and deterministic fixtures
-- promotional hierarchy and copy
-- app-specific typography, colors, and brand identity
+- app icon and name
+- marketing title, subtitle, and footer copy
+- app-owned themes and background views
+- deterministic feature views, cards, widgets, and screen fixtures
 - registration order and filenames
-- the decision to expose the studio only in Debug or an internal build
+- the decision to expose the Studio only in Debug or an internal build
 
-AppFoundation must not ship portfolio-wide finished templates. The reusable component layer supplies canvas pieces that remain fully app-configurable.
+AppFoundation templates are opinionated layout systems, not finished app-branded campaigns. Every template accepts normal SwiftUI views and completely owns canvas geometry.
 
-## Registration API
+## Studio presentation
 
-```swift
-@MainActor
-enum MiLoveScreenshotCatalog {
-    static func make(settings: MiLoveScreenshotSettings) -> ScreenshotCatalog {
-        ScreenshotCatalog(
-            appName: "MiLove",
-            presets: [.iPhone69Portrait, .iPhone65Portrait],
-            locales: [
-                .english,
-                ScreenshotStudioLocale(
-                    title: "Tiếng Việt",
-                    localeIdentifier: "vi-VN"
-                ),
-            ]
-        ) {
-            ScreenshotDefinition(
-                id: "hero",
-                title: "Relationship Hero",
-                filename: "Every day together matters"
-            ) {
-                MiLoveHeroStoreScreenshot(settings: settings)
-            }
-
-            ScreenshotDefinition(
-                id: "widgets",
-                title: "Widgets",
-                filename: "Beautiful relationship widgets"
-            ) {
-                MiLoveWidgetStoreScreenshot(settings: settings)
-            }
-        }
-    }
-}
-```
-
-Present the shared studio and inject app-specific controls:
+Push `ScreenshotStudio` from the app's Settings navigation stack. The Studio does not create a nested `NavigationStack`, always uses an inline navigation title, and hides any host tab bar while open.
 
 ```swift
 #if DEBUG
-ScreenshotStudio(
-    catalog: MiLoveScreenshotCatalog.make(settings: settings)
-) {
-    MiLoveScreenshotControls(settings: settings)
+NavigationLink("Screenshot Studio") {
+  ScreenshotStudio(
+    catalog: MyScreenshotCatalog.make(settings: settings)
+  ) { context in
+    MySelectedScreenshotControls(settings: settings, context: context)
+  } appConfigurationControls: { context in
+    MyCampaignControls(settings: settings, context: context)
+  }
 }
 #endif
 ```
 
-A dedicated internal build can use a custom compilation condition:
+The control center uses a segmented switch:
+
+- **Screenshot** selects one registered screenshot and shows controls for that composition.
+- **App Config** contains output preset, appearance, locale, and app-wide campaign controls.
+
+The host builders may return normal SwiftUI `Section` views and may change sections dynamically based on `ScreenshotStudioControlContext.selectedScreenshotID`.
+
+The trailing toolbar preview button renders the complete supported set at final dimensions and opens it as a swipeable carousel. Export remains separate.
+
+## Registration
 
 ```swift
-#if DEBUG || SCREENSHOT_STUDIO
-ScreenshotStudio(...)
-#endif
+@MainActor
+enum MyScreenshotCatalog {
+  static func make(settings: MyScreenshotSettings) -> ScreenshotCatalog {
+    ScreenshotCatalog(
+      appName: "My App",
+      presets: [.iPhone69Portrait, .iPhone65Portrait],
+      locales: [.english]
+    ) {
+      ScreenshotDefinition(
+        id: "hero",
+        title: "Hero",
+        filename: "The best way to focus"
+      ) {
+        MyHeroScreenshot(settings: settings)
+      }
+    }
+  }
+}
 ```
 
-The APIs remain available in all builds so the host can create an internal Release-quality screenshot configuration while keeping the studio out of its App Store build.
+## Template architecture
 
-## Reusable visual components
+Templates are independent strongly typed SwiftUI view types. There is no single template-style enum and no initializer filled with irrelevant optional arguments.
 
-The optional component layer includes:
+Each template requests only the visual slots its composition needs:
 
-- `ScreenshotDeviceFrame` with frameless, floating, minimal, realistic, and clay styles
-- iPhone portrait, iPhone landscape, and iPad portrait device profiles
-- `ScreenshotStatusBar`, `ScreenshotNavigationBar`, `ScreenshotToolbarIcon`, `ScreenshotToolbar`, `ScreenshotTabBar`, and `ScreenshotHomeIndicator`
-- solid, gradient, aurora, spotlight, paper, technical-grid, rings, and floating-shapes backgrounds
-- `ScreenshotHeadline`, badges, metrics, callouts, and page indicators
-- reusable shadow, tilt, perspective, glow, glass, and clay modifiers
+- `HeroScreenshotTemplate`
+- `LayeredCardsScreenshotTemplate`
+- `SplitFeatureScreenshotTemplate`
+- `FloatingCardsScreenshotTemplate`
+- `WidgetGalleryScreenshotTemplate`
+- `BeforeAfterScreenshotTemplate`
+- `FeatureStepsScreenshotTemplate`
+- `DeviceFocusScreenshotTemplate`
+- `ComparisonGridScreenshotTemplate`
+- `ContinuousCampaignScreenshotTemplate`
 
-These components accept app-owned content and colors. They do not decide the final screenshot composition.
+Every template owns:
 
-See [ScreenshotStudioComponents.md](ScreenshotStudioComponents.md) for the complete API and examples.
+- safe margins
+- headline and content regions
+- visual sizing and clipping
+- overlap, rotation, and depth
+- shadows
+- footer placement
+- adaptation between output presets
+
+The host app does not provide raw offsets, rotations, canvas padding, or `GeometryReader` positioning when using a standard template.
+
+## Four common content components
+
+Most templates are composed from four app-supplied layers plus a background:
+
+1. Brand
+2. Message
+3. One or more template-specific visuals
+4. Footer
+
+The package includes optional standard content views:
+
+- `ScreenshotTemplateBrand`
+- `ScreenshotTemplateMessage`
+- `ScreenshotTemplateFooter`
+
+Apps may replace any of them with custom SwiftUI views.
+
+```swift
+HeroScreenshotTemplate {
+  MyStoreBackground()
+} brand: {
+  ScreenshotTemplateBrand(appName: "My App") {
+    Image("AppIcon").resizable()
+  }
+} message: {
+  ScreenshotTemplateMessage(
+    title: "Focus on what matters.",
+    subtitle: "A calm workspace for your daily priorities.",
+    foreground: .white,
+    secondaryForeground: .white.opacity(0.72)
+  )
+} visual: {
+  MyDashboardFixture()
+} footer: {
+  ScreenshotTemplateFooter(
+    "Today",
+    systemImage: "checkmark.circle.fill",
+    tint: .mint,
+    foreground: .white
+  )
+}
+```
+
+## Background control
+
+Background is a generic full-canvas SwiftUI layer independent from template positioning. Apps may provide:
+
+- a custom app-owned background view
+- `ScreenshotBackground`
+- a solid color
+- a gradient
+- an image or deterministic pattern
+
+The template fills and clips the background to the exact screenshot canvas. Background content never participates in foreground layout measurement.
+
+```swift
+LayeredCardsScreenshotTemplate {
+  ScreenshotBackground(
+    style: .technicalGrid,
+    colors: [.black, .indigo, .cyan]
+  )
+} brand: {
+  MyBrand()
+} message: {
+  MyMessage()
+} primary: {
+  MainCard()
+} secondary: {
+  SecondaryCard()
+} tertiary: {
+  ThirdCard()
+} footer: {
+  MyFooter()
+}
+```
 
 ## Rendering contract
 
-Each registered screenshot is rendered at the preset's point size and output scale. The built-in 6.9-inch iPhone preset uses a 440 × 956 point canvas at 3× to create a 1320 × 2868 pixel PNG.
+The built-in 6.9-inch iPhone preset uses a 440 × 956 point canvas at 3× to create a 1320 × 2868 pixel PNG.
 
 The renderer:
 
@@ -118,9 +201,9 @@ The renderer:
 3. clips the view to the exact point canvas
 4. renders with `ImageRenderer`
 5. forces opaque output
-6. verifies the produced `CGImage` dimensions
+6. validates the `CGImage` dimensions
 7. writes an atomic PNG into a temporary batch folder
-8. shares one or multiple output files using the system share sheet
+8. previews or shares the resulting files
 
 Built-in presets:
 
@@ -129,67 +212,22 @@ Built-in presets:
 - iPad 13-inch: 2064 × 2752 at 2×
 - Mac 16:10 helper: 2880 × 1800 at 2×
 
-The built-in sizes are convenience presets rather than hard-coded policy. Apps can register custom `ScreenshotDevicePreset` values when additional dimensions are needed.
-
-Apple's accepted screenshot sizes remain the source of truth:
-
-<https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/>
+Apps may register custom `ScreenshotDevicePreset` values.
 
 ## Deterministic screenshot rules
 
-Registered screenshot views should not depend directly on:
+Registered screenshots should not depend directly on:
 
 - current dates or time
 - real user data
 - random values
 - network responses
-- Photos permission or the Photos library
+- Photos or other permissions
 - live StoreKit products or transactions
 - asynchronous image loading
 - physical device dimensions
 
-Use fixed fixtures and observable screenshot settings instead:
-
-```swift
-@Observable
-@MainActor
-final class MiLoveScreenshotSettings {
-    var theme: MiLoveTheme = .paper
-    var relationshipFixture: RelationshipFixture = .threeYears
-    var avatarSet: AvatarFixture = .storePreview
-    var backgroundStyle: ScreenshotBackgroundStyle = .aurora
-    var frameStyle: ScreenshotDeviceFrameStyle = .clay
-}
-```
-
-This makes exports reproducible and lets intentional design changes be reviewed in source control.
-
-## Control view responsibilities
-
-The shared `ScreenshotStudio` interface includes:
-
-- registered screenshot selection
-- live scaled preview
-- output preset selection
-- exact pixel dimensions and render scale
-- light and dark appearance override
-- locale selection
-- app-defined controls
-- selected and batch export
-- progress, errors, and system sharing
-
-The shared interface does not understand app themes or app data. The injected app control view can expose any settings observed by its screenshot compositions.
-
-## File naming
-
-Exports use stable sortable names:
-
-```text
-01-every-day-together-matters-iphone-6-9-1320x2868.png
-02-beautiful-relationship-widgets-iphone-6-9-1320x2868.png
-```
-
-`ScreenshotFileName` removes unsafe characters, collapses separators, preserves export order, and includes the selected preset identifier.
+Use fixed fixtures and observable screenshot settings so exports are reproducible.
 
 ## Source layout
 
@@ -198,55 +236,13 @@ Sources/AppFoundation/ScreenshotStudio/
 ├── ScreenshotStudioModels.swift
 ├── ScreenshotStudioEngine.swift
 ├── ScreenshotStudioView.swift
-└── Components/
-    ├── ScreenshotBackground.swift
-    ├── ScreenshotDeviceFrame.swift
-    ├── ScreenshotEffects.swift
-    ├── ScreenshotPromotionalComponents.swift
-    └── ScreenshotSystemChrome.swift
-
-Examples/Demo/Demo/
-└── ScreenshotStudioDemoView.swift
-
-Tests/AppFoundationTests/
-└── ScreenshotStudioTests.swift
+├── Components/
+└── Templates/
+    ├── ScreenshotTemplateComponents.swift
+    ├── HeroScreenshotTemplates.swift
+    ├── LayeredScreenshotTemplates.swift
+    ├── FeatureScreenshotTemplates.swift
+    └── GalleryScreenshotTemplates.swift
 ```
 
-The package remains one Swift Package target for simple adoption while the source layout keeps models, rendering, controls, and visual primitives separated.
-
-## Demo
-
-The Demo app includes a dedicated **Screenshots** tab. It proves that:
-
-- the Demo owns four distinct promotional screenshot compositions
-- the app registers those views with the package
-- app-defined controls update previews and exports
-- background and device-frame styles can be changed live
-- mock system chrome can be enabled or hidden
-- English and Vietnamese locale overrides work
-- 6.9-inch and 6.5-inch output presets work
-- selected and batch PNG export use the shared engine
-
-The Demo compositions are examples only and are not reusable templates for other apps.
-
-## Validation
-
-Portable Swift 6.2 tests cover built-in dimensions, landscape conversion, and stable filenames. GitHub Actions runs `swift test` on pushes to `develop`.
-
-Final iOS rendering and Demo interaction require Xcode 26 on macOS because SwiftUI and UIKit are unavailable in the Linux workflow.
-
-## Completion status
-
-- [x] Document package/app ownership boundary
-- [x] Add extensible output preset and locale models
-- [x] Add screenshot registration result builder
-- [x] Add exact-dimension `ImageRenderer` engine
-- [x] Add opaque PNG validation and batch export
-- [x] Add reusable developer control interface
-- [x] Support app-defined controls
-- [x] Add reusable device and clay frames
-- [x] Add mock system chrome and toolbar icons
-- [x] Add configurable background visuals
-- [x] Add promotional components and effects
-- [x] Add Demo-owned component showcase
-- [x] Add portable tests
+The Demo pushes Screenshot Studio from Settings and registers template-based example compositions.

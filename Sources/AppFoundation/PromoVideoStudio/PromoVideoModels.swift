@@ -21,15 +21,26 @@
     public let id: String
     public var title: String
     public var pixelSize: PromoVideoPixelSize
+    public var scale: Double
 
     public init(
       id: String,
       title: String,
-      pixelSize: PromoVideoPixelSize
+      pixelSize: PromoVideoPixelSize,
+      scale: Double = 3
     ) {
+      precondition(scale > 0, "Promo video output scale must be positive.")
       self.id = id
       self.title = title
       self.pixelSize = pixelSize
+      self.scale = scale
+    }
+
+    public var pointSize: CGSize {
+      CGSize(
+        width: Double(pixelSize.width) / scale,
+        height: Double(pixelSize.height) / scale
+      )
     }
   }
 

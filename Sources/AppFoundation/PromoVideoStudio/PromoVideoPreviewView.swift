@@ -1,5 +1,6 @@
 #if os(iOS) && canImport(SwiftUI)
   import Combine
+  import Foundation
   import SwiftUI
 
   @MainActor

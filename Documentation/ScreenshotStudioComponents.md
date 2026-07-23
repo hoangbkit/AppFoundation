@@ -1,8 +1,36 @@
 # Screenshot Studio Components
 
-Screenshot Studio includes optional visual primitives for building App Store screenshots quickly without forcing every app into the same template.
+Screenshot Studio includes two reusable layers:
 
-The engine still renders and exports. The host app still owns the composition, copy, colors, fixtures, and brand identity.
+1. strongly typed responsive template views that own complete screenshot positioning
+2. lower-level visual primitives for custom compositions and template content
+
+The engine renders and exports. Templates own geometry. The host app owns copy, colors, fixtures, brand identity, and the SwiftUI views placed into each slot.
+
+## Template views
+
+Use a concrete template when the screenshot matches a standard composition:
+
+- `HeroScreenshotTemplate`
+- `LayeredCardsScreenshotTemplate`
+- `SplitFeatureScreenshotTemplate`
+- `FloatingCardsScreenshotTemplate`
+- `WidgetGalleryScreenshotTemplate`
+- `BeforeAfterScreenshotTemplate`
+- `FeatureStepsScreenshotTemplate`
+- `DeviceFocusScreenshotTemplate`
+- `ComparisonGridScreenshotTemplate`
+- `ContinuousCampaignScreenshotTemplate`
+
+Each type asks only for the content required by that layout and owns all frames, offsets, overlap, clipping, shadows, safe margins, and output-preset adaptation.
+
+The optional standard slot views are:
+
+- `ScreenshotTemplateBrand`
+- `ScreenshotTemplateMessage`
+- `ScreenshotTemplateFooter`
+
+Apps may supply any custom SwiftUI view instead.
 
 ## Device frames
 
@@ -10,12 +38,12 @@ The engine still renders and exports. The host app still owns the composition, c
 
 ```swift
 ScreenshotDeviceFrame(
-    style: .clay,
-    device: .iPhonePortrait,
-    frameColor: theme.accent.opacity(0.32),
-    rotation: .degrees(-4)
+  style: .clay,
+  device: .iPhonePortrait,
+  frameColor: theme.accent.opacity(0.32),
+  rotation: .degrees(-4)
 ) {
-    MiLoveHomeFixtureView()
+  MiLoveHomeFixtureView()
 }
 ```
 
@@ -33,7 +61,7 @@ Available device profiles:
 - `iPhoneLandscape`
 - `iPadPortrait`
 
-The caller controls the final frame size with normal SwiftUI layout modifiers. Content is clipped into the device screen rather than resized independently of the frame.
+Inside a standard template, the template controls the final frame size. Inside a custom composition, the caller may use normal SwiftUI layout modifiers.
 
 ## Mock system chrome
 
@@ -46,31 +74,31 @@ The package provides lightweight promotional chrome for reconstructed fixture vi
 - `ScreenshotTabBar`
 - `ScreenshotHomeIndicator`
 
-These are intentionally configurable visual approximations. Apps can use their real navigation and tab bars whenever exact UI fidelity matters.
+These are configurable visual approximations. Apps can use their real navigation and tab bars whenever exact UI fidelity matters.
 
 ```swift
 VStack(spacing: 0) {
-    ScreenshotStatusBar()
-    ScreenshotNavigationBar(
-        title: "Timeline",
-        trailingItems: [
-            ScreenshotToolbarItem(
-                title: "Add",
-                systemImage: "plus",
-                isProminent: true
-            )
-        ],
-        tint: theme.accent
-    )
+  ScreenshotStatusBar()
+  ScreenshotNavigationBar(
+    title: "Timeline",
+    trailingItems: [
+      ScreenshotToolbarItem(
+        title: "Add",
+        systemImage: "plus",
+        isProminent: true
+      )
+    ],
+    tint: theme.accent
+  )
 
-    TimelineFixtureView()
+  TimelineFixtureView()
 
-    ScreenshotTabBar(
-        items: tabs,
-        selectedID: "Timeline",
-        tint: theme.accent
-    )
-    ScreenshotHomeIndicator()
+  ScreenshotTabBar(
+    items: tabs,
+    selectedID: "Timeline",
+    tint: theme.accent
+  )
+  ScreenshotHomeIndicator()
 }
 ```
 
@@ -89,12 +117,12 @@ VStack(spacing: 0) {
 
 ```swift
 ScreenshotBackground(
-    style: .aurora,
-    colors: MiLoveScreenshotPalette.rose
-) {
-    MiLoveStoreComposition()
-}
+  style: .aurora,
+  colors: MiLoveScreenshotPalette.rose
+)
 ```
+
+A template accepts the background as a separate generic full-canvas view. It fills and clips the background without allowing it to affect foreground layout.
 
 All generated details are deterministic. The backgrounds do not use random values, network assets, or runtime user data.
 
@@ -111,12 +139,12 @@ Small reusable pieces reduce repetitive screenshot-only SwiftUI:
 
 ```swift
 ScreenshotHeadline(
-    eyebrow: "BEAUTIFUL WIDGETS",
-    title: "Love, at a glance",
-    subtitle: "Choose the style that feels like you.",
-    foreground: .white,
-    secondaryForeground: .white.opacity(0.72),
-    accent: theme.accent
+  eyebrow: "BEAUTIFUL WIDGETS",
+  title: "Love, at a glance",
+  subtitle: "Choose the style that feels like you.",
+  foreground: .white,
+  secondaryForeground: .white.opacity(0.72),
+  accent: theme.accent
 )
 ```
 
@@ -126,10 +154,10 @@ Reusable modifiers provide consistent high-quality rendering:
 
 ```swift
 content
-    .screenshotTilt(.degrees(-4))
-    .screenshotPerspective(x: 2, y: -7)
-    .screenshotShadow(.soft)
-    .screenshotGlow(color: theme.accent)
+  .screenshotTilt(.degrees(-4))
+  .screenshotPerspective(x: 2, y: -7)
+  .screenshotShadow(.soft)
+  .screenshotGlow(color: theme.accent)
 ```
 
 Available helpers:
@@ -143,23 +171,21 @@ Available helpers:
 
 ## Design boundary
 
-Use these APIs as canvas pieces, not finished templates.
-
-Good package responsibility:
+AppFoundation owns:
 
 - rendering quality
-- device geometry
-- reusable chrome
-- deterministic visual effects
+- exact output geometry
+- responsive template positioning
+- device geometry and reusable chrome
+- deterministic backgrounds and effects
 - generic promotional components
 
-Host app responsibility:
+The host app owns:
 
-- screenshot story and hierarchy
+- screenshot story and feature claims
 - app-specific screens and fixtures
-- typography choices
-- colors and brand identity
-- feature claims and marketing copy
-- final composition
+- brand typography and colors
+- copy and localization
+- selection of template type or a fully custom composition
 
-This keeps every app visually distinct while removing the repetitive work that previously required an external design tool.
+This keeps every app visually distinct while removing repetitive layout and export work.

@@ -7,9 +7,8 @@ public struct WidgetShowcaseView<Background: View>: View {
     private let hasPro: Bool
     private let style: WidgetShowcaseStyle
     private let onRequestUpgrade: (() -> Void)?
+    private let embedsInNavigationStack: Bool
     private let background: Background
-
-    @State private var path: [WidgetShowcaseRoute] = []
 
     public init(
         catalog: WidgetShowcaseCatalog,
@@ -19,48 +18,76 @@ public struct WidgetShowcaseView<Background: View>: View {
         onRequestUpgrade: (() -> Void)? = nil,
         @ViewBuilder background: () -> Background
     ) {
+        self.init(
+            catalog: catalog,
+            guide: guide,
+            hasPro: hasPro,
+            style: style,
+            onRequestUpgrade: onRequestUpgrade,
+            embedsInNavigationStack: true,
+            background: background
+        )
+    }
+
+    public init(
+        catalog: WidgetShowcaseCatalog,
+        guide: WidgetInstallGuideConfiguration,
+        hasPro: Bool = true,
+        style: WidgetShowcaseStyle = .standard,
+        onRequestUpgrade: (() -> Void)? = nil,
+        embedsInNavigationStack: Bool,
+        @ViewBuilder background: () -> Background
+    ) {
         self.catalog = catalog
         self.guide = guide
         self.hasPro = hasPro
         self.style = style
         self.onRequestUpgrade = onRequestUpgrade
+        self.embedsInNavigationStack = embedsInNavigationStack
         self.background = background()
     }
 
+    @ViewBuilder
     public var body: some View {
-        NavigationStack(path: $path) {
-            GeometryReader { proxy in
-                ZStack {
-                    styledBackground
-
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 28) {
-                            introCard
-                            setupCard
-
-                            ForEach(catalog.families) { family in
-                                familySection(
-                                    family,
-                                    availableWidth: max(0, Double(proxy.size.width - 36))
-                                )
-                            }
-                        }
-                        .padding(.horizontal, 18)
-                        .padding(.top, 10)
-                        .padding(.bottom, 32)
-                    }
-                    .scrollIndicators(.hidden)
+        Group {
+            if embedsInNavigationStack {
+                NavigationStack {
+                    gallery
                 }
-            }
-            .foregroundStyle(style.primaryTextColor)
-            .navigationTitle(guide.galleryTitle)
-            .navigationBarTitleDisplayMode(.large)
-            .toolbarBackground(.hidden, for: .navigationBar)
-            .navigationDestination(for: WidgetShowcaseRoute.self) { route in
-                destination(for: route)
+            } else {
+                gallery
             }
         }
         .tint(style.accentColor)
+    }
+
+    private var gallery: some View {
+        GeometryReader { proxy in
+            ZStack {
+                styledBackground
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 28) {
+                        setupCard
+
+                        ForEach(catalog.families) { family in
+                            familySection(
+                                family,
+                                availableWidth: max(0, Double(proxy.size.width - 36))
+                            )
+                        }
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.top, 10)
+                    .padding(.bottom, 32)
+                }
+                .scrollIndicators(.hidden)
+            }
+        }
+        .foregroundStyle(style.primaryTextColor)
+        .navigationTitle(guide.galleryTitle)
+        .navigationBarTitleDisplayMode(.large)
+        .toolbarBackground(.hidden, for: .navigationBar)
     }
 
     private var styledBackground: some View {
@@ -70,46 +97,14 @@ public struct WidgetShowcaseView<Background: View>: View {
         }
     }
 
-    private var introCard: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("WIDGET SHOWCASE")
-                        .font(.caption2.weight(.bold))
-                        .tracking(1.2)
-                        .foregroundStyle(style.secondaryTextColor)
-
-                    Text(guide.gallerySubtitle)
-                        .font(.title2.bold())
-                        .foregroundStyle(style.primaryTextColor)
-                }
-
-                Spacer(minLength: 12)
-
-                Image(systemName: "square.grid.2x2.fill")
-                    .font(.title2.weight(.semibold))
-                    .foregroundStyle(style.accentColor)
-            }
-
-            ScrollView(.horizontal) {
-                HStack(spacing: 8) {
-                    metricPill("\(catalog.items.count) designs", systemImage: "sparkles")
-                    metricPill("\(catalog.families.count) sizes", systemImage: "rectangle.3.group")
-                    if catalog.proItemCount > 0 {
-                        metricPill("\(catalog.proItemCount) Pro", systemImage: "crown.fill")
-                    }
-                }
-                .padding(.horizontal, 1)
-            }
-            .scrollIndicators(.hidden)
-        }
-        .widgetShowcaseCard(style: style, padding: 20, cornerRadius: 26)
-        .accessibilityElement(children: .combine)
-    }
-
     private var setupCard: some View {
-        Button {
-            path.append(.guide)
+        NavigationLink {
+            WidgetInstallGuideView(
+                goal: .general,
+                configuration: guide,
+                style: style,
+                background: { styledBackground }
+            )
         } label: {
             HStack(spacing: 14) {
                 Image(systemName: "hand.tap.fill")
@@ -152,7 +147,7 @@ public struct WidgetShowcaseView<Background: View>: View {
 
         return VStack(alignment: .leading, spacing: 13) {
             HStack {
-                Label(family.title, systemImage: family.systemImage)
+                Text(family.title)
                     .font(.title3.bold())
                     .foregroundStyle(style.primaryTextColor)
 
@@ -180,52 +175,24 @@ public struct WidgetShowcaseView<Background: View>: View {
         _ item: WidgetShowcaseItem,
         size: WidgetShowcaseSize
     ) -> some View {
-        Button {
+        Group {
             if item.access == .pro && !hasPro {
-                onRequestUpgrade?()
-            } else {
-                path.append(.widget(item.id))
-            }
-        } label: {
-            VStack(alignment: .leading, spacing: 9) {
-                item.preview()
-                    .frame(width: size.width, height: size.height)
-                    .clipShape(
-                        RoundedRectangle(
-                            cornerRadius: item.family.cornerRadius,
-                            style: .continuous
-                        )
-                    )
-                    .overlay {
-                        RoundedRectangle(
-                            cornerRadius: item.family.cornerRadius,
-                            style: .continuous
-                        )
-                        .strokeBorder(style.borderColor)
-                    }
-                    .overlay(alignment: .topTrailing) {
-                        if item.access == .pro {
-                            Label("PRO", systemImage: hasPro ? "checkmark" : "lock.fill")
-                                .font(.caption2.weight(.black))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 9)
-                                .padding(.vertical, 6)
-                                .background(.black.opacity(0.56), in: Capsule())
-                                .padding(9)
-                        }
-                    }
-                    .shadow(color: style.shadowColor, radius: 12, y: 7)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(item.title)
-                        .font(.subheadline.bold())
-                        .foregroundStyle(style.primaryTextColor)
-                    Text(item.subtitle)
-                        .font(.caption)
-                        .foregroundStyle(style.secondaryTextColor)
-                        .lineLimit(2)
+                Button {
+                    onRequestUpgrade?()
+                } label: {
+                    widgetLabel(item, size: size)
                 }
-                .frame(width: size.width, alignment: .leading)
+            } else {
+                NavigationLink {
+                    WidgetInstallGuideView(
+                        goal: WidgetInstallGoal(descriptor: item.descriptor),
+                        configuration: guide,
+                        style: style,
+                        background: { styledBackground }
+                    )
+                } label: {
+                    widgetLabel(item, size: size)
+                }
             }
         }
         .buttonStyle(.plain)
@@ -237,41 +204,44 @@ public struct WidgetShowcaseView<Background: View>: View {
         )
     }
 
-    private func metricPill(_ title: String, systemImage: String) -> some View {
-        Label(title, systemImage: systemImage)
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(style.secondaryTextColor)
-            .lineLimit(1)
-            .fixedSize(horizontal: true, vertical: false)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 7)
-            .background(style.elevatedSurfaceColor, in: Capsule())
-            .overlay { Capsule().strokeBorder(style.borderColor) }
-    }
-
-    @ViewBuilder
-    private func destination(for route: WidgetShowcaseRoute) -> some View {
-        switch route {
-        case .guide:
-            WidgetInstallGuideView(
-                goal: .general,
-                configuration: guide,
-                style: style,
-                background: { styledBackground }
-            )
-        case let .widget(id):
-            if let item = catalog.item(id: id) {
-                WidgetShowcaseDetailView(
-                    item: item,
-                    guide: guide,
-                    hasPro: hasPro,
-                    style: style,
-                    onRequestUpgrade: onRequestUpgrade,
-                    background: { styledBackground }
+    private func widgetLabel(
+        _ item: WidgetShowcaseItem,
+        size: WidgetShowcaseSize
+    ) -> some View {
+        VStack(spacing: 9) {
+            item.preview()
+                .frame(width: size.width, height: size.height)
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: item.family.cornerRadius,
+                        style: .continuous
+                    )
                 )
-            } else {
-                ContentUnavailableView("Widget unavailable", systemImage: "square.grid.2x2")
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: item.family.cornerRadius,
+                        style: .continuous
+                    )
+                    .strokeBorder(style.borderColor)
+                }
+                .shadow(color: style.shadowColor, radius: 12, y: 7)
+
+            HStack(spacing: 6) {
+                Text(item.title)
+                    .font(.subheadline.bold())
+                    .foregroundStyle(style.primaryTextColor)
+                    .multilineTextAlignment(.center)
+
+                if item.access == .pro && !hasPro {
+                    Text("PRO")
+                        .font(.caption2.weight(.black))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(style.accentColor, in: Capsule())
+                }
             }
+            .frame(width: size.width, alignment: .center)
         }
     }
 
@@ -296,14 +266,28 @@ public extension WidgetShowcaseView where Background == Color {
             hasPro: hasPro,
             style: style,
             onRequestUpgrade: onRequestUpgrade,
-            background: { .clear }
+            background: { Color.clear }
         )
     }
-}
 
-private enum WidgetShowcaseRoute: Hashable {
-    case guide
-    case widget(String)
+    init(
+        catalog: WidgetShowcaseCatalog,
+        guide: WidgetInstallGuideConfiguration,
+        hasPro: Bool = true,
+        style: WidgetShowcaseStyle = .standard,
+        onRequestUpgrade: (() -> Void)? = nil,
+        embedsInNavigationStack: Bool
+    ) {
+        self.init(
+            catalog: catalog,
+            guide: guide,
+            hasPro: hasPro,
+            style: style,
+            onRequestUpgrade: onRequestUpgrade,
+            embedsInNavigationStack: embedsInNavigationStack,
+            background: { Color.clear }
+        )
+    }
 }
 
 private struct WidgetShowcaseDefaultBackground: View {

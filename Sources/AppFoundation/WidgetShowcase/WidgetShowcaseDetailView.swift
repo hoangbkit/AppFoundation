@@ -152,10 +152,12 @@ public struct WidgetShowcaseDetailView<Background: View>: View {
                 )
             }
 
-            Label(guide.tip, systemImage: "lightbulb.fill")
-                .font(.caption)
-                .foregroundStyle(style.secondaryTextColor)
-                .padding(.horizontal, 4)
+            if !guide.tip.isEmpty {
+                Label(guide.tip, systemImage: "lightbulb.fill")
+                    .font(.caption)
+                    .foregroundStyle(style.secondaryTextColor)
+                    .padding(.horizontal, 4)
+            }
         }
     }
 
@@ -213,10 +215,12 @@ public struct WidgetInstallGuideView<Background: View>: View {
                         WidgetInstallStepRow(number: index + 1, step: step, style: style)
                     }
 
-                    Label(configuration.tip, systemImage: "lightbulb.fill")
-                        .font(.caption)
-                        .foregroundStyle(style.secondaryTextColor)
-                        .padding(.horizontal, 4)
+                    if !configuration.tip.isEmpty {
+                        Label(configuration.tip, systemImage: "lightbulb.fill")
+                            .font(.caption)
+                            .foregroundStyle(style.secondaryTextColor)
+                            .padding(.horizontal, 4)
+                    }
                 }
                 .padding(18)
                 .padding(.bottom, 28)

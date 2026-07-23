@@ -5,6 +5,7 @@ import SwiftUI
 struct DemoSettingsView: View {
     @Environment(PurchaseManager.self) private var purchases
     @Environment(ThemeManager.self) private var themes
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.requestReview) private var requestReview
 
     @State private var isShowingPaywall = false
@@ -19,6 +20,12 @@ struct DemoSettingsView: View {
                 AppThemeBackground(theme: theme)
 
                 Form {
+                    premiumStatusSection
+
+                    #if DEBUG
+                    simulatedPurchasesSection
+                    #endif
+
                     ProPlanSettingsSection(
                         purchaseManager: purchases,
                         configuration: configuration.proPlanConfiguration,
@@ -51,6 +58,13 @@ struct DemoSettingsView: View {
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Close", systemImage: "xmark") {
+                        dismiss()
+                    }
+                }
+            }
             .sheet(isPresented: $isShowingPaywall) {
                 PaywallView(
                     purchaseManager: purchases,
@@ -59,6 +73,102 @@ struct DemoSettingsView: View {
             }
         }
         .tint(theme.accentColor)
+    }
+
+    private var premiumStatusSection: some View {
+        Section("Premium status") {
+            HStack(spacing: 12) {
+                Image(systemName: entitlementIcon)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(entitlementColor)
+                    .frame(width: 38, height: 38)
+                    .background(
+                        entitlementColor.opacity(0.12),
+                        in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    )
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(entitlementTitle)
+                        .font(.headline)
+                    Text(entitlementMessage)
+                        .font(.caption)
+                        .foregroundStyle(theme.secondaryForegroundColor)
+                }
+
+                Spacer(minLength: 8)
+            }
+        }
+        .listRowBackground(theme.surfaceColor)
+    }
+
+    #if DEBUG
+    private var simulatedPurchasesSection: some View {
+        Section("Debug purchases") {
+            Toggle(
+                "Simulated purchases",
+                isOn: Binding(
+                    get: { purchases.isUsingSimulatedPurchases },
+                    set: { enabled in
+                        Task {
+                            await purchases.setSimulatedPurchasesEnabled(enabled)
+                        }
+                    }
+                )
+            )
+
+            Button("Reset simulated purchases", role: .destructive) {
+                Task { await purchases.resetSimulatedPurchases() }
+            }
+            .disabled(!purchases.isUsingSimulatedPurchases)
+        }
+        .listRowBackground(theme.surfaceColor)
+    }
+    #endif
+
+    private var entitlementTitle: String {
+        switch purchases.entitlementState {
+        case .checking: "Checking premium access"
+        case .inactive: "Free plan"
+        case .active: "Demo Pro is active"
+        }
+    }
+
+    private var entitlementMessage: String {
+        switch purchases.entitlementState {
+        case .checking:
+            "Verifying current App Store entitlements."
+        case .inactive:
+            #if DEBUG
+            purchases.isUsingSimulatedPurchases
+                ? "Use the paywall to test purchases without App Store Connect."
+                : "The Demo is currently using live StoreKit."
+            #else
+            "Open the default paywall to test StoreKit purchases."
+            #endif
+        case .active:
+            #if DEBUG
+            purchases.isUsingSimulatedPurchases
+                ? "This entitlement comes from the Debug purchase simulator."
+                : "This status comes from verified StoreKit transactions."
+            #else
+            "This status comes from verified StoreKit transactions."
+            #endif
+        }
+    }
+
+    private var entitlementIcon: String {
+        switch purchases.entitlementState {
+        case .checking: "clock.arrow.circlepath"
+        case .inactive: "lock.fill"
+        case .active: "crown.fill"
+        }
+    }
+
+    private var entitlementColor: Color {
+        switch purchases.entitlementState {
+        case .checking: theme.secondaryForegroundColor
+        case .inactive, .active: theme.accentColor
+        }
     }
 
     @ViewBuilder

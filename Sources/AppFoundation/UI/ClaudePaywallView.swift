@@ -76,7 +76,7 @@ public struct ClaudePaywallView: View {
     private var header: some View {
         VStack(spacing: 10) {
             Text(configuration.title)
-                .font(.system(size: 32, weight: .regular, design: .serif))
+                .font(.system(size: 32, weight: .semibold, design: .rounded))
                 .foregroundStyle(theme.primaryForeground)
             Text(configuration.subtitle)
                 .font(.title3)
@@ -219,24 +219,19 @@ public struct ClaudePaywallView: View {
             }
         } label: {
             HStack {
-                if purchases.isBusy { ProgressView().tint(.white) }
-                Text(configuration.purchaseButtonTitle).font(.headline)
+                if purchases.isBusy { ProgressView().tint(.black) }
+                Text(purchaseButtonTitle).font(.headline)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
         }
         .background(
-            LinearGradient(
-                colors: [theme.accent, theme.secondaryAccent],
-                startPoint: .leading,
-                endPoint: .trailing
-            ),
+            Color.white,
             in: Capsule()
         )
-        .foregroundStyle(.white)
-        .shadow(color: theme.accent.opacity(0.24), radius: 12, y: 6)
+        .foregroundStyle(.black)
+        .shadow(color: .black.opacity(0.16), radius: 12, y: 6)
         .disabled(selectedProduct == nil || purchases.isBusy)
-        .opacity(selectedProduct == nil ? 0.55 : 1)
     }
 
     private var featureList: some View {
@@ -294,6 +289,13 @@ public struct ClaudePaywallView: View {
     private var selectedProduct: StoreProduct? {
         selectedProductID.flatMap(purchases.product(withID:))
             ?? purchases.preferredProduct
+    }
+
+    private var purchaseButtonTitle: String {
+        guard let selectedProduct else {
+            return configuration.purchaseButtonTitle
+        }
+        return "\(configuration.purchaseButtonTitle) with \(selectedProduct.planLabel)"
     }
 
     private func selectDefaultPlanIfNeeded() {

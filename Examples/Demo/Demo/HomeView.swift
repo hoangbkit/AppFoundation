@@ -1,13 +1,15 @@
 import AppFoundation
 import SwiftUI
+import UIKit
 
 struct HomeView: View {
     @Environment(PurchaseManager.self) private var purchases
     @Environment(ThemeManager.self) private var themes
 
-    @State private var selectedPaywallStyle: PaywallStyle?
+    @State private var isShowingPaywall = false
     @State private var isShowingSettings = false
     @State private var isShowingOnboarding = false
+    @State private var isShowingUpsell = false
 
     private var theme: AppTheme { themes.effectiveTheme }
 
@@ -17,16 +19,17 @@ struct HomeView: View {
                 AppThemeBackground(theme: theme)
 
                 List {
-                    row(top: 8, bottom: 9) { heroCard }
-                    row(top: 9, bottom: 9) { entitlementCard }
-                    row(top: 9, bottom: 30) { featuresCard }
+                    row(top: 8, bottom: 15) { heroCard }
+                    featuresSection
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
                 .scrollIndicators(.hidden)
+                .contentMargins(.bottom, 30, for: .scrollContent)
             }
             .foregroundStyle(theme.primaryForegroundColor)
-            .navigationTitle("AppFoundation")
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -38,20 +41,52 @@ struct HomeView: View {
                     .accessibilityLabel("Settings")
                 }
 
+                ToolbarItem(placement: .principal) {
+                    HStack(spacing: 7) {
+                        if let appIcon {
+                            Image(uiImage: appIcon)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 24, height: 24)
+                                .clipShape(
+                                    RoundedRectangle(
+                                        cornerRadius: 6,
+                                        style: .continuous
+                                    )
+                                )
+                        }
+
+                        Text("AF")
+                            .font(.headline.weight(.semibold))
+                    }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("AF")
+                }
+
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        selectedPaywallStyle = .current
+                        isShowingPaywall = true
                     } label: {
                         Image(systemName: "crown.fill")
                     }
-                    .accessibilityLabel("Open default paywall")
+                    .accessibilityLabel("Open Claude paywall")
                 }
             }
-            .navigationDestination(for: DemoFeature.self) { feature in
-                destination(for: feature)
+            .sheet(isPresented: $isShowingPaywall) {
+                ClaudePaywallView(
+                    purchases: purchases,
+                    configuration: DemoConfiguration.legacyClaudePaywall
+                )
             }
-            .sheet(item: $selectedPaywallStyle) { style in
-                paywall(for: style)
+            .sheet(isPresented: $isShowingUpsell) {
+                LimitReachedUpsellFlow(
+                    configuration: DemoConfiguration.limitReachedUpsell
+                ) {
+                    PaywallView(
+                        purchaseManager: purchases,
+                        configuration: DemoConfiguration.modernPaywall
+                    )
+                }
             }
             .sheet(isPresented: $isShowingSettings) {
                 DemoSettingsView()
@@ -66,6 +101,18 @@ struct HomeView: View {
         }
         .tint(theme.accentColor)
         .animation(.smooth, value: theme.id)
+    }
+
+    private var appIcon: UIImage? {
+        guard
+            let icons = Bundle.main.infoDictionary?["CFBundleIcons"] as? [String: Any],
+            let primaryIcon = icons["CFBundlePrimaryIcon"] as? [String: Any],
+            let iconFiles = primaryIcon["CFBundleIconFiles"] as? [String]
+        else {
+            return nil
+        }
+
+        return iconFiles.reversed().lazy.compactMap(UIImage.init(named:)).first
     }
 
     private func row<Content: View>(
@@ -87,17 +134,12 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .center) {
                     FoundationPill(
-                        "SHARED INFRASTRUCTURE",
-                        systemImage: "square.stack.3d.up.fill",
+                        "AppFoundation",
+                        systemImage: "swift",
                         tint: theme.accentColor
                     )
 
                     Spacer(minLength: 12)
-
-                    Image(systemName: "swift")
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(theme.accentColor)
-                        .accessibilityHidden(true)
                 }
 
                 VStack(alignment: .leading, spacing: 7) {
@@ -114,26 +156,8 @@ struct HomeView: View {
 
                 ScrollView(.horizontal) {
                     HStack(spacing: 8) {
-                        heroButton(
-                            "StoreKit 2",
-                            systemImage: "cart.fill",
-                            destination: .paywalls
-                        )
-                        heroButton(
-                            "Swift 6",
-                            systemImage: "swift",
-                            destination: .infrastructure
-                        )
-                        heroButton(
-                            "Widgets",
-                            systemImage: "square.grid.2x2.fill",
-                            destination: .widgets
-                        )
-                        heroButton(
-                            "Studios",
-                            systemImage: "wand.and.stars",
-                            destination: .screenshotStudio
-                        )
+                        platformTag("iOS 26.0+")
+                        platformTag("macOS 15.0+")
                     }
                     .padding(.horizontal, 1)
                 }
@@ -143,137 +167,95 @@ struct HomeView: View {
         }
     }
 
-    private func heroButton(
-        _ title: String,
-        systemImage: String,
-        destination: DemoFeature
-    ) -> some View {
-        NavigationLink(value: destination) {
-            Label(title, systemImage: systemImage)
-                .font(.caption2.weight(.semibold))
+    private func platformTag(_ title: String) -> some View {
+        Text(title)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(theme.secondaryForegroundColor)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(theme.elevatedSurfaceColor, in: Capsule())
+            .overlay { Capsule().strokeBorder(theme.borderColor) }
+    }
+
+    private var featuresSection: some View {
+        Section {
+            Text("EXPLORE THE PACKAGE")
+                .font(.caption2.weight(.bold))
+                .tracking(1.2)
                 .foregroundStyle(theme.secondaryForegroundColor)
-                .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: false)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(theme.elevatedSurfaceColor, in: Capsule())
-                .overlay { Capsule().strokeBorder(theme.borderColor) }
-        }
-        .buttonStyle(.plain)
-    }
+                .padding(.top, 18)
+                .padding(.bottom, 10)
+                .featureCardRow(theme: theme, position: .top)
 
-    private var entitlementCard: some View {
-        AppThemeCard(theme: theme) {
-            VStack(alignment: .leading, spacing: 14) {
-                Text("PREMIUM STATUS")
-                    .font(.caption2.weight(.bold))
-                    .tracking(1.2)
-                    .foregroundStyle(theme.secondaryForegroundColor)
+            featureRow(.screenshotStudio, showsDivider: true)
+            featureRow(.promoStudio, showsDivider: true)
+            featureRow(.widgets, showsDivider: true)
+            upsellRow
+            featureRow(.themes, showsDivider: true)
+            featureRow(.infrastructure, showsDivider: true)
 
-                HStack(spacing: 12) {
-                    Image(systemName: entitlementIcon)
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(entitlementColor)
-                        .frame(width: 44, height: 44)
-                        .background(
-                            entitlementColor.opacity(0.12),
-                            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        )
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(entitlementTitle)
-                            .font(.headline)
-                        Text(entitlementMessage)
-                            .font(.subheadline)
-                            .foregroundStyle(theme.secondaryForegroundColor)
-                    }
-
-                    Spacer(minLength: 8)
-                }
-
-                #if DEBUG
-                Divider().overlay(theme.borderColor)
-
-                VStack(alignment: .leading, spacing: 10) {
-                    Toggle(
-                        "Simulated purchases",
-                        isOn: Binding(
-                            get: { purchases.isUsingSimulatedPurchases },
-                            set: { enabled in
-                                Task {
-                                    await purchases.setSimulatedPurchasesEnabled(enabled)
-                                }
-                            }
-                        )
-                    )
-                    .font(.subheadline.weight(.semibold))
-
-                    Button("Reset simulated purchases", role: .destructive) {
-                        Task { await purchases.resetSimulatedPurchases() }
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(!purchases.isUsingSimulatedPurchases)
-                }
-                #endif
+            Button {
+                isShowingOnboarding = true
+            } label: {
+                featureLabel(
+                    title: "Onboarding",
+                    subtitle: "Preview the reusable onboarding flow",
+                    systemImage: "rectangle.stack.fill",
+                    showsChevron: true
+                )
             }
+            .buttonStyle(.plain)
+            .padding(.bottom, 18)
+            .featureCardRow(theme: theme, position: .bottom)
         }
     }
 
-    private var featuresCard: some View {
-        AppThemeCard(theme: theme) {
-            VStack(alignment: .leading, spacing: 0) {
-                Text("EXPLORE THE PACKAGE")
-                    .font(.caption2.weight(.bold))
-                    .tracking(1.2)
-                    .foregroundStyle(theme.secondaryForegroundColor)
-                    .padding(.bottom, 10)
-
-                featureRow(.screenshotStudio)
-                divider
-                featureRow(.promoStudio)
-                divider
-                featureRow(.widgets)
-                divider
-                featureRow(.upsells)
-                divider
-                featureRow(.paywalls)
-                divider
-                featureRow(.themes)
-                divider
-                featureRow(.screenshotTemplates)
-                divider
-                featureRow(.infrastructure)
-                divider
-
-                Button {
-                    isShowingOnboarding = true
-                } label: {
-                    featureLabel(
-                        title: "Onboarding",
-                        subtitle: "Preview the reusable onboarding flow",
-                        systemImage: "rectangle.stack.fill"
-                    )
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
-
-    private func featureRow(_ feature: DemoFeature) -> some View {
-        NavigationLink(value: feature) {
+    private func featureRow(
+        _ feature: DemoFeature,
+        showsDivider: Bool
+    ) -> some View {
+        NavigationLink {
+            destination(for: feature)
+        } label: {
             featureLabel(
                 title: feature.title,
                 subtitle: feature.subtitle,
                 systemImage: feature.systemImage
             )
         }
+        .featureCardRow(
+            theme: theme,
+            position: .middle,
+            showsDivider: showsDivider
+        )
+    }
+
+    private var upsellRow: some View {
+        Button {
+            isShowingUpsell = true
+        } label: {
+            featureLabel(
+                title: DemoFeature.upsells.title,
+                subtitle: DemoFeature.upsells.subtitle,
+                systemImage: DemoFeature.upsells.systemImage,
+                showsChevron: true
+            )
+        }
         .buttonStyle(.plain)
+        .featureCardRow(
+            theme: theme,
+            position: .middle,
+            showsDivider: true
+        )
     }
 
     private func featureLabel(
         title: String,
         subtitle: String,
-        systemImage: String
+        systemImage: String,
+        showsChevron: Bool = false
     ) -> some View {
         HStack(spacing: 14) {
             Image(systemName: systemImage)
@@ -296,18 +278,15 @@ struct HomeView: View {
             }
 
             Spacer(minLength: 8)
-            Image(systemName: "chevron.right")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(theme.secondaryForegroundColor.opacity(0.7))
+            if showsChevron {
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(theme.secondaryForegroundColor.opacity(0.7))
+            }
         }
         .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
+        .padding(.vertical, 6)
         .contentShape(Rectangle())
-    }
-
-    private var divider: some View {
-        Divider()
-            .overlay(theme.borderColor)
-            .padding(.leading, 56)
     }
 
     @ViewBuilder
@@ -321,83 +300,13 @@ struct HomeView: View {
             WidgetShowcaseDemoView()
         case .upsells:
             PurchaseUpsellDemoView()
-        case .paywalls:
-            PaywallStylePickerView { selectedPaywallStyle = $0 }
         case .themes:
             ThemeDemoView()
-        case .screenshotTemplates:
-            ScreenshotTemplateGalleryView()
         case .infrastructure:
             InfrastructureDemoView()
         }
     }
 
-    @ViewBuilder
-    private func paywall(for style: PaywallStyle) -> some View {
-        switch style {
-        case .current:
-            PaywallView(
-                purchaseManager: purchases,
-                configuration: DemoConfiguration.modernPaywall
-            )
-        case .legacyGradient:
-            FoundationPaywallView(
-                purchases: purchases,
-                configuration: DemoConfiguration.legacyPaywall
-            )
-        case .legacyClaude:
-            ClaudePaywallView(
-                purchases: purchases,
-                configuration: DemoConfiguration.legacyClaudePaywall
-            )
-        }
-    }
-
-    private var entitlementTitle: String {
-        switch purchases.entitlementState {
-        case .checking: "Checking premium access"
-        case .inactive: "Free plan"
-        case .active: "Demo Pro is active"
-        }
-    }
-
-    private var entitlementMessage: String {
-        switch purchases.entitlementState {
-        case .checking:
-            "Verifying current App Store entitlements."
-        case .inactive:
-            #if DEBUG
-            purchases.isUsingSimulatedPurchases
-                ? "Use the paywall to test purchases without App Store Connect."
-                : "The Demo is currently using live StoreKit."
-            #else
-            "Open the default paywall to test StoreKit purchases."
-            #endif
-        case .active:
-            #if DEBUG
-            purchases.isUsingSimulatedPurchases
-                ? "This entitlement comes from the Debug purchase simulator."
-                : "This status comes from verified StoreKit transactions."
-            #else
-            "This status comes from verified StoreKit transactions."
-            #endif
-        }
-    }
-
-    private var entitlementIcon: String {
-        switch purchases.entitlementState {
-        case .checking: "clock.arrow.circlepath"
-        case .inactive: "lock.fill"
-        case .active: "crown.fill"
-        }
-    }
-
-    private var entitlementColor: Color {
-        switch purchases.entitlementState {
-        case .checking: theme.secondaryForegroundColor
-        case .inactive, .active: theme.accentColor
-        }
-    }
 }
 
 private enum DemoFeature: Hashable {
@@ -405,9 +314,7 @@ private enum DemoFeature: Hashable {
     case promoStudio
     case widgets
     case upsells
-    case paywalls
     case themes
-    case screenshotTemplates
     case infrastructure
 
     var title: String {
@@ -415,10 +322,8 @@ private enum DemoFeature: Hashable {
         case .screenshotStudio: "Screenshot Studio"
         case .promoStudio: "Promo Video Studio"
         case .widgets: "Widgets"
-        case .upsells: "Pro & Upsells"
-        case .paywalls: "Paywall Styles"
+        case .upsells: "Upsell"
         case .themes: "Themes"
-        case .screenshotTemplates: "Screenshot Templates"
         case .infrastructure: "New APIs"
         }
     }
@@ -428,10 +333,8 @@ private enum DemoFeature: Hashable {
         case .screenshotStudio: "Compose, preview, and export App Store screenshots"
         case .promoStudio: "Build responsive animated promo videos in SwiftUI"
         case .widgets: "Browse reusable widget designs and install guidance"
-        case .upsells: "Preview Pro settings and reusable upgrade flows"
-        case .paywalls: "Compare the current paywall with legacy layouts"
+        case .upsells: "Preview the reusable limit-reached upgrade flow"
         case .themes: "Persistent selection and timed Pro previews"
-        case .screenshotTemplates: "Explore reusable screenshot compositions"
         case .infrastructure: "Export, backup, snapshots, notifications, and utilities"
         }
     }
@@ -442,87 +345,134 @@ private enum DemoFeature: Hashable {
         case .promoStudio: "film.stack.fill"
         case .widgets: "square.grid.2x2.fill"
         case .upsells: "crown.fill"
-        case .paywalls: "creditcard.fill"
         case .themes: "paintpalette.fill"
-        case .screenshotTemplates: "rectangle.3.group.fill"
         case .infrastructure: "shippingbox.fill"
         }
     }
 }
 
-private struct PaywallStylePickerView: View {
-    @Environment(\.appFoundationTheme) private var theme
+private enum FeatureCardRowPosition {
+    case top
+    case middle
+    case bottom
+}
 
-    let onSelect: (PaywallStyle) -> Void
+private struct FeatureCardRowBackground: View {
+    let theme: AppTheme
+    let position: FeatureCardRowPosition
 
-    var body: some View {
-        ZStack {
-            AppThemeBackground(theme: theme)
-
-            List {
-                Section("Recommended") {
-                    styleButton(
-                        title: "PaywallView",
-                        subtitle: "Current theme-aware weekly, monthly, yearly, and lifetime paywall.",
-                        systemImage: "rectangle.split.2x1",
-                        style: .current
-                    )
-                }
-                .listRowBackground(theme.surfaceColor)
-
-                Section("Migration previews") {
-                    styleButton(
-                        title: "FoundationPaywallView",
-                        subtitle: "Legacy gradient layout retained for existing apps.",
-                        systemImage: "sparkles.rectangle.stack",
-                        style: .legacyGradient
-                    )
-                    styleButton(
-                        title: "ClaudePaywallView",
-                        subtitle: "Legacy compact layout retained for comparison.",
-                        systemImage: "rectangle.grid.2x2",
-                        style: .legacyClaude
-                    )
-                }
-                .listRowBackground(theme.surfaceColor)
-            }
-            .scrollContentBackground(.hidden)
-            .foregroundStyle(theme.primaryForegroundColor)
-        }
-        .navigationTitle("Paywall Styles")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.hidden, for: .navigationBar)
-        .tint(theme.accentColor)
+    private var cornerRadius: CGFloat {
+        CGFloat(theme.appearance.cardCornerRadius)
     }
 
-    private func styleButton(
-        title: String,
-        subtitle: String,
-        systemImage: String,
-        style: PaywallStyle
-    ) -> some View {
-        Button { onSelect(style) } label: {
-            Label {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(.headline)
-                        .foregroundStyle(theme.primaryForegroundColor)
-                    Text(subtitle)
-                        .font(.subheadline)
-                        .foregroundStyle(theme.secondaryForegroundColor)
-                }
-            } icon: {
-                Image(systemName: systemImage)
-                    .foregroundStyle(theme.accentColor)
+    var body: some View {
+        featureShape
+            .foregroundStyle(theme.surfaceColor)
+            .overlay {
+                FeatureCardRowBorder(
+                    position: position,
+                    cornerRadius: cornerRadius
+                )
+                .stroke(theme.borderColor, lineWidth: 1)
             }
+            .padding(.horizontal, 20)
+    }
+
+    @ViewBuilder
+    private var featureShape: some View {
+        switch position {
+        case .top:
+            UnevenRoundedRectangle(
+                topLeadingRadius: cornerRadius,
+                topTrailingRadius: cornerRadius
+            )
+        case .middle:
+            Rectangle()
+        case .bottom:
+            UnevenRoundedRectangle(
+                bottomLeadingRadius: cornerRadius,
+                bottomTrailingRadius: cornerRadius
+            )
         }
     }
 }
 
-private enum PaywallStyle: String, Identifiable {
-    case current
-    case legacyGradient
-    case legacyClaude
+private struct FeatureCardRowBorder: Shape {
+    let position: FeatureCardRowPosition
+    let cornerRadius: CGFloat
 
-    var id: String { rawValue }
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let radius = min(cornerRadius, rect.width / 2, rect.height)
+
+        switch position {
+        case .top:
+            path.move(to: CGPoint(x: 0, y: rect.maxY))
+            path.addLine(to: CGPoint(x: 0, y: radius))
+            path.addArc(
+                center: CGPoint(x: radius, y: radius),
+                radius: radius,
+                startAngle: .degrees(180),
+                endAngle: .degrees(270),
+                clockwise: false
+            )
+            path.addLine(to: CGPoint(x: rect.maxX - radius, y: 0))
+            path.addArc(
+                center: CGPoint(x: rect.maxX - radius, y: radius),
+                radius: radius,
+                startAngle: .degrees(270),
+                endAngle: .degrees(360),
+                clockwise: false
+            )
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+
+        case .middle:
+            path.move(to: .zero)
+            path.addLine(to: CGPoint(x: 0, y: rect.maxY))
+            path.move(to: CGPoint(x: rect.maxX, y: 0))
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+
+        case .bottom:
+            path.move(to: .zero)
+            path.addLine(to: CGPoint(x: 0, y: rect.maxY - radius))
+            path.addArc(
+                center: CGPoint(x: radius, y: rect.maxY - radius),
+                radius: radius,
+                startAngle: .degrees(180),
+                endAngle: .degrees(90),
+                clockwise: true
+            )
+            path.addLine(to: CGPoint(x: rect.maxX - radius, y: rect.maxY))
+            path.addArc(
+                center: CGPoint(x: rect.maxX - radius, y: rect.maxY - radius),
+                radius: radius,
+                startAngle: .degrees(90),
+                endAngle: .degrees(0),
+                clockwise: true
+            )
+            path.addLine(to: CGPoint(x: rect.maxX, y: 0))
+        }
+        return path
+    }
+}
+
+private extension View {
+    func featureCardRow(
+        theme: AppTheme,
+        position: FeatureCardRowPosition,
+        showsDivider: Bool = false
+    ) -> some View {
+        listRowInsets(EdgeInsets(top: 0, leading: 38, bottom: 0, trailing: 38))
+            .listRowSeparator(.hidden)
+            .listRowBackground(
+                FeatureCardRowBackground(theme: theme, position: position)
+            )
+            .overlay(alignment: .bottom) {
+                if showsDivider {
+                    Divider()
+                        .overlay(theme.borderColor)
+                        .padding(.leading, 56)
+                }
+            }
+    }
 }

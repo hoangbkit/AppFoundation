@@ -98,7 +98,7 @@ public struct FoundationOnboardingView: View {
                         }
                     }
                 }
-                .buttonStyle(FoundationPrimaryButtonStyle(theme: resolvedTheme))
+                .buttonStyle(FoundationOnboardingButtonStyle())
                 .padding(.horizontal, 24)
                 .padding(.bottom, 18)
             }
@@ -119,66 +119,65 @@ public struct FoundationOnboardingView: View {
     }
 
     private func pageView(_ page: FoundationOnboardingPage) -> some View {
-        VStack(spacing: 28) {
-            Spacer(minLength: 12)
+        VStack {
+            Spacer(minLength: 8)
+            pageContent(page)
+            Spacer(minLength: 8)
+        }
+        .padding(.vertical, 8)
+    }
 
+    private func pageContent(_ page: FoundationOnboardingPage) -> some View {
+        VStack(spacing: 0) {
             ZStack {
                 Circle()
                     .fill(
                         LinearGradient(
-                            colors: [resolvedTheme.primary.opacity(0.24), resolvedTheme.secondary.opacity(0.12)],
+                            colors: [
+                                resolvedTheme.primary.opacity(0.20),
+                                resolvedTheme.secondary.opacity(0.10),
+                            ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
-                    .frame(width: 220, height: 220)
-                    .blur(radius: 1)
+
+                Circle()
+                    .strokeBorder(resolvedTheme.primary.opacity(0.18))
 
                 Image(systemName: page.systemImage)
-                    .font(.system(size: 78, weight: .medium))
+                    .font(.system(size: 40, weight: .semibold))
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(resolvedTheme.primary)
                     .contentTransition(.symbolEffect(.replace))
             }
+            .frame(width: 88, height: 88)
+            .shadow(color: resolvedTheme.primary.opacity(0.14), radius: 16, y: 8)
+            .padding(.bottom, 24)
 
-            pageCard(page)
-
-            Spacer(minLength: 8)
-        }
-    }
-
-    @ViewBuilder
-    private func pageCard(_ page: FoundationOnboardingPage) -> some View {
-        if fixedTheme == nil {
-            AppThemeCard(theme: environmentTheme) {
-                pageCardContent(page)
-            }
-        } else {
-            FoundationCard(theme: resolvedTheme) {
-                pageCardContent(page)
-            }
-        }
-    }
-
-    private func pageCardContent(_ page: FoundationOnboardingPage) -> some View {
-        VStack(spacing: 14) {
             Text(page.eyebrow.uppercased())
-                .font(.caption.weight(.bold))
-                .tracking(1.6)
+                .font(.caption2.weight(.bold))
+                .tracking(1.4)
                 .foregroundStyle(resolvedTheme.primary)
+                .padding(.bottom, 9)
 
             Text(page.title)
-                .font(.largeTitle.bold())
+                .font(.system(size: 30, weight: .bold, design: .rounded))
                 .multilineTextAlignment(.center)
                 .foregroundStyle(primaryForeground)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.bottom, 12)
 
             Text(page.message)
                 .font(.body)
                 .foregroundStyle(secondaryForeground)
                 .multilineTextAlignment(.center)
-                .lineSpacing(4)
+                .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity)
+        .padding(.horizontal, 4)
+        .padding(.vertical, 10)
     }
 
     private var pageIndicator: some View {
@@ -228,6 +227,21 @@ public struct FoundationOnboardingView: View {
                 )
             ]
             : pages
+    }
+}
+
+private struct FoundationOnboardingButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.headline)
+            .foregroundStyle(.black)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .background(.white, in: RoundedRectangle(cornerRadius: 18))
+            .shadow(color: .black.opacity(0.14), radius: 14, y: 7)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .animation(.snappy(duration: 0.18), value: configuration.isPressed)
     }
 }
 #endif

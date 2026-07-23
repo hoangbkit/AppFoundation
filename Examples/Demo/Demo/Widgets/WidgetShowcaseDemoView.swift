@@ -16,7 +16,7 @@ struct WidgetShowcaseDemoView: View {
                 appName: "AF",
                 widgetSearchName: "AF",
                 gallerySubtitle: "Package features at a glance",
-                tip: "These previews are supplied by the Demo app. AppFoundation owns the gallery, sizing, access, navigation, and setup instructions."
+                tip: ""
             ),
             hasPro: purchases.hasPro,
             style: WidgetShowcaseStyle(
@@ -28,6 +28,7 @@ struct WidgetShowcaseDemoView: View {
                 borderColor: theme.borderColor
             ),
             onRequestUpgrade: { isShowingPaywall = true },
+            embedsInNavigationStack: false,
             background: { AppThemeBackground(theme: theme) }
         )
         .sheet(isPresented: $isShowingPaywall) {

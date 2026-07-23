@@ -3,30 +3,18 @@ import SwiftUI
 
 @MainActor
 enum DemoConfiguration {
-    static let weeklyProductID = "com.hoangbkit.appfoundationdemo.pro.weekly"
     static let monthlyProductID = "com.hoangbkit.appfoundationdemo.pro.monthly"
     static let yearlyProductID = "com.hoangbkit.appfoundationdemo.pro.yearly"
-    static let lifetimeProductID = "com.hoangbkit.appfoundationdemo.pro.lifetime"
 
     static let purchases = PurchaseConfiguration(
         productIDs: [
-            weeklyProductID,
             monthlyProductID,
             yearlyProductID,
-            lifetimeProductID,
         ],
         preferredProductID: yearlyProductID
     )
 
     static let simulatedProducts: [PurchaseProduct] = [
-        PurchaseProduct(
-            id: weeklyProductID,
-            displayName: "Demo Pro Weekly",
-            description: "Weekly access to every Demo Pro feature.",
-            displayPrice: "$1.99",
-            price: 1.99,
-            subscriptionPeriod: .init(value: 1, unit: .week)
-        ),
         PurchaseProduct(
             id: monthlyProductID,
             displayName: "Demo Pro Monthly",
@@ -43,17 +31,10 @@ enum DemoConfiguration {
             price: 39.99,
             subscriptionPeriod: .init(value: 1, unit: .year)
         ),
-        PurchaseProduct(
-            id: lifetimeProductID,
-            displayName: "Demo Pro Lifetime",
-            description: "Permanent access with one purchase.",
-            displayPrice: "$79.99",
-            price: 79.99
-        ),
     ]
 
     static let purchaseServiceMode = PurchaseServiceFactory.effectiveMode(
-        for: PurchaseServiceMode.fromEnvironment(fallback: .live)
+        for: PurchaseServiceMode.fromEnvironment(fallback: .simulated)
     )
 
     static let premiumExportFeature = PremiumFeature(
@@ -108,9 +89,9 @@ enum DemoConfiguration {
         title: "Unlock Demo Pro",
         subtitle: purchaseServiceMode == .simulated
             ? "This Debug build uses the in-process purchase simulator."
-            : "Choose weekly, monthly, yearly, or lifetime access through StoreKit.",
+            : "Choose monthly or yearly access through StoreKit.",
         planTitle: "Demo Pro",
-        planSubtitle: "Subscriptions or one-time lifetime access",
+        planSubtitle: "Monthly or yearly subscription",
         features: [
             PaywallFeature(
                 id: "exports",
@@ -154,7 +135,7 @@ enum DemoConfiguration {
 
     static let legacyPaywall = FoundationPaywallConfiguration(
         title: "Make every app premium",
-        subtitle: "Weekly, monthly, yearly, and lifetime plans in the gradient style.",
+        subtitle: "Monthly and yearly plans in the gradient style.",
         features: [
             FoundationPaywallFeature(
                 id: "storekit",
@@ -175,7 +156,7 @@ enum DemoConfiguration {
 
     static let legacyClaudePaywall = FoundationPaywallConfiguration(
         title: "Get more Demo",
-        subtitle: "Compare all recurring options with lifetime access",
+        subtitle: "Choose monthly or yearly access",
         features: [
             FoundationPaywallFeature(
                 id: "pro-features",
@@ -190,7 +171,7 @@ enum DemoConfiguration {
                 message: "Priority access to new updates"
             ),
         ],
-        purchaseButtonTitle: "Get Pro plan",
+        purchaseButtonTitle: "Continue",
         highlightedProductID: yearlyProductID,
         privacyURL: URL(string: "https://example.com/privacy"),
         termsURL: URL(string: "https://example.com/terms")

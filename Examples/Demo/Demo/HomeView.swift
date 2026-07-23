@@ -10,7 +10,6 @@ struct HomeView: View {
     @State private var isShowingOnboarding = false
     @State private var isShowingThemeDemo = false
     @State private var isShowingInfrastructureDemo = false
-    @State private var isShowingSettings = false
 
     private var theme: AppTheme { themes.effectiveTheme }
 
@@ -31,14 +30,6 @@ struct HomeView: View {
             .foregroundStyle(theme.primaryForegroundColor)
             .navigationTitle("AppFoundation")
             .toolbarBackground(.hidden, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Settings", systemImage: "gearshape.fill") {
-                        isShowingSettings = true
-                    }
-                    .labelStyle(.iconOnly)
-                }
-            }
             .sheet(item: $selectedPaywallStyle) { style in
                 switch style {
                 case .current:
@@ -73,12 +64,6 @@ struct HomeView: View {
                 ) {
                     isShowingOnboarding = false
                 }
-            }
-            .sheet(isPresented: $isShowingSettings) {
-                FoundationSettingsView(
-                    purchases: purchases,
-                    configuration: DemoConfiguration.settings
-                )
             }
         }
         .tint(theme.accentColor)
@@ -242,13 +227,6 @@ struct HomeView: View {
                     systemImage: "rectangle.stack.fill",
                     action: { isShowingOnboarding = true }
                 )
-                divider
-                componentRow(
-                    title: "Legacy Settings",
-                    subtitle: "Existing all-in-one settings view for migration testing",
-                    systemImage: "slider.horizontal.3",
-                    action: { isShowingSettings = true }
-                )
             }
         }
     }
@@ -405,25 +383,42 @@ private struct PaywallStylePickerView: View {
         systemImage: String,
         style: PaywallStyle
     ) -> some View {
-        Button { onSelect(style) } label: {
-            Label {
-                VStack(alignment: .leading, spacing: 4) {
+        Button {
+            onSelect(style)
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: systemImage)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(theme.accentColor)
+                    .frame(width: 42, height: 42)
+                    .background(
+                        theme.elevatedSurfaceColor,
+                        in: RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    )
+
+                VStack(alignment: .leading, spacing: 3) {
                     Text(title)
                         .font(.headline)
                         .foregroundStyle(theme.primaryForegroundColor)
                     Text(subtitle)
-                        .font(.subheadline)
+                        .font(.caption)
                         .foregroundStyle(theme.secondaryForegroundColor)
+                        .lineLimit(2)
                 }
-            } icon: {
-                Image(systemName: systemImage)
-                    .foregroundStyle(theme.accentColor)
+
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(theme.secondaryForegroundColor.opacity(0.7))
             }
+            .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
     }
 }
 
-private enum PaywallStyle: String, Identifiable {
+enum PaywallStyle: String, Identifiable {
     case current
     case legacyGradient
     case legacyClaude

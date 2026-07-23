@@ -47,7 +47,7 @@
         .frame(width: canvasSize.width, height: canvasSize.height)
         .clipped()
       }
-      .aspectRatio(preset.pixelSize.aspectRatio, contentMode: .fit)
+      .aspectRatio(CGFloat(preset.pixelSize.aspectRatio), contentMode: .fit)
       .background(Color.black)
     }
 
@@ -80,7 +80,8 @@
       progress: Double,
       canvasSize: CGSize
     ) -> some View {
-      let amount = CGFloat(min(max(progress, 0), 1))
+      let normalized = min(max(progress, 0), 1)
+      let amount = CGFloat(normalized)
 
       switch transition {
       case .none:
@@ -89,16 +90,16 @@
       case .crossfade:
         ZStack {
           sceneView(index: fromIndex, canvasSize: canvasSize)
-            .opacity(1 - amount)
+            .opacity(1 - normalized)
           sceneView(index: toIndex, canvasSize: canvasSize)
-            .opacity(amount)
+            .opacity(normalized)
         }
 
       case .slide:
         ZStack {
           sceneView(index: fromIndex, canvasSize: canvasSize)
             .offset(x: -canvasSize.width * amount * 0.28)
-            .opacity(1 - amount * 0.28)
+            .opacity(1 - normalized * 0.28)
 
           sceneView(index: toIndex, canvasSize: canvasSize)
             .offset(x: canvasSize.width * (1 - amount))
@@ -108,11 +109,11 @@
         ZStack {
           sceneView(index: fromIndex, canvasSize: canvasSize)
             .scaleEffect(1 + amount * 0.08)
-            .opacity(1 - amount)
+            .opacity(1 - normalized)
 
           sceneView(index: toIndex, canvasSize: canvasSize)
             .scaleEffect(0.90 + amount * 0.10)
-            .opacity(amount)
+            .opacity(normalized)
         }
       }
     }

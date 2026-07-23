@@ -254,11 +254,14 @@
         bitmapInfo: bitmapInfo
       ) else { return }
 
+      let frame = CGRect(x: 0, y: 0, width: width, height: height)
       context.setFillColor(CGColor(gray: 0, alpha: 1))
-      context.fill(CGRect(x: 0, y: 0, width: width, height: height))
-      context.translateBy(x: 0, y: CGFloat(height))
-      context.scaleBy(x: 1, y: -1)
-      context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+      context.fill(frame)
+
+      // ImageRenderer already returns the completed SwiftUI frame in the
+      // orientation expected by the pixel buffer. Flipping again here would
+      // invert the exported video while leaving the live preview correct.
+      context.draw(image, in: frame)
     }
 
     private func finish(_ writer: AVAssetWriter) async {

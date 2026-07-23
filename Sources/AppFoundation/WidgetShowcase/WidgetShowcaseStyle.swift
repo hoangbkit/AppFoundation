@@ -1,7 +1,7 @@
 #if canImport(SwiftUI)
 import SwiftUI
 
-public struct WidgetShowcaseStyle {
+public struct WidgetShowcaseStyle: Sendable {
     public let accentColor: Color
     public let primaryTextColor: Color
     public let secondaryTextColor: Color

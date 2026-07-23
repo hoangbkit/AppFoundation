@@ -27,6 +27,16 @@
 - Added portable tests covering access policy, export filenames and render preflight, backup round trips and unsafe paths, review policy, deep links, weekly plans, and lifetime entitlements.
 - Added a Swift 6.2 GitHub Actions workflow for package manifest and test validation.
 
+### Screenshot and promo studios
+
+- Added the reusable Screenshot Studio engine, exact App Store presets, app-injected Screenshot and App Config sections, full-set preview, and concrete screenshot templates.
+- Added `AppFoundationPromoVideoStudio` as a separate package product and re-exported it through `AppFoundation`.
+- Added an AppReel-inspired Scene / Video editor with deterministic SwiftUI playback, scrubbing, scene selection, safe-area preview, app-injected configuration sections, and full-screen preview.
+- Added overlapping crossfade, slide, and zoom transitions with shared preview/export timeline evaluation.
+- Added logical-point rendering so preview and exact pixel MP4 output preserve identical typography and geometry.
+- Added H.264 silent MP4 export at 30 or 60 fps for vertical, portrait, square, and landscape presets.
+- Added `HeroIntroPromoVideoScene`, `DeviceRevealPromoVideoScene`, `FeatureFocusPromoVideoScene`, `LayeredScreensPromoVideoScene`, `AppFlowPromoVideoScene`, `OutroCallToActionPromoVideoScene`, and `ContinuousCanvasPromoVideoScene`.
+
 ### Demo app
 
 - Updated the Demo to use `PurchaseManager`, `hasPro`, and the current `PaywallView` while retaining legacy paywalls for migration comparison.
@@ -37,7 +47,9 @@
 - Added weekly, monthly, yearly, and non-consumable lifetime products to both the in-process simulator and the Demo StoreKit configuration.
 - Standardized the settings sheet and all Demo paywall presentations on native toolbar close buttons.
 - Changed only the Demo app's installed display name to `AF`; target, scheme, module, and bundle identifiers remain unchanged.
-- Added Demo configuration tests for all four plans, the modern paywall, theme-aware settings, backup package, and stable deep link.
+- Combined all Demo configuration into the Settings tab and removed the Home toolbar Settings shortcut.
+- Added a ten-template Screenshot Template Gallery and a six-scene Promo Video Studio campaign under Settings → Developer Tools.
+- Added Demo tests for all screenshot templates, the complete promo video story, and overlapping scene timing.
 
 ### Existing theme and simulation work
 

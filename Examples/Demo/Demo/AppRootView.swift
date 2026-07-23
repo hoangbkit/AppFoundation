@@ -12,14 +12,14 @@ struct AppRootView: View {
             Label("Showcase", systemImage: "square.stack.3d.up.fill")
           }
 
-        ScreenshotStudioDemoView()
-          .tabItem {
-            Label("Screenshots", systemImage: "photo.stack.fill")
-          }
-
         PurchaseUpsellDemoView()
           .tabItem {
             Label("Upsells", systemImage: "crown.fill")
+          }
+
+        DemoSettingsView()
+          .tabItem {
+            Label("Settings", systemImage: "gearshape.fill")
           }
       }
     } else {

@@ -20,6 +20,10 @@ let package = Package(
         .library(
             name: "AppFoundationPromoVideoStudio",
             targets: ["AppFoundationPromoVideoStudio"]
+        ),
+        .library(
+            name: "AppFoundationWidgetShowcase",
+            targets: ["AppFoundationWidgetShowcase"]
         )
     ],
     targets: [
@@ -32,15 +36,21 @@ let package = Package(
             path: "Sources/AppFoundation/PromoVideoStudio"
         ),
         .target(
+            name: "AppFoundationWidgetShowcase",
+            path: "Sources/AppFoundation/WidgetShowcase"
+        ),
+        .target(
             name: "AppFoundation",
             dependencies: [
                 "AppFoundationScreenshotStudio",
-                "AppFoundationPromoVideoStudio"
+                "AppFoundationPromoVideoStudio",
+                "AppFoundationWidgetShowcase"
             ],
             path: "Sources/AppFoundation",
             exclude: [
                 "ScreenshotStudio",
-                "PromoVideoStudio"
+                "PromoVideoStudio",
+                "WidgetShowcase"
             ]
         ),
         .testTarget(
@@ -48,7 +58,8 @@ let package = Package(
             dependencies: [
                 "AppFoundation",
                 "AppFoundationScreenshotStudio",
-                "AppFoundationPromoVideoStudio"
+                "AppFoundationPromoVideoStudio",
+                "AppFoundationWidgetShowcase"
             ]
         )
     ],

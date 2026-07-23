@@ -49,6 +49,12 @@ struct DemoSettingsView: View {
             }
 
             NavigationLink {
+              PromoVideoStudioDemoView()
+            } label: {
+              Label("Promo Video Studio", systemImage: "film.stack.fill")
+            }
+
+            NavigationLink {
               InfrastructureDemoView()
             } label: {
               Label("Infrastructure Demo", systemImage: "shippingbox.fill")

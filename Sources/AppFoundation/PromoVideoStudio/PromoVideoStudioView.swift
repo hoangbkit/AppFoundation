@@ -2,93 +2,9 @@
 import SwiftUI
 import UIKit
 
-public struct PromoVideoStudioStyle: Sendable {
-    public let accentColor: Color
-    public let primaryTextColor: Color
-    public let secondaryTextColor: Color
-    public let surfaceColor: Color
-    public let elevatedSurfaceColor: Color
-    public let borderColor: Color
-    public let backgroundColor: Color
-    public let gradientStartColor: Color
-    public let gradientEndColor: Color
-
-    public init(
-        accentColor: Color,
-        primaryTextColor: Color = .primary,
-        secondaryTextColor: Color = .secondary,
-        surfaceColor: Color = Color(uiColor: .secondarySystemGroupedBackground),
-        elevatedSurfaceColor: Color = Color(uiColor: .tertiarySystemGroupedBackground),
-        borderColor: Color = Color.primary.opacity(0.10),
-        backgroundColor: Color = Color(uiColor: .systemGroupedBackground),
-        gradientStartColor: Color? = nil,
-        gradientEndColor: Color? = nil
-    ) {
-        self.accentColor = accentColor
-        self.primaryTextColor = primaryTextColor
-        self.secondaryTextColor = secondaryTextColor
-        self.surfaceColor = surfaceColor
-        self.elevatedSurfaceColor = elevatedSurfaceColor
-        self.borderColor = borderColor
-        self.backgroundColor = backgroundColor
-        self.gradientStartColor = gradientStartColor ?? accentColor.opacity(0.34)
-        self.gradientEndColor = gradientEndColor ?? accentColor.opacity(0.08)
-    }
-
-    public static let standard = PromoVideoStudioStyle(accentColor: .accentColor)
-}
-
-public enum PromoVideoStudioControlScope: String, CaseIterable, Identifiable, Sendable {
-    case scene
-    case video
-
-    public var id: String { rawValue }
-
-    public var title: String {
-        switch self {
-        case .scene: "Scene"
-        case .video: "Video"
-        }
-    }
-}
-
-public struct PromoVideoStudioControlContext: Sendable {
-    public let selectedSceneID: String
-    public let selectedSceneTitle: String
-    public let selectedSceneIndex: Int
-    public let sceneCount: Int
-    public let preset: PromoVideoOutputPreset
-    public let frameRate: PromoVideoFrameRate
-    public let motionIntensity: PromoVideoMotionIntensity
-    public let playhead: TimeInterval
-    public let totalDuration: TimeInterval
-
-    public init(
-        selectedSceneID: String,
-        selectedSceneTitle: String,
-        selectedSceneIndex: Int,
-        sceneCount: Int,
-        preset: PromoVideoOutputPreset,
-        frameRate: PromoVideoFrameRate,
-        motionIntensity: PromoVideoMotionIntensity,
-        playhead: TimeInterval,
-        totalDuration: TimeInterval
-    ) {
-        self.selectedSceneID = selectedSceneID
-        self.selectedSceneTitle = selectedSceneTitle
-        self.selectedSceneIndex = selectedSceneIndex
-        self.sceneCount = sceneCount
-        self.preset = preset
-        self.frameRate = frameRate
-        self.motionIntensity = motionIntensity
-        self.playhead = playhead
-        self.totalDuration = totalDuration
-    }
-}
-
 @MainActor
 public struct PromoVideoStudio<SceneControls: View, VideoControls: View>: View {
-    private let project: PromoVideoProject
+    private let videos: [PromoVideoProject]
     private let style: PromoVideoStudioStyle
     private let sceneControls: (PromoVideoStudioControlContext) -> SceneControls
     private let videoControls: (PromoVideoStudioControlContext) -> VideoControls
@@ -96,6 +12,7 @@ public struct PromoVideoStudio<SceneControls: View, VideoControls: View>: View {
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
+    @State private var selectedVideoIndex: Int
     @State private var selectedSceneID: String
     @State private var selectedPresetID: String
     @State private var frameRate: PromoVideoFrameRate
@@ -112,21 +29,39 @@ public struct PromoVideoStudio<SceneControls: View, VideoControls: View>: View {
     @State private var errorMessage: String?
 
     public init(
+        videos: [PromoVideoProject],
+        style: PromoVideoStudioStyle = .standard,
+        @ViewBuilder sceneControls: @escaping (PromoVideoStudioControlContext) -> SceneControls,
+        @ViewBuilder videoConfigurationControls: @escaping (PromoVideoStudioControlContext) -> VideoControls
+    ) {
+        precondition(!videos.isEmpty, "Promo Video Studio requires at least one video.")
+        let firstVideo = videos[0]
+
+        self.videos = videos
+        self.style = style
+        self.sceneControls = sceneControls
+        videoControls = videoConfigurationControls
+        _selectedVideoIndex = State(initialValue: 0)
+        _selectedSceneID = State(initialValue: firstVideo.scenes.first?.id ?? "")
+        _selectedPresetID = State(
+            initialValue: firstVideo.defaultPresetID ?? firstVideo.presets.first?.id ?? ""
+        )
+        _frameRate = State(initialValue: firstVideo.defaultFrameRate)
+        _motionIntensity = State(initialValue: firstVideo.defaultMotionIntensity)
+    }
+
+    public init(
         project: PromoVideoProject,
         style: PromoVideoStudioStyle = .standard,
         @ViewBuilder sceneControls: @escaping (PromoVideoStudioControlContext) -> SceneControls,
         @ViewBuilder videoConfigurationControls: @escaping (PromoVideoStudioControlContext) -> VideoControls
     ) {
-        self.project = project
-        self.style = style
-        self.sceneControls = sceneControls
-        videoControls = videoConfigurationControls
-        _selectedSceneID = State(initialValue: project.scenes.first?.id ?? "")
-        _selectedPresetID = State(
-            initialValue: project.defaultPresetID ?? project.presets.first?.id ?? ""
+        self.init(
+            videos: [project],
+            style: style,
+            sceneControls: sceneControls,
+            videoConfigurationControls: videoConfigurationControls
         )
-        _frameRate = State(initialValue: project.defaultFrameRate)
-        _motionIntensity = State(initialValue: project.defaultMotionIntensity)
     }
 
     public var body: some View {
@@ -172,6 +107,12 @@ public struct PromoVideoStudio<SceneControls: View, VideoControls: View>: View {
         } message: {
             Text(errorMessage ?? "Unknown error")
         }
+        .onChange(of: selectedVideoIndex) { _, _ in
+            resetForSelectedVideo()
+        }
+        .onChange(of: videos.count) { _, _ in
+            repairVideoSelection()
+        }
         .onChange(of: project.sceneIDs) { _, _ in
             repairSceneSelection()
         }
@@ -182,6 +123,7 @@ public struct PromoVideoStudio<SceneControls: View, VideoControls: View>: View {
             jumpToScene(id: newValue)
         }
         .onAppear {
+            repairVideoSelection()
             repairSceneSelection()
             repairPresetSelection()
         }
@@ -422,6 +364,25 @@ public struct PromoVideoStudio<SceneControls: View, VideoControls: View>: View {
     @ToolbarContentBuilder
     private var editorToolbar: some ToolbarContent {
         ToolbarItemGroup(placement: .topBarTrailing) {
+            if videos.count > 1 {
+                Menu {
+                    ForEach(Array(videos.enumerated()), id: \.offset) { index, video in
+                        Button {
+                            selectedVideoIndex = index
+                        } label: {
+                            Label(
+                                video.name,
+                                systemImage: index == selectedVideoIndex ? "checkmark" : "film"
+                            )
+                        }
+                    }
+                } label: {
+                    Image(systemName: "film.stack")
+                }
+                .disabled(isExporting)
+                .accessibilityLabel("Select promo video")
+            }
+
             Button {
                 isShowingFullPreview = true
             } label: {
@@ -443,6 +404,11 @@ public struct PromoVideoStudio<SceneControls: View, VideoControls: View>: View {
                 .accessibilityLabel("Export promo video")
             }
         }
+    }
+
+    private var project: PromoVideoProject {
+        let safeIndex = min(max(selectedVideoIndex, 0), videos.count - 1)
+        return videos[safeIndex]
     }
 
     private var selectedPreset: PromoVideoOutputPreset? {
@@ -475,6 +441,28 @@ public struct PromoVideoStudio<SceneControls: View, VideoControls: View>: View {
             playhead: playhead,
             totalDuration: project.totalDuration
         )
+    }
+
+    private func repairVideoSelection() {
+        selectedVideoIndex = min(max(selectedVideoIndex, 0), videos.count - 1)
+    }
+
+    private func resetForSelectedVideo() {
+        let selectedProject = project
+        selectedSceneID = selectedProject.scenes.first?.id ?? ""
+        selectedPresetID = selectedProject.defaultPresetID ?? selectedProject.presets.first?.id ?? ""
+        frameRate = selectedProject.defaultFrameRate
+        motionIntensity = selectedProject.defaultMotionIntensity
+        scope = .scene
+        playhead = 0
+        isPlaying = false
+        isShowingFullPreview = false
+        exportedFile = nil
+        isShowingShareSheet = false
+        exportProgress = 0
+        errorMessage = nil
+        repairSceneSelection()
+        repairPresetSelection()
     }
 
     private func repairSceneSelection() {
@@ -515,6 +503,9 @@ public struct PromoVideoStudio<SceneControls: View, VideoControls: View>: View {
 
     private func exportVideo() {
         guard !isExporting, let selectedPreset else { return }
+        let exportingVideoIndex = selectedVideoIndex
+        let exportingProject = project
+
         isPlaying = false
         isExporting = true
         exportProgress = 0
@@ -523,12 +514,16 @@ public struct PromoVideoStudio<SceneControls: View, VideoControls: View>: View {
         Task {
             do {
                 let file = try await exporter.export(
-                    project: project,
+                    project: exportingProject,
                     preset: selectedPreset,
                     frameRate: frameRate,
                     motionIntensity: motionIntensity
                 ) { value in
                     exportProgress = value
+                }
+                guard selectedVideoIndex == exportingVideoIndex else {
+                    isExporting = false
+                    return
                 }
                 exportedFile = file
                 isExporting = false
@@ -556,112 +551,5 @@ public struct PromoVideoStudio<SceneControls: View, VideoControls: View>: View {
             }
         )
     }
-}
-
-public extension PromoVideoStudio where SceneControls == EmptyView, VideoControls == EmptyView {
-    init(
-        project: PromoVideoProject,
-        style: PromoVideoStudioStyle = .standard
-    ) {
-        self.init(
-            project: project,
-            style: style,
-            sceneControls: { _ in EmptyView() },
-            videoConfigurationControls: { _ in EmptyView() }
-        )
-    }
-}
-
-public extension PromoVideoStudio where VideoControls == EmptyView {
-    init(
-        project: PromoVideoProject,
-        style: PromoVideoStudioStyle = .standard,
-        @ViewBuilder sceneControls: @escaping (PromoVideoStudioControlContext) -> SceneControls
-    ) {
-        self.init(
-            project: project,
-            style: style,
-            sceneControls: sceneControls,
-            videoConfigurationControls: { _ in EmptyView() }
-        )
-    }
-}
-
-@MainActor
-private struct PromoVideoSceneThumbnail: View {
-    let project: PromoVideoProject
-    let sceneIndex: Int
-    let preset: PromoVideoOutputPreset
-    let frameRate: PromoVideoFrameRate
-    let motionIntensity: PromoVideoMotionIntensity
-    let isSelected: Bool
-    let style: PromoVideoStudioStyle
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            PromoVideoCompositionView(
-                project: project,
-                playhead: thumbnailPlayhead,
-                preset: preset,
-                frameRate: frameRate,
-                motionIntensity: motionIntensity
-            )
-            .frame(width: 86, height: 130)
-            .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .strokeBorder(
-                        isSelected ? style.accentColor : style.borderColor,
-                        lineWidth: isSelected ? 3 : 1
-                    )
-            }
-
-            Text(project.scenes[sceneIndex].title)
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(style.primaryTextColor)
-                .lineLimit(1)
-                .frame(width: 86, alignment: .leading)
-        }
-    }
-
-    private var thumbnailPlayhead: TimeInterval {
-        project.startTime(forSceneAt: sceneIndex) + project.scenes[sceneIndex].duration * 0.55
-    }
-}
-
-private struct PromoVideoStudioBackground: View {
-    let style: PromoVideoStudioStyle
-
-    var body: some View {
-        ZStack {
-            style.backgroundColor
-            LinearGradient(
-                colors: [style.gradientStartColor, style.gradientEndColor, .clear],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .blur(radius: 28)
-            .scaleEffect(1.15)
-
-            RadialGradient(
-                colors: [style.accentColor.opacity(0.20), .clear],
-                center: .topTrailing,
-                startRadius: 8,
-                endRadius: 520
-            )
-        }
-        .ignoresSafeArea()
-        .accessibilityHidden(true)
-    }
-}
-
-private struct PromoVideoShareSheet: UIViewControllerRepresentable {
-    let url: URL
-
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: [url], applicationActivities: nil)
-    }
-
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 #endif

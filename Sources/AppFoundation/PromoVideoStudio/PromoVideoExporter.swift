@@ -125,11 +125,6 @@
       }
       writer.startSession(atSourceTime: .zero)
 
-      guard let pool = adaptor.pixelBufferPool else {
-        writer.cancelWriting()
-        throw PromoVideoExportError.cannotCreatePixelBuffer
-      }
-
       let frameCount = max(1, Int(ceil(project.totalDuration * Double(frameRate.rawValue))))
       let frameDuration = CMTime(value: 1, timescale: CMTimeScale(frameRate.rawValue))
 
@@ -140,6 +135,10 @@
           while !input.isReadyForMoreMediaData {
             try Task.checkCancellation()
             try await Task.sleep(for: .milliseconds(2))
+          }
+
+          guard let pool = adaptor.pixelBufferPool else {
+            throw PromoVideoExportError.cannotCreatePixelBuffer
           }
 
           var optionalBuffer: CVPixelBuffer?
@@ -211,7 +210,7 @@
       frameRate: PromoVideoFrameRate,
       motionIntensity: PromoVideoMotionIntensity
     ) -> CGImage? {
-      let size = preset.pixelSize.cgSize
+      let size = preset.pointSize
       let content = PromoVideoCompositionView(
         project: project,
         playhead: playhead,
@@ -225,7 +224,7 @@
 
       let renderer = ImageRenderer(content: content)
       renderer.proposedSize = ProposedViewSize(size)
-      renderer.scale = 1
+      renderer.scale = CGFloat(preset.scale)
       renderer.isOpaque = true
       return renderer.cgImage
     }

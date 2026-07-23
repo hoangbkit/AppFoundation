@@ -2,37 +2,17 @@ import AppFoundation
 import SwiftUI
 
 struct AppRootView: View {
-  @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
 
-  var body: some View {
-    if hasCompletedOnboarding {
-      TabView {
-        HomeView()
-          .tabItem {
-            Label("Showcase", systemImage: "square.stack.3d.up.fill")
-          }
-
-        WidgetShowcaseDemoView()
-          .tabItem {
-            Label("Widgets", systemImage: "square.grid.2x2.fill")
-          }
-
-        PurchaseUpsellDemoView()
-          .tabItem {
-            Label("Upsells", systemImage: "crown.fill")
-          }
-
-        DemoSettingsView()
-          .tabItem {
-            Label("Settings", systemImage: "gearshape.fill")
-          }
-      }
-    } else {
-      FoundationOnboardingView(
-        pages: DemoConfiguration.onboardingPages
-      ) {
-        hasCompletedOnboarding = true
-      }
+    var body: some View {
+        if hasCompletedOnboarding {
+            HomeView()
+        } else {
+            FoundationOnboardingView(
+                pages: DemoConfiguration.onboardingPages
+            ) {
+                hasCompletedOnboarding = true
+            }
+        }
     }
-  }
 }

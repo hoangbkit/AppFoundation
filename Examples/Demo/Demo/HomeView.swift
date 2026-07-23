@@ -383,42 +383,25 @@ private struct PaywallStylePickerView: View {
         systemImage: String,
         style: PaywallStyle
     ) -> some View {
-        Button {
-            onSelect(style)
-        } label: {
-            HStack(spacing: 14) {
-                Image(systemName: systemImage)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(theme.accentColor)
-                    .frame(width: 42, height: 42)
-                    .background(
-                        theme.elevatedSurfaceColor,
-                        in: RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    )
-
-                VStack(alignment: .leading, spacing: 3) {
+        Button { onSelect(style) } label: {
+            Label {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(title)
                         .font(.headline)
                         .foregroundStyle(theme.primaryForegroundColor)
                     Text(subtitle)
-                        .font(.caption)
+                        .font(.subheadline)
                         .foregroundStyle(theme.secondaryForegroundColor)
-                        .lineLimit(2)
                 }
-
-                Spacer(minLength: 8)
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(theme.secondaryForegroundColor.opacity(0.7))
+            } icon: {
+                Image(systemName: systemImage)
+                    .foregroundStyle(theme.accentColor)
             }
-            .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
     }
 }
 
-enum PaywallStyle: String, Identifiable {
+private enum PaywallStyle: String, Identifiable {
     case current
     case legacyGradient
     case legacyClaude

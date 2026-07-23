@@ -118,7 +118,7 @@
               shadowRadius: metrics.shadowRadius * 1.1,
               shadowOpacity: 0.30
             )
-            .scaleEffect(scale)
+            .scaleEffect(CGFloat(scale))
             .rotationEffect(.degrees(rotation))
             .offset(y: CGFloat((1 - devicePhase) * 110 * intensity + drift))
             .opacity(devicePhase)
@@ -191,7 +191,7 @@
                   cornerRadius: metrics.cornerRadius,
                   shadowRadius: metrics.shadowRadius
                 )
-                .scaleEffect(0.90 + visualPhase * 0.10)
+                .scaleEffect(CGFloat(0.90 + visualPhase * 0.10))
                 .offset(
                   x: CGFloat((1 - visualPhase) * 44 * intensity),
                   y: CGFloat((1 - visualPhase) * 62 * intensity + pan)
@@ -205,7 +205,7 @@
                   shadowRadius: metrics.shadowRadius * 0.65,
                   shadowOpacity: 0.20
                 )
-                .scaleEffect(0.82 + calloutPhase * 0.18)
+                .scaleEffect(CGFloat(0.82 + calloutPhase * 0.18))
                 .offset(
                   x: CGFloat((1 - calloutPhase) * 28),
                   y: CGFloat((1 - calloutPhase) * 34)

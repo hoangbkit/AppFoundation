@@ -20,6 +20,16 @@ struct DemoSettingsView: View {
                 AppThemeBackground(theme: theme)
 
                 Form {
+                    Section("Appearance") {
+                        ThemePickerView(
+                            manager: themes,
+                            title: nil,
+                            onRequestUpgrade: { isShowingPaywall = true }
+                        )
+                        .padding(.vertical, 4)
+                    }
+                    .listRowBackground(theme.surfaceColor)
+
                     premiumStatusSection
 
                     #if DEBUG
@@ -31,15 +41,6 @@ struct DemoSettingsView: View {
                         configuration: configuration.proPlanConfiguration,
                         onUpgrade: { isShowingPaywall = true }
                     )
-                    .listRowBackground(theme.surfaceColor)
-
-                    Section("Appearance") {
-                        NavigationLink {
-                            ThemeDemoView()
-                        } label: {
-                            Label("Themes", systemImage: "paintpalette.fill")
-                        }
-                    }
                     .listRowBackground(theme.surfaceColor)
 
                     supportSection

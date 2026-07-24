@@ -16,7 +16,7 @@ The main `AppFoundation` product continues to re-export Screenshot Studio for ex
 import AppFoundation
 ```
 
-Only the Screenshot Studio product is intended for macOS consumption in this release. Other AppFoundation features remain iOS-focused for now.
+Screenshot Studio and Promo Video Studio are both supported on macOS in this release. Apps that need promo-video creation can also link `AppFoundationPromoVideoStudio` directly.
 
 ## Register Mac screenshots
 
@@ -42,15 +42,25 @@ enum OnlinkScreenshotCatalog {
 }
 ```
 
-Present the same shared API used on iOS:
+Present the same contextual API used on iOS:
 
 ```swift
 #if DEBUG
-ScreenshotStudio(catalog: OnlinkScreenshotCatalog.make())
+ScreenshotStudio(
+  catalog: OnlinkScreenshotCatalog.make()
+) { context in
+  Section("Screenshot") {
+    Text(context.selectedScreenshotTitle)
+  }
+} appConfigurationControls: { context in
+  Section("Campaign") {
+    Text(context.preset.title)
+  }
+}
 #endif
 ```
 
-On macOS the studio uses a native split-view workspace. Export actions ask for a destination folder, write exact-size opaque PNG files there, and reveal the results in Finder.
+On macOS the Studio uses a native three-column workspace with registered screenshots, a large live preview, and contextual Screenshot/App Config inspectors. The complete set can be rendered and reviewed inside the Studio before export. Export actions ask for a destination folder, write exact-size opaque PNG files there, and reveal the results in Finder.
 
 ## Mac window frame
 

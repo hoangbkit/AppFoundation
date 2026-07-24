@@ -5,6 +5,7 @@ options:
   xcodeVersion: "26.0"
   deploymentTarget:
     iOS: "26.0"
+    macOS: "15.0"
   createIntermediateGroups: true
   generateEmptyDirectories: true
   schemePathPrefix: "../../"
@@ -62,6 +63,28 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.hoangbkit.appfoundationdemo.tests
         GENERATE_INFOPLIST_FILE: YES
 
+  DemoMac:
+    type: application
+    platform: macOS
+    deploymentTarget: "15.0"
+    sources:
+      - path: DemoMac
+    dependencies:
+      - package: AppFoundation
+        product: AppFoundationScreenshotStudio
+      - package: AppFoundation
+        product: AppFoundationPromoVideoStudio
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.hoangbkit.appfoundationdemo.mac
+        PRODUCT_NAME: AF Mac
+        MARKETING_VERSION: 1.0
+        CURRENT_PROJECT_VERSION: 1
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: AF Mac
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_HARDENED_RUNTIME: YES
+
 schemes:
   Demo:
     build:
@@ -78,6 +101,19 @@ schemes:
         - name: DemoTests
           parallelizable: true
           randomExecutionOrder: true
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
+
+  DemoMac:
+    build:
+      targets:
+        DemoMac: all
+    run:
+      config: Debug
     profile:
       config: Release
     analyze:

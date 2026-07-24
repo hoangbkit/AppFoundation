@@ -83,7 +83,7 @@ final class DemoTests: XCTestCase {
     func testBackupConfigurationMatchesDemoBundle() {
         XCTAssertEqual(
             DemoConfiguration.backupConfiguration.appIdentifier,
-            "com.hoangbkit.appfoundationdemo"
+            "com.hoangbkit.afdemo"
         )
         XCTAssertEqual(DemoConfiguration.backupConfiguration.fileExtension, "afdemo")
     }

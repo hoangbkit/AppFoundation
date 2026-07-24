@@ -45,7 +45,7 @@ enum DemoConfiguration {
     static let backupConfiguration = BackupPackageConfiguration(
         format: "com.hoangbkit.appfoundationdemo.backup",
         version: 1,
-        appIdentifier: "com.hoangbkit.appfoundationdemo",
+        appIdentifier: "com.hoangbkit.afdemo",
         fileExtension: "afdemo"
     )
 

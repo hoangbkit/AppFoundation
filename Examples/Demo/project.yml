@@ -37,7 +37,7 @@ targets:
         product: AppFoundation
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.hoangbkit.appfoundationdemo
+        PRODUCT_BUNDLE_IDENTIFIER: com.hoangbkit.afdemo
         PRODUCT_NAME: AF
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         MARKETING_VERSION: 1.0
@@ -60,7 +60,7 @@ targets:
       - target: Demo
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.hoangbkit.appfoundationdemo.tests
+        PRODUCT_BUNDLE_IDENTIFIER: com.hoangbkit.afdemo.tests
         GENERATE_INFOPLIST_FILE: YES
 
   DemoMac:
@@ -76,12 +76,13 @@ targets:
         product: AppFoundationPromoVideoStudio
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.hoangbkit.appfoundationdemo.mac
-        PRODUCT_NAME: AF Mac
+        PRODUCT_BUNDLE_IDENTIFIER: com.hoangbkit.afdemo
+        PRODUCT_NAME: AF
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         MARKETING_VERSION: 1.0
         CURRENT_PROJECT_VERSION: 1
         GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_CFBundleDisplayName: AF Mac
+        INFOPLIST_KEY_CFBundleDisplayName: AF
         CODE_SIGN_STYLE: Automatic
         ENABLE_HARDENED_RUNTIME: YES
 

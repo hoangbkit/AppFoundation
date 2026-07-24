@@ -1,4 +1,4 @@
-#if os(iOS) && canImport(SwiftUI)
+#if canImport(SwiftUI)
   import SwiftUI
 
   public struct LayeredScreensPromoVideoScene<

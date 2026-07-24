@@ -319,7 +319,7 @@
     }
 
     private var exportSection: some View {
-      Section("Export") {
+      Section {
         if isExporting || isRenderingPreview {
           HStack(spacing: 10) {
             ProgressView().controlSize(.small)
@@ -341,6 +341,8 @@
           Label("Export All Registered PNGs", systemImage: "square.and.arrow.up.on.square")
         }
         .disabled(isExporting || availableDefinitions.isEmpty || selectedPreset == nil)
+      } header: {
+        Text("Export")
       } footer: {
         Text(
           "Exports are opaque PNG files rendered at exact App Store dimensions. Batch preview uses the same final renderer."

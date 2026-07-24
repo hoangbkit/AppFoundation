@@ -19,7 +19,15 @@ struct HomeView: View {
                 AppThemeBackground(theme: theme)
 
                 List {
-                    row(top: 8, bottom: 15) { heroCard }
+                    row(top: 8, bottom: 15) {
+                        NavigationLink {
+                            PackageDocumentationView()
+                        } label: {
+                            heroCard
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Open AppFoundation package documentation")
+                    }
                     featuresSection
                 }
                 .listStyle(.plain)
@@ -306,7 +314,6 @@ struct HomeView: View {
             InfrastructureDemoView()
         }
     }
-
 }
 
 private enum DemoFeature: Hashable {

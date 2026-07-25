@@ -1,5 +1,8 @@
 #if canImport(SwiftUI)
 import SwiftUI
+#if canImport(StoreKit)
+import StoreKit
+#endif
 
 /// Renders the host app's real paywall as a full-canvas Screenshot Studio scene.
 ///
@@ -22,8 +25,6 @@ public struct PaywallScreenshotTemplate<Paywall: View>: View {
 }
 
 #if canImport(StoreKit)
-import StoreKit
-
 /// A Screenshot Studio template that renders AppFoundation's real `ClaudePaywallView`.
 ///
 /// Pass a deterministic controller created with `PurchaseManager.screenshotPreview` so the

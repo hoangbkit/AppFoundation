@@ -20,7 +20,7 @@ ScreenshotDefinition(
 }
 ```
 
-`PaywallScreenshotTemplate` only fills the screenshot canvas, clips overflow, and disables interaction. The supplied view remains the source of truth.
+`PaywallScreenshotTemplate` fills the screenshot canvas, centers the supplied paywall by default, clips overflow, and disables interaction. The supplied view remains the source of truth. Pass a different `Alignment` when an app-owned paywall intentionally uses another placement.
 
 ## ClaudePaywallView
 
@@ -61,7 +61,7 @@ ScreenshotDefinition(
 }
 ```
 
-`ClaudePaywallScreenshotTemplate` instantiates the real `ClaudePaywallView`. It does not maintain a separate screenshot implementation.
+`ClaudePaywallScreenshotTemplate` instantiates the real `ClaudePaywallView`. It does not maintain a separate screenshot implementation. During screenshot rendering, the same paywall content is shown without its interactive `NavigationStack`, toolbar, alerts, or asynchronous setup. The content is vertically centered on the final screenshot canvas so `ImageRenderer` exports the complete review asset reliably.
 
 ## Deterministic products
 
@@ -79,4 +79,4 @@ ClaudePaywallScreenshotTemplate(
 )
 ```
 
-The Demo includes a developer-only Paywall Screenshot Studio under Settings and renders the real Claude paywall with deterministic monthly and yearly products.
+The Demo registers Subscription Review directly in the Screenshot Studio opened from Home. It renders the real Claude paywall alongside the normal App Store screenshot examples.

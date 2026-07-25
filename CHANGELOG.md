@@ -1,72 +1,182 @@
 # Changelog
 
+All notable changes to AppFoundation are documented in this file.
+
+AppFoundation follows semantic versioning while its public API remains in the `0.x` development series.
+
 ## Unreleased
+
+### Documentation
+
+- Rebuilt the changelog from the actual `0.1.0` through `0.1.8` tag history.
+- Updated the README for the current package products, macOS support, multi-video Promo Video Studio, and `0.1.8` installation guidance.
+
+## 0.1.8 - 2026-07-24
+
+### Added
+
+- Added complete macOS 15 support to `AppFoundationPromoVideoStudio`.
+- Added macOS promo-video models, deterministic composition, frame-by-frame H.264 export, and a native Studio editor.
+- Added a three-column macOS Promo Video Studio workspace with registered-video switching, scene selection and thumbnails, live preview, timeline playback and scrubbing, Scene and Video inspectors, output settings, safe-area controls, and full-window preview.
+- Added native macOS save-panel export and Finder reveal for generated MP4 files.
+- Made all seven Promo Video Studio story templates available on macOS.
+- Added `Documentation/PromoVideoStudioMacOS.md`.
+- Added macOS Promo Video Studio tests.
+- Added a separate `DemoMac` XcodeGen target with native navigation, Screenshot Studio and Promo Video Studio samples, a macOS app icon, and a `make build-mac` command.
+
+### Changed
+
+- Brought the macOS Screenshot Studio editor to parity with the current Studio workflow using a native three-column registered-screenshot, preview, and inspector workspace.
+- Expanded macOS Screenshot Studio preview and export behavior, including complete-set review, destination-folder export, and Finder reveal.
+- Updated macOS Studio documentation and Demo project configuration.
+- Unified the iOS and macOS Demo display name as `AF` and corrected the Demo bundle identifiers and app-icon configuration.
+
+## 0.1.7 - 2026-07-23
+
+### Added
+
+- Added multi-video Promo Video Studio support through `PromoVideoStudio(videos:)`.
+- Added toolbar selection between registered promo videos.
+- Added reusable support types for video selection and Studio presentation.
+- Added three complete Demo promo-video projects covering AppFoundation, Widget Showcase, and Screenshot Studio stories.
+
+### Changed
+
+- Preview, scene selection, scrubbing, configuration, playback, and export now operate on the currently selected promo video only.
+- Retained `PromoVideoStudio(project:)` as the source-compatible single-project initializer.
+- Split the Demo promo campaign into reusable project and component files.
+
+## 0.1.6 - 2026-07-23
+
+### Added
+
+- Added `ScreenshotStudioStyle` with configurable accent, text, surface, border, background, and gradient colors.
+- Added `PromoVideoStudioStyle` with configurable accent, text, surface, border, background, and gradient colors.
+- Expanded `WidgetShowcaseStyle` with gradient start, gradient end, and shadow customization.
+
+### Changed
+
+- Applied polished default presentation across Screenshot Studio, Promo Video Studio, and Widget Showcase.
+- Refined compact and regular-size Studio layouts, preview surfaces, inspector sections, navigation chrome, and control styling.
+- Polished reusable onboarding and `ClaudePaywallView` presentation.
+- Reorganized the Demo from tab-heavy navigation into a focused Home and Settings structure.
+- Simplified Developer Tools navigation and standardized the Demo's package showcases.
+
+### Fixed
+
+- Cleaned up Demo and package integration issues and verified successful builds after the presentation refactor.
+
+## 0.1.5 - 2026-07-23
+
+### Added
+
+- Added `AppFoundationWidgetShowcase` as a separate package product and re-exported it through `AppFoundation`.
+- Added normalized widget catalogs grouped by small, medium, and large families.
+- Added responsive widget previews, gallery and detail views, generated Home Screen setup guidance, and app-owned upgrade actions.
+- Added Free and Pro widget presentation without coupling the package to an app's model types or widget extension.
+- Added a Demo catalog containing small, medium, and large widget examples.
+- Added Widget Showcase model and catalog tests.
+- Added `Documentation/WidgetShowcase.md`.
+
+### Changed
+
+- Made `WidgetShowcaseStyle` conform to `Sendable`.
+
+## 0.1.4 - 2026-07-23
+
+### Added
+
+- Added `AppFoundationPromoVideoStudio` as a separate package product and re-exported it through `AppFoundation`.
+- Added an AppReel-inspired Scene and Video editor with deterministic SwiftUI playback, scrubbing, scene selection, safe-area preview, app-injected configuration sections, and full-screen preview.
+- Added overlapping crossfade, slide, and zoom transitions with shared preview/export timeline evaluation.
+- Added logical-point rendering so interactive preview and exact-pixel MP4 output preserve matching typography and geometry.
+- Added silent H.264 MP4 export at 30 or 60 fps for vertical, portrait, square, and landscape presets.
+- Added `HeroIntroPromoVideoScene`, `DeviceRevealPromoVideoScene`, `FeatureFocusPromoVideoScene`, `LayeredScreensPromoVideoScene`, `AppFlowPromoVideoScene`, `OutroCallToActionPromoVideoScene`, and `ContinuousCanvasPromoVideoScene`.
+- Added a six-scene Demo campaign and timing/export tests.
+- Added `Documentation/PromoVideoStudio.md`.
+
+### Fixed
+
+- Fixed upside-down exported promo-video frames while preserving the correct live-preview orientation.
+
+## 0.1.3 - 2026-07-23
+
+### Added
+
+- Added `AppFoundationScreenshotStudio` as a separate package product and re-exported it through `AppFoundation`.
+- Added macOS 15 package support for compatible AppFoundation APIs.
+- Added the initial native macOS Screenshot Studio editor and reusable `ScreenshotMacWindowFrame` presentation.
+- Added hero, feature, layered, and gallery screenshot templates.
+- Added a ten-template Screenshot Template Gallery to the Demo app.
+- Added `Documentation/ScreenshotStudioMacOS.md`.
+
+### Changed
+
+- Expanded and reorganized Screenshot Studio and reusable-component documentation.
+- Refined Screenshot Studio export compatibility and preview behavior across iOS and macOS.
+- Consolidated Demo configuration into Settings and simplified Home navigation.
+
+## 0.1.2 - 2026-07-22
+
+### Added
+
+- Added the initial reusable Screenshot Studio engine for app-owned SwiftUI screenshot definitions.
+- Added exact App Store device presets, locale support, full-set preview, app-injected Screenshot and App Config sections, and exact-size export.
+- Added reusable backgrounds, device frames, system chrome, promotional components, and visual effects.
+- Added Screenshot Studio examples and tests.
+- Added `Documentation/ScreenshotStudio.md` and `Documentation/ScreenshotStudioComponents.md`.
+
+### Fixed
+
+- Fixed contextual resolution of default App Store screenshot presets in `ScreenshotStudioProject` initialization.
+
+## 0.1.1 - 2026-07-21
+
+### Added
+
+- Added `ProPlanSettingsSection` and configurable Pro-plan settings presentation.
+- Added `LimitReachedUpsellView`, comparison rows, and `LimitReachedUpsellFlow` for reusable Free-versus-Pro upgrade flows.
+- Added optional paywall configuration to `FoundationSettingsView`.
+- Added a Demo screen covering Pro settings and limit-reached upsells.
+
+### Changed
+
+- Updated `FoundationSettingsView` to use the reusable Pro-plan section and app-owned paywall presentation.
+
+## 0.1.0 - 2026-07-21
 
 ### Commerce
 
-- Added `PurchaseManager` as the preferred source-compatible name for `PurchaseController`.
-- Added the simple `hasPro` entitlement property.
-- Added `PremiumFeature`, `PremiumAccessPolicy`, and safe post-expiry access decisions for existing user content.
-- Added the primary compact `PaywallView` and neutral paywall configuration API.
-- Added premium gates, badges, premium buttons, locked overlays, and a composable subscription settings section.
-- Made `PaywallView`, `FoundationPaywallView`, and `ClaudePaywallView` follow the active `AppTheme`, including backgrounds, surfaces, foregrounds, borders, shadows, corner radii, accents, and preferred color scheme.
-- Added optional full-theme overrides while retaining the legacy fixed `FoundationTheme` initializer for source compatibility.
-- Added weekly, monthly, yearly, and lifetime plan presentation across all paywall styles.
+- Added StoreKit 2 product loading, purchase, restore, verified entitlement evaluation, transaction observation, and foreground refresh.
+- Added `PurchaseManager` as the preferred source-compatible name for `PurchaseController` and added the simple `hasPro` entitlement property.
+- Added Debug-only in-process purchase simulation and runtime switching.
+- Added weekly, monthly, yearly, and non-consumable lifetime plan support.
 - Added `PurchasePlanKind`, plan labels, billing descriptions, recurring/lifetime helpers, and catalog-aware legal disclosure.
-- Updated paywall layouts to show the complete configured product catalog and use one column at accessibility text sizes.
-- Replaced custom floating and styled paywall close controls with native navigation toolbar cancellation buttons.
-- Preserved live StoreKit verification, transaction observation, restore behavior, non-consumable lifetime entitlements, and Debug-only simulation.
+- Added `PaywallView`, `FoundationPaywallView`, and `ClaudePaywallView` with active-theme support and adaptive catalog layouts.
+- Added premium gates, badges, buttons, locked overlays, and safe post-expiry access decisions for existing user content.
+
+### Themes and reusable UI
+
+- Added the Rose, Sunset, Lavender, Midnight, Paper, and Champagne theme defaults.
+- Added immutable theme catalogs, persisted selected-theme state, free fallback resolution, and App Group-compatible widget state.
+- Added timed Pro theme previews, promotion on unlock, and selected Pro theme preservation after entitlement loss.
+- Added SwiftUI environment integration, a customizable theme picker, themed background/card primitives, and bridges to `FoundationTheme` components.
+- Added optional alternate app-icon application support.
+- Added reusable onboarding, settings, paywall, and design primitives.
 
 ### Shared infrastructure
 
-- Added ExportKit safe filenames and extensions, atomic temporary files, PNG/JPEG definitions, pixel-count preflight, rounded exact-size SwiftUI rendering, and a reusable share sheet.
+- Added ExportKit safe filenames and extensions, atomic temporary files, PNG/JPEG definitions, pixel-count preflight, exact-size SwiftUI rendering, and reusable sharing support.
 - Added versioned folder-based backup packages with manifests, metadata, checksums, optional assets, security-scoped URL access, duplicate and missing-asset detection, and path-traversal protection.
-- Added typed App Group snapshots, shared deep links, and widget reload throttling.
+- Added typed App Group snapshots, schema metadata, shared deep links, and widget reload throttling.
 - Added local notification authorization, scheduling, replacement, and cancellation helpers.
 - Added `UserFacingError`, `AppInfo`, safe file replacement, async debouncing, review policy, logging, haptics, and `AsyncButton`.
-- Added portable tests covering access policy, export filenames and render preflight, backup round trips and unsafe paths, review policy, deep links, weekly plans, and lifetime entitlements.
-- Added a Swift 6.2 GitHub Actions workflow for package manifest and test validation.
-
-### Screenshot and promo studios
-
-- Added the reusable Screenshot Studio engine, exact App Store presets, app-injected Screenshot and App Config sections, full-set preview, and concrete screenshot templates.
-- Added `AppFoundationPromoVideoStudio` as a separate package product and re-exported it through `AppFoundation`.
-- Added an AppReel-inspired Scene / Video editor with deterministic SwiftUI playback, scrubbing, scene selection, safe-area preview, app-injected configuration sections, and full-screen preview.
-- Added overlapping crossfade, slide, and zoom transitions with shared preview/export timeline evaluation.
-- Added logical-point rendering so preview and exact pixel MP4 output preserve identical typography and geometry.
-- Added H.264 silent MP4 export at 30 or 60 fps for vertical, portrait, square, and landscape presets.
-- Added `HeroIntroPromoVideoScene`, `DeviceRevealPromoVideoScene`, `FeatureFocusPromoVideoScene`, `LayeredScreensPromoVideoScene`, `AppFlowPromoVideoScene`, `OutroCallToActionPromoVideoScene`, and `ContinuousCanvasPromoVideoScene`.
+- Added portable package tests and a Swift 6.2 GitHub Actions validation workflow.
 
 ### Demo app
 
-- Updated the Demo to use `PurchaseManager`, `hasPro`, and the current `PaywallView` while retaining legacy paywalls for migration comparison.
-- Added an interactive New APIs showcase for premium gating, subscription settings, rounded PNG export and sharing, backup package verification, shared snapshots and deep links, local notifications, `AppInfo`, review policy, haptics, and `AsyncButton`.
-- Updated all Demo paywall configurations to follow live theme changes and added configuration coverage for that behavior.
-- Made the complete Demo theme-aware: first-launch onboarding, Home, package browser, paywall picker, settings, navigation chrome, list rows, cards, statuses, and exported preview artwork now follow `ThemeManager.effectiveTheme`.
-- Made reusable onboarding and settings views follow the active app theme by default while preserving explicit fixed `FoundationTheme` initializers.
-- Added weekly, monthly, yearly, and non-consumable lifetime products to both the in-process simulator and the Demo StoreKit configuration.
-- Standardized the settings sheet and all Demo paywall presentations on native toolbar close buttons.
-- Changed only the Demo app's installed display name to `AF`; target, scheme, module, and bundle identifiers remain unchanged.
-- Combined all Demo configuration into the Settings tab and removed the Home toolbar Settings shortcut.
-- Added a ten-template Screenshot Template Gallery and a six-scene Promo Video Studio campaign under Settings → Developer Tools.
-- Added Demo tests for all screenshot templates, the complete promo video story, and overlapping scene timing.
-
-### Existing theme and simulation work
-
-- Added a reusable monetized theme system modeled on MiLove's production behavior.
-- Added Rose, Sunset, Lavender, Midnight, Paper, and Champagne default themes.
-- Added immutable theme catalogs that support excluding, replacing, reordering, and appending themes.
-- Added persisted selected-theme state, free fallback resolution, and App Group-compatible widget state.
-- Added five-minute Pro theme previews, shared preview expiry when switching themes, promotion on unlock, and selected Pro theme preservation after entitlement loss.
-- Added a customizable SwiftUI theme picker, environment integration, themed background/card primitives, and bridges to existing `FoundationTheme` components.
-- Added optional alternate app-icon application support.
-- Added a Debug-only in-process purchase simulator for CLI-deployed prototypes.
-- Added `PurchaseController` simulation configuration with `simulated: Bool = false` and runtime switching through `setSimulatedPurchasesEnabled(_:)`.
-
-## 1.0.0 - 2026-07-16
-
-- Initial iOS 26+ release.
-- Added StoreKit 2 purchase and entitlement infrastructure.
-- Added reusable onboarding, paywall, settings, and design primitives.
-- Added XcodeGen Demo app and local StoreKit configuration.
-- Added portable core tests and iOS purchase-controller tests.
+- Added the XcodeGen Demo app and local StoreKit configuration.
+- Added interactive examples for commerce, themes, premium gating, settings, exports, backups, App Group snapshots, deep links, notifications, review policy, haptics, and reusable controls.
+- Added weekly, monthly, yearly, and non-consumable lifetime products to both the in-process simulator and Demo StoreKit configuration.
+- Added theme-aware onboarding, navigation, settings, paywall, list, card, and exported-preview presentation.
+- Standardized paywall and settings dismissal on native navigation toolbar cancellation actions.

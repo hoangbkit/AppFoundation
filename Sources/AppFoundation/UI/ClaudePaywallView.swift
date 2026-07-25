@@ -10,6 +10,7 @@ public struct ClaudePaywallView: View {
 
     private let purchases: PurchaseController
     private let configuration: FoundationPaywallConfiguration
+    private let rendersForScreenshot: Bool
 
     @State private var selectedProductID: String?
     @State private var restoreMessage: String?
@@ -19,8 +20,23 @@ public struct ClaudePaywallView: View {
         configuration: FoundationPaywallConfiguration,
         initialSelectedProductID: String? = nil
     ) {
+        self.init(
+            purchases: purchases,
+            configuration: configuration,
+            initialSelectedProductID: initialSelectedProductID,
+            rendersForScreenshot: false
+        )
+    }
+
+    init(
+        purchases: PurchaseController,
+        configuration: FoundationPaywallConfiguration,
+        initialSelectedProductID: String?,
+        rendersForScreenshot: Bool
+    ) {
         self.purchases = purchases
         self.configuration = configuration
+        self.rendersForScreenshot = rendersForScreenshot
         _selectedProductID = State(
             initialValue: initialSelectedProductID
                 ?? configuration.highlightedProductID
@@ -29,23 +45,28 @@ public struct ClaudePaywallView: View {
     }
 
     public var body: some View {
-        NavigationStack {
-            ZStack {
-                PaywallThemeBackground(tokens: theme)
+        Group {
+            if rendersForScreenshot {
+                screenshotBody
+            } else {
+                interactiveBody
+            }
+        }
+        .tint(theme.accent)
+        .preferredColorScheme(theme.preferredColorScheme)
+    }
 
+    private var interactiveBody: some View {
+        NavigationStack {
+            paywallBackground {
                 ScrollView {
-                    VStack(spacing: 28) {
-                        header
-                        planCard
-                        legalFooter
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
-                    .padding(.bottom, 32)
+                    contentStack
+                        .padding(.horizontal, 20)
+                        .padding(.top, 8)
+                        .padding(.bottom, 32)
                 }
                 .scrollIndicators(.hidden)
             }
-            .foregroundStyle(theme.primaryForeground)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close", systemImage: "xmark") {
@@ -75,8 +96,40 @@ public struct ClaudePaywallView: View {
                 Text(restoreMessage ?? "")
             }
         }
-        .tint(theme.accent)
-        .preferredColorScheme(theme.preferredColorScheme)
+    }
+
+    private var screenshotBody: some View {
+        paywallBackground {
+            GeometryReader { proxy in
+                contentStack
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 24)
+                    .frame(
+                        width: proxy.size.width,
+                        height: proxy.size.height,
+                        alignment: .center
+                    )
+            }
+        }
+    }
+
+    private func paywallBackground<Content: View>(
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        ZStack {
+            PaywallThemeBackground(tokens: theme)
+            content()
+        }
+        .foregroundStyle(theme.primaryForeground)
+    }
+
+    private var contentStack: some View {
+        VStack(spacing: 28) {
+            header
+            planCard
+            legalFooter
+        }
     }
 
     private var header: some View {

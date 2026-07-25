@@ -23,6 +23,7 @@ struct DemoSettingsView: View {
                     premiumStatusSection
 
                     #if DEBUG
+                    developerToolsSection
                     simulatedPurchasesSection
                     #endif
 
@@ -102,6 +103,17 @@ struct DemoSettingsView: View {
     }
 
     #if DEBUG
+    private var developerToolsSection: some View {
+        Section("Developer tools") {
+            NavigationLink {
+                PaywallScreenshotStudioDemoView()
+            } label: {
+                Label("Paywall Screenshot Studio", systemImage: "crown.fill")
+            }
+        }
+        .listRowBackground(theme.surfaceColor)
+    }
+
     private var simulatedPurchasesSection: some View {
         Section("Debug purchases") {
             Toggle(

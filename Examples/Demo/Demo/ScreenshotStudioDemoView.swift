@@ -67,10 +67,17 @@ private enum DemoScreenshotDensity: String, CaseIterable, Identifiable {
 @MainActor
 struct ScreenshotStudioDemoView: View {
   @State private var settings = DemoScreenshotSettings()
+  @State private var screenshotPurchases = PurchaseManager.screenshotPreview(
+    configuration: DemoConfiguration.purchases,
+    products: DemoConfiguration.simulatedProducts
+  )
 
   var body: some View {
     ScreenshotStudio(
-      catalog: DemoScreenshotCatalog.make(settings: settings)
+      catalog: DemoScreenshotCatalog.make(
+        settings: settings,
+        purchases: screenshotPurchases
+      )
     ) { context in
       DemoSelectedScreenshotControls(settings: settings, context: context)
     } appConfigurationControls: { _ in
@@ -81,7 +88,10 @@ struct ScreenshotStudioDemoView: View {
 
 @MainActor
 private enum DemoScreenshotCatalog {
-  static func make(settings: DemoScreenshotSettings) -> ScreenshotCatalog {
+  static func make(
+    settings: DemoScreenshotSettings,
+    purchases: PurchaseController
+  ) -> ScreenshotCatalog {
     ScreenshotCatalog(
       appName: "AppFoundation Demo",
       presets: [
@@ -130,6 +140,17 @@ private enum DemoScreenshotCatalog {
       ) {
         DemoTemplateGalleryScreenshot(settings: settings)
       }
+
+      ScreenshotDefinition(
+        id: "subscription-review",
+        title: "Subscription Review",
+        filename: "Demo Pro subscription paywall"
+      ) {
+        ClaudePaywallScreenshotTemplate(
+          purchases: purchases,
+          configuration: DemoConfiguration.legacyClaudePaywall
+        )
+      }
     }
   }
 }
@@ -152,6 +173,8 @@ private struct DemoSelectedScreenshotControls: View {
         Toggle("Show supporting labels", isOn: $settings.showSupportingLabels)
       case "native-studio":
         Toggle("Highlight exact export", isOn: $settings.highlightExport)
+      case "subscription-review":
+        LabeledContent("Paywall", value: "ClaudePaywallView")
       default:
         LabeledContent("Template", value: context.selectedScreenshotTitle)
       }

@@ -84,6 +84,23 @@ final class PurchaseControllerTests: XCTestCase {
         XCTAssertEqual(controller.activity, .failed(.unknown))
     }
 
+    func testScreenshotPreviewPreloadsProductsSynchronously() {
+        let configuration = PurchaseConfiguration(
+            productIDs: [Self.monthly.id, Self.yearly.id],
+            preferredProductID: Self.yearly.id
+        )
+
+        let controller = PurchaseController.screenshotPreview(
+            configuration: configuration,
+            products: [Self.yearly, Self.monthly]
+        )
+
+        XCTAssertEqual(controller.products, [Self.monthly, Self.yearly])
+        XCTAssertEqual(controller.productLoadingState, .loaded)
+        XCTAssertEqual(controller.preferredProduct?.id, Self.yearly.id)
+        XCTAssertFalse(controller.isEntitled)
+    }
+
     #if DEBUG
     func testSimulationDefaultsToDisabled() {
         let controller = PurchaseController(
@@ -130,6 +147,15 @@ final class PurchaseControllerTests: XCTestCase {
         displayPrice: "$4.99",
         price: 4.99,
         subscriptionPeriod: .init(value: 1, unit: .month)
+    )
+
+    private static let yearly = StoreProduct(
+        id: "pro.yearly",
+        displayName: "Yearly",
+        description: "Yearly access",
+        displayPrice: "$39.99",
+        price: 39.99,
+        subscriptionPeriod: .init(value: 1, unit: .year)
     )
 }
 

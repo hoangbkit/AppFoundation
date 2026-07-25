@@ -1,76 +1,52 @@
 # AppFoundation
 
-Shared production infrastructure for Hoang's iOS apps. AppFoundation targets **iOS 26+** and **Swift 6.2 strict concurrency**.
+Shared production infrastructure for SwiftUI apps. AppFoundation targets **iOS 26+**, **macOS 15+**, and **Swift 6.2 strict concurrency**.
 
-The package centralizes behavior that is expensive to reimplement correctly while keeping each app's navigation, data models, copy, and visual identity app-owned.
+The package centralizes behavior that is expensive to reimplement correctly while keeping each app's navigation, models, copy, branding, fixtures, and visual identity app-owned.
 
-## Included
+## Package products
 
-### Commerce
+| Product | Purpose |
+| --- | --- |
+| `AppFoundation` | Commerce, themes, onboarding, settings, exports, backups, App Group storage, notifications, and shared utilities. It also re-exports the Studio and Showcase products. |
+| `AppFoundationScreenshotStudio` | Exact-size SwiftUI screenshot composition, preview, templates, and export on iOS and macOS. |
+| `AppFoundationPromoVideoStudio` | Deterministic SwiftUI promo-video editing and silent H.264 MP4 export on iOS and macOS. |
+| `AppFoundationWidgetShowcase` | In-app widget catalogs, previews, detail screens, installation guidance, and Free/Pro presentation. |
 
-- StoreKit 2 product loading, purchase, restore, and verified entitlement state
-- Transaction update observation and foreground refresh support
-- Debug-only in-process purchase simulation
-- `PurchaseManager` as the preferred app-facing API
-- Simple `hasPro` entitlement access
-- Theme-aware paywalls supporting weekly, monthly, yearly, and lifetime plans
-- Premium feature gates and subscription settings components
-- Access policy that can keep existing user-created content available after expiry
-
-### Themes
-
-- Existing reusable theme catalog and manager
-- Rose, Sunset, Lavender, Midnight, Paper, and Champagne defaults
-- Free fallback themes and timed Pro previews
-- App Group-compatible persisted theme state
-- SwiftUI environment integration and theme picker
-- Optional alternate app-icon helper
-
-### ExportKit
-
-- Safe filenames and predictable suggested filenames
-- Atomic temporary-file writing and cleanup
-- PNG and JPEG definitions
-- SwiftUI view rendering at exact dimensions and scale
-- Transparent PNG and JPEG quality support
-
-### BackupKit
-
-- Generic versioned `BackupEnvelope<Payload>`
-- Folder-based custom backup packages
-- Manifest, payload checksum, and optional assets
-- Cross-app and unsupported-version rejection
-- Corrupt-payload and path-traversal protection
-- Actor-isolated package reader and writer
-
-### Platform support
-
-- Typed App Group snapshot storage
-- Schema version and update metadata
-- Shared deep-link construction
-- Widget reload throttling
-- Local notification authorization, scheduling, replacement, and cancellation
-
-### Utilities
-
-- `UserFacingError`
-- `AppInfo`
-- Atomic file replacement
-- Async debouncing
-- Review-request policy
-- Structured logging and haptics
-- Reusable `AsyncButton`
+Individual APIs use conditional compilation when a framework or platform is unavailable. Linking a standalone product is useful when a macOS target only needs one Studio and should not depend on the rest of AppFoundation.
 
 ## Requirements
 
 - Xcode 26+
 - Swift 6.2+
 - iOS 26+
-- XcodeGen 2.45.4+ for the Demo app
+- macOS 15+ for supported products and APIs
+- XcodeGen 2.45.4+ for the Demo projects
 
-## Add the package
+## Installation
 
-Add this repository as a Swift package and link the `AppFoundation` product to the app target.
+Add the package in Xcode using:
+
+```text
+https://github.com/hoangbkit/AppFoundation.git
+```
+
+The latest tagged release is **0.1.8**. Because AppFoundation is still in the `0.x` development series, prefer **Up to Next Minor Version** from `0.1.8` or pin an exact version for reproducible app releases.
+
+For a package manifest:
+
+```swift
+dependencies: [
+    .package(
+        url: "https://github.com/hoangbkit/AppFoundation.git",
+        .upToNextMinor(from: "0.1.8")
+    )
+]
+```
+
+Link `AppFoundation` for the complete package, or link one of the narrower products when an isolated Studio or Showcase dependency is preferred.
+
+## Commerce quick start
 
 ```swift
 import AppFoundation
@@ -101,97 +77,159 @@ struct MyApp: App {
 }
 ```
 
-`PurchaseManager` is a source-compatible preferred name for the existing `PurchaseController`. Existing apps do not need an immediate migration.
+`PurchaseManager` is the preferred source-compatible name for the existing `PurchaseController`. Existing apps do not need an immediate migration.
 
-Verified StoreKit transactions remain the source of truth. Do not mirror `hasPro` into UserDefaults as an authorization source.
+Verified StoreKit transactions remain the source of truth. Do not mirror `hasPro` into `UserDefaults` as an authorization source.
 
-## Supported purchase plans
+## Included infrastructure
 
-AppFoundation presents every configured entitlement product in `PurchaseConfiguration.productIDs` order:
+### Commerce
 
-- A one-week subscription appears as **Weekly**.
-- A one-month subscription appears as **Monthly**.
-- A one-year subscription appears as **Yearly**.
-- A configured entitlement product without a subscription period appears as **Lifetime**.
+- StoreKit 2 product loading, purchase, restore, and verified entitlement state
+- Transaction update observation and foreground refresh
+- Debug-only in-process purchase simulation
+- `PurchaseManager` and simple `hasPro` entitlement access
+- Weekly, monthly, yearly, and non-consumable lifetime plans
+- Theme-aware `PaywallView`, `FoundationPaywallView`, and `ClaudePaywallView`
+- Premium gates, badges, locked overlays, settings sections, and limit-reached upsells
+- Access policy that can keep existing user-created content available after entitlement expiry
 
-Use an auto-renewable subscription in App Store Connect for recurring plans. Use a non-consumable in-app purchase for lifetime access. A verified non-consumable transaction has no expiration date, so the existing entitlement evaluator keeps it active permanently unless Apple revokes it.
+AppFoundation presents configured entitlement products in `PurchaseConfiguration.productIDs` order. Subscription prices and periods come from StoreKit. A configured entitlement product without a subscription period is treated as lifetime access and uses one-time-purchase disclosure instead of renewal wording.
 
-`StoreProduct.planKind`, `planLabel`, `billingDescription`, `isRecurring`, and `isLifetime` are available for app-owned purchase UI. `PurchasePlanDisclosure` provides accurate renewal and one-time-purchase copy for recurring-only, lifetime-only, and mixed catalogs.
+### Themes
 
-## Present the primary paywall
+- Reusable immutable theme catalogs and `ThemeManager`
+- Rose, Sunset, Lavender, Midnight, Paper, and Champagne defaults
+- Persisted selected-theme state and free fallback resolution
+- Timed Pro previews and entitlement-aware selection behavior
+- App Group-compatible widget theme state
+- SwiftUI environment integration and theme picker
+- Optional alternate app-icon helper
+
+Apps may exclude, replace, reorder, or append themes. AppFoundation does not require every app to share the same visual design.
+
+### ExportKit
+
+- Safe filenames and predictable suggested filenames
+- Atomic temporary-file writing and cleanup
+- PNG and JPEG definitions
+- Exact-dimension SwiftUI rendering
+- Transparent PNG and JPEG quality support
+- Pixel-count preflight and reusable sharing support
+
+### BackupKit
+
+- Generic versioned `BackupEnvelope<Payload>`
+- Folder-based custom backup packages
+- Manifest, payload checksum, and optional assets
+- Cross-app and unsupported-version rejection
+- Missing-asset, corrupt-payload, duplicate-path, and path-traversal protection
+- Actor-isolated package reader and writer
+
+Each app remains responsible for migrations, duplicate handling, replace-versus-merge behavior, restore confirmation, and transactional mutation of its own database.
+
+### App and platform support
+
+- Typed App Group snapshot storage
+- Schema version and update metadata
+- Shared deep-link construction
+- Widget reload throttling
+- Local notification authorization, scheduling, replacement, and cancellation
+- `UserFacingError`, `AppInfo`, safe file replacement, and async debouncing
+- Review-request policy, structured logging, haptics, and `AsyncButton`
+
+## Screenshot Studio
+
+`AppFoundationScreenshotStudio` lets an app register deterministic SwiftUI screenshots, preview them at exact output geometry, inject app-owned controls, and export the complete set.
 
 ```swift
-PaywallView(
-    purchaseManager: purchaseManager,
-    configuration: PaywallConfiguration(
-        title: "Unlock Pro",
-        subtitle: "Choose a subscription or lifetime access.",
-        features: [
-            PaywallFeature(
-                id: "unlimited",
-                systemImage: "infinity",
-                title: "Unlimited access",
-                message: "Remove all free-plan limits."
-            )
-        ],
-        preferredProductID: "com.example.app.pro.yearly",
-        highlightedProductID: "com.example.app.pro.yearly",
-        privacyURL: privacyURL,
-        termsURL: termsURL
-    )
-)
-```
+import AppFoundationScreenshotStudio
 
-`PaywallView`, `FoundationPaywallView`, and `ClaudePaywallView` display the full configured catalog. Their layouts adapt from one to multiple columns and fall back to one column at accessibility text sizes. Prices and periods come from StoreKit; lifetime products are described as one-time purchases and never receive subscription-renewal wording.
-
-The paywalls follow the active `AppTheme`. Copy, legal URLs, preferred and highlighted products, optional tint or full-theme overrides, and custom plan details remain app-configured.
-
-## Gate premium actions safely
-
-```swift
-let feature = PremiumFeature(
-    id: "premiumThemes",
-    title: "Premium themes"
-)
-
-let decision = PremiumAccessPolicy().decision(
-    for: feature,
-    requirement: .pro,
-    hasPro: purchaseManager.hasPro
-)
-
-PremiumGate(decision: decision) {
-    PremiumThemePicker()
-} locked: { feature in
-    LockedFeatureOverlay(feature: feature) {
-        showPaywall = true
+ScreenshotStudio(
+    catalog: screenshotCatalog,
+    style: .standard
+) { context in
+    Section("Screenshot") {
+        Text(context.selectedScreenshotTitle)
+    }
+} appConfigurationControls: { context in
+    Section("Campaign") {
+        Text(context.preset.title)
     }
 }
 ```
 
-For apps containing user-created data, pass `isExistingContent: true` when the user is viewing, exporting, sharing, or deleting content created before expiry. The default policy keeps that content accessible while still allowing creation and premium editing to be gated.
+The iOS Studio supports App Store presets, locale and appearance selection, full-set preview, and sharing. The macOS Studio uses a native three-column screenshot, preview, and inspector workspace, exports exact-size PNG files to a selected folder, and can reveal the result in Finder.
+
+See:
+
+- [Screenshot Studio](Documentation/ScreenshotStudio.md)
+- [Reusable Screenshot Components](Documentation/ScreenshotStudioComponents.md)
+- [Screenshot Studio on macOS](Documentation/ScreenshotStudioMacOS.md)
+
+## Promo Video Studio
+
+`AppFoundationPromoVideoStudio` renders registered SwiftUI scenes using the same deterministic timeline for interactive preview and exact frame-by-frame export.
+
+```swift
+import AppFoundationPromoVideoStudio
+
+PromoVideoStudio(
+    videos: [launchVideo, widgetVideo],
+    style: .standard
+) { context in
+    Section("Scene Controls") {
+        Text(context.selectedSceneTitle)
+    }
+} videoConfigurationControls: { context in
+    Section("Campaign") {
+        Text(context.preset.title)
+    }
+}
+```
+
+A single project can still be supplied with `PromoVideoStudio(project:)`. With `videos:`, the toolbar switches among registered videos while preview, scrubbing, configuration, and export remain scoped to the selected video.
+
+Both iOS and macOS support deterministic playback, scrubbing, scene selection, safe-area preview, 30 or 60 fps output, and silent H.264 MP4 export. The macOS implementation adds a native three-column workspace, save panel, Finder reveal, and full-window preview.
+
+Included story templates:
+
+- `HeroIntroPromoVideoScene`
+- `DeviceRevealPromoVideoScene`
+- `FeatureFocusPromoVideoScene`
+- `LayeredScreensPromoVideoScene`
+- `AppFlowPromoVideoScene`
+- `OutroCallToActionPromoVideoScene`
+- `ContinuousCanvasPromoVideoScene`
+
+See:
+
+- [Promo Video Studio](Documentation/PromoVideoStudio.md)
+- [Promo Video Studio on macOS](Documentation/PromoVideoStudioMacOS.md)
+
+## Widget Showcase
+
+`AppFoundationWidgetShowcase` owns the reusable in-app experience around app-owned WidgetKit views. The host app still owns its widget extension, timeline provider, intents, App Group data, production widget views, preview data, and upgrade flow.
+
+```swift
+import AppFoundationWidgetShowcase
+
+WidgetShowcaseView(
+    catalog: widgetCatalog,
+    guide: WidgetInstallGuideConfiguration(appName: "My App"),
+    hasPro: purchaseManager.hasPro,
+    style: WidgetShowcaseStyle(accentColor: theme.accentColor),
+    onRequestUpgrade: { showPaywall = true }
+) {
+    AppBackground(theme: theme)
+}
+```
+
+See [Widget Showcase](Documentation/WidgetShowcase.md) for catalog registration, preview sizing, detail presentation, and generated Home Screen setup guidance.
 
 ## Debug purchase simulation
 
 ```swift
-let products: [PurchaseProduct] = [
-    PurchaseProduct(
-        id: "com.example.app.pro.weekly",
-        displayName: "Pro Weekly",
-        description: "Weekly access",
-        displayPrice: "$1.99",
-        price: 1.99,
-        subscriptionPeriod: .init(value: 1, unit: .week)
-    ),
-    PurchaseProduct(
-        id: "com.example.app.pro.lifetime",
-        displayName: "Pro Lifetime",
-        description: "Permanent access",
-        displayPrice: "$79.99",
-        price: 79.99
-    ),
-]
-
 let purchaseManager = PurchaseManager(
     configuration: configuration,
     simulated: true,
@@ -200,126 +238,7 @@ let purchaseManager = PurchaseManager(
 )
 ```
 
-Simulation code is Debug-only. Release builds always use live StoreKit. Existing runtime switching remains available through `setSimulatedPurchasesEnabled(_:)` in Debug builds.
-
-## Export a SwiftUI view
-
-```swift
-let data = try ViewImageExporter.render(
-    HeroCardView(),
-    size: CGSize(width: 1200, height: 1200),
-    scale: 1,
-    opaque: false,
-    format: .png
-)
-
-let file = try await ExportFileWriter().write(
-    data,
-    filename: "MiLove Hero",
-    fileExtension: ExportImageFormat.png.fileExtension
-)
-```
-
-AppFoundation handles rendering and file creation. The app still owns the actual hero, card, screenshot, or promotional design.
-
-## Create a custom backup package
-
-```swift
-struct AppBackup: Codable, Sendable {
-    let records: [Record]
-}
-
-let configuration = BackupPackageConfiguration(
-    format: "com.example.app.backup",
-    version: 1,
-    appIdentifier: "com.example.app",
-    fileExtension: "examplebackup"
-)
-
-let envelope = BackupEnvelope(
-    format: configuration.format,
-    version: configuration.version,
-    appIdentifier: configuration.appIdentifier,
-    appVersion: "1.0",
-    appBuild: "1",
-    payload: AppBackup(records: records)
-)
-
-let packageURL = try await BackupPackageWriter().write(
-    envelope: envelope,
-    configuration: configuration,
-    assets: imageAssets,
-    filename: "My App Backup"
-)
-```
-
-Restore only after reading and validating the package:
-
-```swift
-let result = try await BackupPackageReader().read(
-    AppBackup.self,
-    from: packageURL,
-    configuration: configuration
-)
-```
-
-Each app remains responsible for migrations, duplicate handling, replace-versus-merge behavior, restore confirmation, and transactional mutation of its own database.
-
-## Share data with widgets
-
-```swift
-struct WidgetSnapshot: Codable, Sendable {
-    let title: String
-    let date: Date
-}
-
-let store = try AppGroupStore<WidgetSnapshot>(
-    suiteName: "group.com.example.app",
-    key: "widget.snapshot"
-)
-
-try await store.save(WidgetSnapshot(title: "Anniversary", date: date))
-```
-
-Use `WidgetReloadCoordinator` to avoid repeatedly reloading the same widget kind during bursts of changes.
-
-## Schedule local notifications
-
-```swift
-let manager = LocalNotificationManager()
-let granted = try await manager.requestAuthorization()
-
-if granted {
-    try await manager.replace(
-        LocalNotificationRequest(
-            id: "event.\(eventID)",
-            title: event.title,
-            body: "Your event is coming up.",
-            date: reminderDate
-        )
-    )
-}
-```
-
-The app decides what deserves a reminder and when. AppFoundation only handles permission and reliable scheduling mechanics.
-
-## Use the existing theme system
-
-```swift
-@State private var themes = ThemeManager(
-    catalog: .foundationDefaults,
-    stateStore: UserDefaultsThemeStateStore(
-        storageKey: "com.example.app.theme-state"
-    )
-)
-
-RootView()
-    .environment(themes)
-    .appFoundationTheme(themes)
-    .synchronizesThemeAccess(themes, hasPro: purchaseManager.hasPro)
-```
-
-Apps may exclude, replace, reorder, or append themes. AppFoundation does not require every app to use the shared themes or design primitives.
+Simulation code is Debug-only. Release builds always use live StoreKit. Runtime switching remains available through `setSimulatedPurchasesEnabled(_:)` in Debug builds.
 
 ## Validation
 
@@ -329,25 +248,39 @@ Run portable package validation:
 swift test
 ```
 
-Run the existing project validation script:
+Run the repository validation script:
 
 ```bash
 make validate
 ```
 
-The Demo simulator build still requires macOS with Xcode 26.
+Generate and test the iOS Demo:
+
+```bash
+cd Examples/Demo
+make test
+```
+
+Build the macOS Demo:
+
+```bash
+cd Examples/Demo
+make build-mac
+```
+
+The simulator and macOS Demo builds require macOS with Xcode 26.
 
 ## Migration notes
 
 - Prefer `PurchaseManager` over `PurchaseController` in new code.
 - Prefer `hasPro` over `isEntitled` for normal feature checks.
 - Prefer `PaywallView` and `PaywallConfiguration` for new paywalls.
-- Existing monthly/yearly configurations continue working without changes.
-- Adding weekly or lifetime only requires adding the StoreKit product identifier to the catalog.
+- Existing monthly/yearly purchase configurations continue working.
+- Adding weekly or lifetime access only requires adding the StoreKit product identifier to the entitlement catalog.
 - Existing purchase, theme, onboarding, settings, and legacy paywall APIs remain available.
-- Move only low-level shared infrastructure into AppFoundation; keep app-specific models and presentation in each app.
+- Move only reusable infrastructure into AppFoundation; keep app-specific models, navigation, copy, branding, and final presentation in each app.
 
-See [PLAN.md](PLAN.md) for the package boundary and development phases.
+See [CHANGELOG.md](CHANGELOG.md) for tagged release history and [PLAN.md](PLAN.md) for package boundaries and development phases.
 
 ## License
 

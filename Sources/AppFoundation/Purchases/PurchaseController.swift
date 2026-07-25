@@ -54,6 +54,34 @@ public final class PurchaseController {
         self.service = service
     }
 
+    /// Creates a deterministic purchase controller for Screenshot Studio and SwiftUI previews.
+    ///
+    /// The supplied products are ordered and exposed synchronously so an `ImageRenderer`
+    /// can render the app's real paywall without waiting for StoreKit or an asynchronous task.
+    /// The returned controller starts with an inactive entitlement and should only be used for
+    /// non-interactive previews and screenshot generation.
+    public static func screenshotPreview(
+        configuration: PurchaseConfiguration,
+        products: [StoreProduct]
+    ) -> PurchaseController {
+        let controller = PurchaseController(
+            configuration: configuration,
+            simulated: true,
+            simulatedProducts: products,
+            simulatedOperationDelay: .milliseconds(0)
+        )
+        let orderedProducts = ProductCatalog.ordered(
+            products,
+            using: configuration.productIDs
+        )
+        controller.products = orderedProducts
+        controller.productLoadingState = orderedProducts.isEmpty
+            ? .failed(.noProductsAvailable)
+            : .loaded
+        controller.entitlementState = .inactive
+        return controller
+    }
+
     deinit {
         updateTask?.cancel()
     }

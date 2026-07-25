@@ -51,6 +51,9 @@ let package = Package(
                 "ScreenshotStudio",
                 "PromoVideoStudio",
                 "WidgetShowcase"
+            ],
+            resources: [
+                .copy("PrivacyInfo.xcprivacy")
             ]
         ),
         .testTarget(

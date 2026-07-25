@@ -16,10 +16,16 @@ public struct ClaudePaywallView: View {
 
     public init(
         purchases: PurchaseController,
-        configuration: FoundationPaywallConfiguration
+        configuration: FoundationPaywallConfiguration,
+        initialSelectedProductID: String? = nil
     ) {
         self.purchases = purchases
         self.configuration = configuration
+        _selectedProductID = State(
+            initialValue: initialSelectedProductID
+                ?? configuration.highlightedProductID
+                ?? purchases.configuration.preferredProductID
+        )
     }
 
     public var body: some View {

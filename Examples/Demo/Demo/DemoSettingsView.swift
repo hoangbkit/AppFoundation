@@ -57,12 +57,16 @@ struct DemoSettingsView: View {
                     )
                     .listRowBackground(theme.surfaceColor)
 
-                    Section("Appearance") {
-                        NavigationLink {
-                            ThemeDemoView()
-                        } label: {
-                            Label("Themes", systemImage: "paintpalette.fill")
-                        }
+                    Section {
+                        ThemePickerView(
+                            manager: themes,
+                            title: nil,
+                            onRequestUpgrade: { isShowingPaywall = true }
+                        )
+                    } header: {
+                        Text("App Theme")
+                    } footer: {
+                        Text("Choose a theme for the Demo app. Pro themes can be previewed before upgrading.")
                     }
                     .listRowBackground(theme.surfaceColor)
 

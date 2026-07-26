@@ -91,7 +91,46 @@ Use `UserDefaultsThemeStateStore` with an app-group suite. Widgets should call `
 
 ## App icons
 
-Set `alternateIconName` only for themes whose icon assets are present in the app target. AppFoundation supplies `ThemeAppIconManager`, but the app decides when icon changes occur and handles errors in its own UI.
+Keep alternate icon assets and their `CFBundleAlternateIcons` registration in the app target. AppFoundation supplies the reusable selection UI and performs the `UIApplication` icon change.
+
+Register each primary or alternate icon once:
+
+```swift
+private let appIcons = [
+    AppIconOption(
+        title: "Default",
+        alternateIconName: nil,
+        previewImageName: "AppIconDefaultPreview",
+        accentColor: .blue
+    ),
+    AppIconOption(
+        title: "Midnight",
+        alternateIconName: "AppIconMidnight",
+        previewImageName: "AppIconMidnightPreview",
+        accentColor: .indigo,
+        requiresUnlock: true
+    ),
+]
+```
+
+Apps using `AppTheme` can instead create options with `AppIconOption(theme:)`; the initializer uses the theme's `alternateIconName`, `previewImageName`, accent color, and Pro access metadata.
+
+Embed the ready-made section directly in a `Form`:
+
+```swift
+AppIconPickerSection(
+    icons: appIcons,
+    footer: "Alternate icons are included with Pro.",
+    isLocked: { icon in
+        icon.requiresUnlock && !purchases.hasPro
+    },
+    onRequestUnlock: { _ in
+        isShowingPaywall = true
+    }
+)
+```
+
+Use `AppIconPickerView` when the surrounding app owns the `Section`. `AppIconsPickerView` and `AppIconsPickerSection` are plural-name aliases. `AppIconManager` is available for custom interfaces, while `ThemeAppIconManager` remains source compatible.
 
 ## Onboarding
 
@@ -99,4 +138,4 @@ Onboarding remains app-owned. It is usually too specific to permissions, profile
 
 ## Settings
 
-Apps may embed `ThemePickerView` in their settings screen or create a completely custom theme section. The manager and catalog do not require the package's settings view.
+Apps may embed `ThemePickerView` and `AppIconPickerSection` in their settings screen or create completely custom sections. The managers and catalogs do not require the package's settings view.

@@ -161,15 +161,13 @@ public struct AppIconPickerView: View {
                     Text(icon.title)
                         .font(.caption2.weight(.bold))
                     if icon.requiresUnlock {
-                        Text("PRO")
-                            .font(.caption2.weight(.black))
-                            .foregroundStyle(icon.accentColor)
+                        ProBadgeView(tint: icon.accentColor)
                     }
                 }
                 .foregroundStyle(.primary)
                 .lineLimit(1)
             }
-            .frame(width: 82)
+            .frame(width: 96)
         }
         .buttonStyle(.plain)
         .disabled(applyingIconID != nil)

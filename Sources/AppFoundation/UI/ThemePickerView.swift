@@ -91,9 +91,7 @@ public struct ThemePickerView<Preview: View>: View {
                     Text(theme.title)
                         .font(.caption.weight(.semibold))
                     if theme.isPro {
-                        Text("PRO")
-                            .font(.caption2.weight(.black))
-                            .foregroundStyle(theme.accentColor)
+                        ProBadgeView(tint: theme.accentColor)
                     }
                 }
                 .foregroundStyle(.primary)

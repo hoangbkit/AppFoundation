@@ -1,7 +1,7 @@
 #if canImport(UIKit)
 import UIKit
 
-public enum ThemeAppIconError: LocalizedError, Sendable {
+public enum AppIconError: LocalizedError, Sendable {
     case unsupported
     case applicationRejectedChange
 
@@ -16,28 +16,44 @@ public enum ThemeAppIconError: LocalizedError, Sendable {
 }
 
 @MainActor
-public enum ThemeAppIconManager {
+public enum AppIconManager {
+    public static var supportsAlternateIcons: Bool {
+        UIApplication.shared.supportsAlternateIcons
+    }
+
     public static var currentIconName: String? {
         UIApplication.shared.alternateIconName
     }
 
-    public static func apply(_ theme: AppTheme) async throws {
-        guard UIApplication.shared.supportsAlternateIcons else {
-            throw ThemeAppIconError.unsupported
+    public static func apply(iconName: String?) async throws {
+        guard supportsAlternateIcons else {
+            throw AppIconError.unsupported
         }
 
-        let desiredName = theme.alternateIconName
-        guard UIApplication.shared.alternateIconName != desiredName else { return }
+        guard currentIconName != iconName else { return }
 
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            UIApplication.shared.setAlternateIconName(desiredName) { error in
+            UIApplication.shared.setAlternateIconName(iconName) { error in
                 if error == nil {
                     continuation.resume()
                 } else {
-                    continuation.resume(throwing: ThemeAppIconError.applicationRejectedChange)
+                    continuation.resume(throwing: AppIconError.applicationRejectedChange)
                 }
             }
         }
+    }
+}
+
+public typealias ThemeAppIconError = AppIconError
+
+@MainActor
+public enum ThemeAppIconManager {
+    public static var currentIconName: String? {
+        AppIconManager.currentIconName
+    }
+
+    public static func apply(_ theme: AppTheme) async throws {
+        try await AppIconManager.apply(iconName: theme.alternateIconName)
     }
 }
 #endif

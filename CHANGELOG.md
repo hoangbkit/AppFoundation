@@ -6,8 +6,19 @@ AppFoundation follows semantic versioning while its public API remains in the `0
 
 ## Unreleased
 
+### Added
+
+- Added `AppIconOption`, `AppIconPickerView`, and `AppIconPickerSection` for registering and presenting primary and alternate app icons in Settings.
+- Added reusable locked-icon, upgrade-routing, loading, error, selection, and accessibility behavior.
+- Added `AppIconManager` for app-owned icon interfaces and plural-name picker aliases.
+
+### Changed
+
+- Generalized alternate icon switching while preserving `ThemeAppIconManager` and `ThemeAppIconError` source compatibility.
+
 ### Documentation
 
+- Added app-icon picker registration and Settings adoption guidance.
 - Rebuilt the changelog from the actual `0.1.0` through `0.1.8` tag history.
 - Updated the README for the current package products, macOS support, multi-video Promo Video Studio, and `0.1.8` installation guidance.
 

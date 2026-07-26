@@ -152,16 +152,22 @@ public struct AppIconPickerView: View {
                                     lineWidth: selected ? 2 : 1
                                 )
                         }
-                        .opacity(locked ? 0.62 : 1)
 
-                    statusBadge(selected: selected, locked: locked, applying: applying)
+                    statusBadge(selected: selected, applying: applying)
                         .offset(x: 5, y: -5)
                 }
 
-                Text(icon.title)
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
+                HStack(spacing: 4) {
+                    Text(icon.title)
+                        .font(.caption2.weight(.bold))
+                    if icon.requiresUnlock {
+                        Text("PRO")
+                            .font(.caption2.weight(.black))
+                            .foregroundStyle(icon.accentColor)
+                    }
+                }
+                .foregroundStyle(.primary)
+                .lineLimit(1)
             }
             .frame(width: 82)
         }
@@ -174,7 +180,7 @@ public struct AppIconPickerView: View {
     }
 
     @ViewBuilder
-    private func statusBadge(selected: Bool, locked: Bool, applying: Bool) -> some View {
+    private func statusBadge(selected: Bool, applying: Bool) -> some View {
         if applying {
             ProgressView()
                 .controlSize(.small)
@@ -185,12 +191,6 @@ public struct AppIconPickerView: View {
             Image(systemName: "checkmark.circle.fill")
                 .symbolRenderingMode(.palette)
                 .foregroundStyle(.white, .black.opacity(0.5))
-        } else if locked {
-            Image(systemName: "lock.fill")
-                .font(.caption2.bold())
-                .foregroundStyle(.white)
-                .padding(6)
-                .background(.black.opacity(0.62), in: Circle())
         }
     }
 
@@ -216,7 +216,7 @@ public struct AppIconPickerView: View {
     private func accessibilityValue(selected: Bool, locked: Bool, applying: Bool) -> String {
         if applying { return "Applying" }
         if selected { return "Selected" }
-        if locked { return "Locked" }
+        if locked { return "Pro" }
         return "Available"
     }
 }

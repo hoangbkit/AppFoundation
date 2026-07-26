@@ -14,6 +14,30 @@ struct DemoSettingsView: View {
     private var configuration: FoundationSettingsConfiguration { DemoConfiguration.settings }
     private var metadata: AppMetadata { .current() }
 
+    private var appIcons: [AppIconOption] {
+        [
+            AppIconOption(
+                title: "Default",
+                alternateIconName: nil,
+                previewImageName: "AppIconDefaultPreview",
+                accentColor: theme.accentColor
+            ),
+            AppIconOption(
+                title: "Midnight",
+                alternateIconName: "AppIconMidnight",
+                previewImageName: "AppIconMidnightPreview",
+                accentColor: .indigo
+            ),
+            AppIconOption(
+                title: "Rose",
+                alternateIconName: "AppIconRose",
+                previewImageName: "AppIconRosePreview",
+                accentColor: .pink,
+                requiresUnlock: true
+            ),
+        ]
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -40,6 +64,18 @@ struct DemoSettingsView: View {
                             Label("Themes", systemImage: "paintpalette.fill")
                         }
                     }
+                    .listRowBackground(theme.surfaceColor)
+
+                    AppIconPickerSection(
+                        icons: appIcons,
+                        footer: "Default and Midnight are included with Free. Rose demonstrates a Pro-only alternate icon.",
+                        isLocked: { icon in
+                            icon.requiresUnlock && !purchases.hasPro
+                        },
+                        onRequestUnlock: { _ in
+                            isShowingPaywall = true
+                        }
+                    )
                     .listRowBackground(theme.surfaceColor)
 
                     supportSection

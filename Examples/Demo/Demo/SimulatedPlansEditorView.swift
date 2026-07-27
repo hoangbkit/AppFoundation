@@ -37,13 +37,17 @@ struct SimulatedPlansEditorView: View {
             }
             .listRowBackground(theme.surfaceColor)
 
-            Section("Default selection") {
-                Picker("Preferred plan", selection: $configuration.preferredProductID) {
+            Section {
+                Picker("Preferred & highlighted plan", selection: $configuration.preferredProductID) {
                     ForEach(configuration.enabledPlans) { plan in
                         Text(plan.displayName.isEmpty ? plan.period.title : plan.displayName)
                             .tag(plan.productID)
                     }
                 }
+            } header: {
+                Text("Default selection")
+            } footer: {
+                Text("This plan is selected initially and receives ClaudePaywallView’s BEST VALUE badge.")
             }
             .listRowBackground(theme.surfaceColor)
 

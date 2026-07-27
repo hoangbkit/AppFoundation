@@ -156,6 +156,16 @@ struct DemoSettingsView: View {
                 )
             )
 
+            NavigationLink {
+                SimulatedPlansEditorView()
+            } label: {
+                LabeledContent(
+                    "Configure simulated plans",
+                    value: "\(purchases.configuration.productIDs.count)"
+                )
+            }
+            .disabled(!purchases.isUsingSimulatedPurchases)
+
             Button("Reset simulated purchases", role: .destructive) {
                 Task { await purchases.resetSimulatedPurchases() }
             }

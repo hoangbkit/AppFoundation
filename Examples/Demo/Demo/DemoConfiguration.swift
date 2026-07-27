@@ -3,13 +3,15 @@ import SwiftUI
 
 @MainActor
 enum DemoConfiguration {
-    static let monthlyProductID = "com.hoangbkit.appfoundationdemo.pro.monthly"
-    static let yearlyProductID = "com.hoangbkit.appfoundationdemo.pro.yearly"
+    static let monthlyProductID = DemoProductID.monthly
+    static let yearlyProductID = DemoProductID.yearly
+    static let lifetimeProductID = DemoProductID.lifetime
 
     static let purchases = PurchaseConfiguration(
         productIDs: [
             monthlyProductID,
             yearlyProductID,
+            lifetimeProductID,
         ],
         preferredProductID: yearlyProductID
     )
@@ -30,6 +32,13 @@ enum DemoConfiguration {
             displayPrice: "$39.99",
             price: 39.99,
             subscriptionPeriod: .init(value: 1, unit: .year)
+        ),
+        PurchaseProduct(
+            id: lifetimeProductID,
+            displayName: "Demo Pro Lifetime",
+            description: "Pay once and keep Demo Pro forever.",
+            displayPrice: "$79.99",
+            price: 79.99
         ),
     ]
 
@@ -89,9 +98,9 @@ enum DemoConfiguration {
         title: "Unlock Demo Pro",
         subtitle: purchaseServiceMode == .simulated
             ? "This Debug build uses the in-process purchase simulator."
-            : "Choose monthly or yearly access through StoreKit.",
+            : "Choose monthly, yearly, or lifetime access through StoreKit.",
         planTitle: "Demo Pro",
-        planSubtitle: "Monthly or yearly subscription",
+        planSubtitle: "Monthly, yearly, or lifetime access",
         features: [
             PaywallFeature(
                 id: "exports",
@@ -135,7 +144,7 @@ enum DemoConfiguration {
 
     static let legacyPaywall = FoundationPaywallConfiguration(
         title: "Make every app premium",
-        subtitle: "Monthly and yearly plans in the gradient style.",
+        subtitle: "Monthly, yearly, and lifetime plans in the gradient style.",
         features: [
             FoundationPaywallFeature(
                 id: "storekit",
@@ -156,7 +165,7 @@ enum DemoConfiguration {
 
     static let legacyClaudePaywall = FoundationPaywallConfiguration(
         title: "Get more Demo",
-        subtitle: "Choose monthly or yearly access",
+        subtitle: "Choose monthly, yearly, or lifetime access",
         features: [
             FoundationPaywallFeature(
                 id: "pro-features",

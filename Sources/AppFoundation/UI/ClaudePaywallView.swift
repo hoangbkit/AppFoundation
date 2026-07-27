@@ -237,7 +237,7 @@ public struct ClaudePaywallView: View {
                 Text(product.displayPrice)
                     .font(.title2.weight(.bold))
                     .foregroundStyle(theme.primaryForeground)
-                Text(product.billingDescription)
+                Text(product.isLifetime ? "Pay once" : product.billingDescription)
                     .font(.footnote)
                     .foregroundStyle(theme.secondaryForeground)
                     .fixedSize(horizontal: false, vertical: true)

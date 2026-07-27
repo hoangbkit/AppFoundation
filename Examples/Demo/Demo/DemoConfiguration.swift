@@ -163,28 +163,30 @@ enum DemoConfiguration {
         highlightedProductID: yearlyProductID
     )
 
-    static let legacyClaudePaywall = FoundationPaywallConfiguration(
-        title: "Get more Demo",
-        subtitle: "Choose monthly, yearly, or lifetime access",
-        features: [
-            FoundationPaywallFeature(
-                id: "pro-features",
-                systemImage: "checkmark",
-                title: "Pro",
-                message: "Unlock every Pro feature in Demo"
-            ),
-            FoundationPaywallFeature(
-                id: "updates",
-                systemImage: "checkmark",
-                title: "Updates",
-                message: "Priority access to new updates"
-            ),
-        ],
-        purchaseButtonTitle: "Continue",
-        highlightedProductID: yearlyProductID,
-        privacyURL: URL(string: "https://example.com/privacy"),
-        termsURL: URL(string: "https://example.com/terms")
-    )
+    static var legacyClaudePaywall: FoundationPaywallConfiguration {
+        FoundationPaywallConfiguration(
+            title: "Get more Demo",
+            subtitle: "Choose monthly, yearly, or lifetime access",
+            features: [
+                FoundationPaywallFeature(
+                    id: "pro-features",
+                    systemImage: "checkmark",
+                    title: "Pro",
+                    message: "Unlock every Pro feature in Demo"
+                ),
+                FoundationPaywallFeature(
+                    id: "updates",
+                    systemImage: "checkmark",
+                    title: "Updates",
+                    message: "Priority access to new updates"
+                ),
+            ],
+            purchaseButtonTitle: "Continue",
+            highlightedProductID: DemoSimulatedPlanConfiguration.load().preferredProductID,
+            privacyURL: URL(string: "https://example.com/privacy"),
+            termsURL: URL(string: "https://example.com/terms")
+        )
+    }
 
     static let settings = FoundationSettingsConfiguration(
         appName: "Demo",

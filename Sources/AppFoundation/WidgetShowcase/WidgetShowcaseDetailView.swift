@@ -51,7 +51,7 @@ public struct WidgetShowcaseDetailView<Background: View>: View {
         }
         .foregroundStyle(style.primaryTextColor)
         .navigationTitle(item.title)
-        .navigationBarTitleDisplayMode(.inline)
+        .widgetShowcaseInlineNavigationTitle()
         .tint(style.accentColor)
     }
 
@@ -229,7 +229,7 @@ public struct WidgetInstallGuideView<Background: View>: View {
         }
         .foregroundStyle(style.primaryTextColor)
         .navigationTitle(goal.isSpecific ? "Add This Widget" : "Add a Widget")
-        .navigationBarTitleDisplayMode(.inline)
+        .widgetShowcaseInlineNavigationTitle()
         .tint(style.accentColor)
     }
 
@@ -292,6 +292,17 @@ public extension WidgetInstallGuideView where Background == Color {
             style: style,
             background: { style.backgroundColor }
         )
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func widgetShowcaseInlineNavigationTitle() -> some View {
+#if os(iOS) || os(tvOS) || os(watchOS)
+        navigationBarTitleDisplayMode(.inline)
+#else
+        self
+#endif
     }
 }
 

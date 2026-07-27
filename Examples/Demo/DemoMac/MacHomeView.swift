@@ -1,8 +1,12 @@
+import AppFoundation
 import SwiftUI
 
 @MainActor
 struct MacHomeView: View {
   @Environment(\.openWindow) private var openWindow
+  @Environment(PurchaseManager.self) private var purchases
+
+  @State private var isShowingPaywall = false
 
   private let columns = [
     GridItem(.flexible(), spacing: 20),
@@ -50,6 +54,20 @@ struct MacHomeView: View {
             ) {
               openWindow(id: MacDemoWindowID.promoVideoStudio)
             }
+
+            MacStudioCard(
+              title: "Mac Paywall",
+              subtitle: "Preview the desktop paywall ported from Spokio and backed by AppFoundation.",
+              systemImage: "crown.fill",
+              features: [
+                "Responsive two-column presentation",
+                "AppFoundation product and entitlement state",
+                "Purchase, restore, retry, and legal actions",
+              ],
+              actionTitle: "Open Mac Paywall"
+            ) {
+              isShowingPaywall = true
+            }
           }
 
           navigationHint
@@ -73,7 +91,24 @@ struct MacHomeView: View {
           Label("Promo Video Studio", systemImage: "film")
         }
         .help("Open Promo Video Studio (⌘2)")
+
+        Button {
+          isShowingPaywall = true
+        } label: {
+          Label("Mac Paywall", systemImage: "crown")
+        }
+        .help("Open the AppFoundation Mac paywall")
       }
+    }
+    .sheet(isPresented: $isShowingPaywall) {
+      MacPaywallView(
+        purchases: purchases,
+        configuration: MacDemoConfiguration.paywall,
+        onClose: {
+          isShowingPaywall = false
+        }
+      )
+      .interactiveDismissDisabled(purchases.isBusy)
     }
   }
 
@@ -88,7 +123,7 @@ struct MacHomeView: View {
       VStack(alignment: .leading, spacing: 7) {
         Text("AppFoundation for Mac")
           .font(.largeTitle.bold())
-        Text("Developer media tools built with native SwiftUI workflows.")
+        Text("Developer media tools and reusable app infrastructure built with SwiftUI.")
           .font(.title3)
           .foregroundStyle(.secondary)
       }
@@ -98,7 +133,7 @@ struct MacHomeView: View {
       VStack(alignment: .trailing, spacing: 8) {
         Label("macOS 15+", systemImage: "apple.logo")
           .font(.headline)
-        Text("Screenshot and promo-video production")
+        Text("Studios, StoreKit, and reusable desktop UI")
           .font(.subheadline)
           .foregroundStyle(.secondary)
       }
@@ -122,7 +157,7 @@ struct MacHomeView: View {
         Text("Designed for Mac window workflows")
           .font(.headline)
         Text(
-          "Each Studio opens in its own reusable window, so this dashboard stays available. Use ⌘0 for Home, ⌘1 for Screenshot Studio, or ⌘2 for Promo Video Studio."
+          "Each Studio opens in its own reusable window, while the Mac paywall presents as a focused sheet backed by the shared purchase manager. Use ⌘0 for Home, ⌘1 for Screenshot Studio, or ⌘2 for Promo Video Studio."
         )
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)

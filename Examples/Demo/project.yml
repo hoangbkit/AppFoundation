@@ -72,6 +72,8 @@ targets:
       - path: DemoMac
     dependencies:
       - package: AppFoundation
+        product: AppFoundation
+      - package: AppFoundation
         product: AppFoundationScreenshotStudio
       - package: AppFoundation
         product: AppFoundationPromoVideoStudio

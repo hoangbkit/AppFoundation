@@ -1,11 +1,20 @@
+import AppFoundation
 import SwiftUI
 
 @main
 @MainActor
 struct DemoMacApp: App {
+  @State private var purchases = PurchaseManager(
+    configuration: MacDemoConfiguration.purchases,
+    simulated: true,
+    simulatedProducts: MacDemoConfiguration.simulatedProducts
+  )
+
   var body: some Scene {
     Window("AppFoundation for Mac", id: MacDemoWindowID.home) {
       MacHomeView()
+        .environment(purchases)
+        .managesPurchases(purchases)
         .frame(minWidth: 900, minHeight: 620)
     }
     .defaultSize(width: 1080, height: 720)

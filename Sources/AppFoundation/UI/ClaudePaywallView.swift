@@ -39,8 +39,8 @@ public struct ClaudePaywallView: View {
         self.rendersForScreenshot = rendersForScreenshot
         _selectedProductID = State(
             initialValue: initialSelectedProductID
-                ?? configuration.highlightedProductID
                 ?? purchases.configuration.preferredProductID
+                ?? configuration.highlightedProductID
         )
     }
 

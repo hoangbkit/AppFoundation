@@ -4,12 +4,7 @@ import SwiftUI
 @main
 @MainActor
 struct DemoApp: App {
-    @State private var purchases = PurchaseManager(
-        configuration: DemoConfiguration.purchases,
-        simulated: DemoConfiguration.purchaseServiceMode == .simulated,
-        simulatedProducts: DemoConfiguration.simulatedProducts,
-        simulatedPersistenceKey: "appfoundation.demo.simulated-purchases"
-    )
+    @State private var purchaseStore = DemoPurchaseStore()
 
     @State private var themes = ThemeManager(
         catalog: .foundationDefaults,
@@ -21,11 +16,13 @@ struct DemoApp: App {
     var body: some Scene {
         WindowGroup {
             AppRootView()
-                .environment(purchases)
+                .id(purchaseStore.revision)
+                .environment(purchaseStore)
+                .environment(purchaseStore.purchases)
                 .environment(themes)
-                .managesPurchases(purchases)
+                .managesPurchases(purchaseStore.purchases)
                 .appFoundationTheme(themes)
-                .synchronizesThemeAccess(themes, hasPro: purchases.hasPro)
+                .synchronizesThemeAccess(themes, hasPro: purchaseStore.purchases.hasPro)
         }
     }
 }

@@ -94,39 +94,45 @@ enum DemoConfiguration {
         ),
     ]
 
-    static let modernPaywall = PaywallConfiguration(
-        title: "Unlock Demo Pro",
-        subtitle: purchaseServiceMode == .simulated
-            ? "This Debug build uses the in-process purchase simulator."
-            : "Choose monthly, yearly, or lifetime access through StoreKit.",
-        planTitle: "Demo Pro",
-        planSubtitle: "Monthly, yearly, or lifetime access",
-        features: [
-            PaywallFeature(
-                id: "exports",
-                systemImage: "square.and.arrow.up",
-                title: "Premium exports",
-                message: "Exercise image rendering, rounded PNG output, and sharing."
-            ),
-            PaywallFeature(
-                id: "backups",
-                systemImage: "archivebox",
-                title: "Validated backups",
-                message: "Create and verify versioned packages with assets and checksums."
-            ),
-            PaywallFeature(
-                id: "themes",
-                systemImage: "paintpalette",
-                title: "Pro themes",
-                message: "Try the existing reusable theme preview and entitlement flow."
-            ),
-        ],
-        preferredProductID: purchases.preferredProductID,
-        highlightedProductID: yearlyProductID,
-        purchaseButtonTitle: "Unlock Demo Pro",
-        privacyURL: URL(string: "https://example.com/privacy"),
-        termsURL: URL(string: "https://example.com/terms")
-    )
+    private static var activePreferredProductID: String {
+        DemoSimulatedPlanConfiguration.load().preferredProductID
+    }
+
+    static var modernPaywall: PaywallConfiguration {
+        PaywallConfiguration(
+            title: "Unlock Demo Pro",
+            subtitle: purchaseServiceMode == .simulated
+                ? "This Debug build uses the in-process purchase simulator."
+                : "Choose monthly, yearly, or lifetime access through StoreKit.",
+            planTitle: "Demo Pro",
+            planSubtitle: "Monthly, yearly, or lifetime access",
+            features: [
+                PaywallFeature(
+                    id: "exports",
+                    systemImage: "square.and.arrow.up",
+                    title: "Premium exports",
+                    message: "Exercise image rendering, rounded PNG output, and sharing."
+                ),
+                PaywallFeature(
+                    id: "backups",
+                    systemImage: "archivebox",
+                    title: "Validated backups",
+                    message: "Create and verify versioned packages with assets and checksums."
+                ),
+                PaywallFeature(
+                    id: "themes",
+                    systemImage: "paintpalette",
+                    title: "Pro themes",
+                    message: "Try the existing reusable theme preview and entitlement flow."
+                ),
+            ],
+            preferredProductID: activePreferredProductID,
+            highlightedProductID: activePreferredProductID,
+            purchaseButtonTitle: "Unlock Demo Pro",
+            privacyURL: URL(string: "https://example.com/privacy"),
+            termsURL: URL(string: "https://example.com/terms")
+        )
+    }
 
     static let limitReachedUpsell = LimitReachedUpsellConfiguration(
         title: "Free limit reached",
@@ -142,26 +148,28 @@ enum DemoConfiguration {
         comparisonAccessibilityLabel: "Demo Free and Demo Pro comparison"
     )
 
-    static let legacyPaywall = FoundationPaywallConfiguration(
-        title: "Make every app premium",
-        subtitle: "Monthly, yearly, and lifetime plans in the gradient style.",
-        features: [
-            FoundationPaywallFeature(
-                id: "storekit",
-                systemImage: "checkmark.shield.fill",
-                title: "Verified entitlements",
-                message: "No UserDefaults boolean as the source of truth."
-            ),
-            FoundationPaywallFeature(
-                id: "lifecycle",
-                systemImage: "arrow.triangle.2.circlepath",
-                title: "Automatic refresh",
-                message: "Refreshes at launch, after transactions, restores, and app activation."
-            ),
-        ],
-        purchaseButtonTitle: "Unlock Demo Pro",
-        highlightedProductID: yearlyProductID
-    )
+    static var legacyPaywall: FoundationPaywallConfiguration {
+        FoundationPaywallConfiguration(
+            title: "Make every app premium",
+            subtitle: "Monthly, yearly, and lifetime plans in the gradient style.",
+            features: [
+                FoundationPaywallFeature(
+                    id: "storekit",
+                    systemImage: "checkmark.shield.fill",
+                    title: "Verified entitlements",
+                    message: "No UserDefaults boolean as the source of truth."
+                ),
+                FoundationPaywallFeature(
+                    id: "lifecycle",
+                    systemImage: "arrow.triangle.2.circlepath",
+                    title: "Automatic refresh",
+                    message: "Refreshes at launch, after transactions, restores, and app activation."
+                ),
+            ],
+            purchaseButtonTitle: "Unlock Demo Pro",
+            highlightedProductID: activePreferredProductID
+        )
+    }
 
     static var legacyClaudePaywall: FoundationPaywallConfiguration {
         FoundationPaywallConfiguration(
@@ -182,23 +190,25 @@ enum DemoConfiguration {
                 ),
             ],
             purchaseButtonTitle: "Continue",
-            highlightedProductID: DemoSimulatedPlanConfiguration.load().preferredProductID,
+            highlightedProductID: activePreferredProductID,
             privacyURL: URL(string: "https://example.com/privacy"),
             termsURL: URL(string: "https://example.com/terms")
         )
     }
 
-    static let settings = FoundationSettingsConfiguration(
-        appName: "Demo",
-        supportURL: URL(string: "https://github.com/hoangbkit"),
-        privacyURL: URL(string: "https://example.com/privacy"),
-        termsURL: URL(string: "https://example.com/terms"),
-        shareURL: URL(string: "https://github.com/hoangbkit/AppFoundation"),
-        proPlanConfiguration: ProPlanSettingsConfiguration(
-            sectionTitle: "Demo Pro",
-            activePlanTitle: "Demo Pro",
-            unlockTitle: "Unlock Demo Pro"
-        ),
-        paywallConfiguration: modernPaywall
-    )
+    static var settings: FoundationSettingsConfiguration {
+        FoundationSettingsConfiguration(
+            appName: "Demo",
+            supportURL: URL(string: "https://github.com/hoangbkit"),
+            privacyURL: URL(string: "https://example.com/privacy"),
+            termsURL: URL(string: "https://example.com/terms"),
+            shareURL: URL(string: "https://github.com/hoangbkit/AppFoundation"),
+            proPlanConfiguration: ProPlanSettingsConfiguration(
+                sectionTitle: "Demo Pro",
+                activePlanTitle: "Demo Pro",
+                unlockTitle: "Unlock Demo Pro"
+            ),
+            paywallConfiguration: modernPaywall
+        )
+    }
 }

@@ -197,46 +197,37 @@ public struct ClaudePaywallView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 24)
         case .loaded:
-            LazyVGrid(columns: planColumns, spacing: 12) {
-                ForEach(purchases.products) { product in
-                    planOption(for: product, badge: badge(for: product))
+            if usesStackedPlanLayout {
+                VStack(spacing: 10) {
+                    ForEach(purchases.products) { product in
+                        stackedPlanOption(for: product, badge: badge(for: product))
+                    }
+                }
+            } else {
+                LazyVGrid(columns: planColumns, spacing: 12) {
+                    ForEach(purchases.products) { product in
+                        cardPlanOption(for: product, badge: badge(for: product))
+                    }
                 }
             }
         }
     }
 
-    private func planOption(for product: StoreProduct, badge: String?) -> some View {
+    private func cardPlanOption(for product: StoreProduct, badge: String?) -> some View {
         let isSelected = selectedProductID == product.id
         let optionRadius = min(theme.cardCornerRadius, 16)
 
         return Button {
-            withAnimation(.snappy) {
-                selectedProductID = product.id
-            }
+            select(product)
         } label: {
             VStack(alignment: .leading, spacing: 9) {
                 HStack(alignment: .top) {
-                    ZStack {
-                        Circle()
-                            .strokeBorder(
-                                isSelected ? theme.accent : theme.secondaryForeground.opacity(0.45),
-                                lineWidth: 1.5
-                            )
-                        if isSelected {
-                            Circle().fill(theme.accent).padding(4)
-                        }
-                    }
-                    .frame(width: 22, height: 22)
+                    selectionIndicator(isSelected: isSelected)
 
                     Spacer(minLength: 6)
 
                     if let badge {
-                        Text(badge)
-                            .font(.caption2.bold())
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 4)
-                            .background(theme.accent.opacity(0.15), in: Capsule())
-                            .foregroundStyle(theme.accent)
+                        planBadge(badge)
                     }
                 }
 
@@ -267,6 +258,86 @@ public struct ClaudePaywallView: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private func stackedPlanOption(for product: StoreProduct, badge: String?) -> some View {
+        let isSelected = selectedProductID == product.id
+        let optionRadius = min(theme.cardCornerRadius, 16)
+
+        return Button {
+            select(product)
+        } label: {
+            HStack(spacing: 12) {
+                selectionIndicator(isSelected: isSelected)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(product.planLabel)
+                        .font(.headline)
+                        .foregroundStyle(theme.primaryForeground)
+
+                    Text(product.billingDescription)
+                        .font(.caption)
+                        .foregroundStyle(theme.secondaryForeground)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 10)
+
+                VStack(alignment: .trailing, spacing: 5) {
+                    if let badge {
+                        planBadge(badge)
+                    }
+
+                    Text(product.displayPrice)
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(theme.primaryForeground)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+            .background(
+                isSelected ? theme.accent.opacity(0.12) : theme.elevatedSurface,
+                in: RoundedRectangle(cornerRadius: optionRadius, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: optionRadius, style: .continuous)
+                    .strokeBorder(
+                        isSelected ? theme.accent : theme.border,
+                        lineWidth: isSelected ? 1.5 : 1
+                    )
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private func selectionIndicator(isSelected: Bool) -> some View {
+        ZStack {
+            Circle()
+                .strokeBorder(
+                    isSelected ? theme.accent : theme.secondaryForeground.opacity(0.45),
+                    lineWidth: 1.5
+                )
+            if isSelected {
+                Circle().fill(theme.accent).padding(4)
+            }
+        }
+        .frame(width: 22, height: 22)
+        .accessibilityHidden(true)
+    }
+
+    private func planBadge(_ badge: String) -> some View {
+        Text(badge)
+            .font(.caption2.bold())
+            .padding(.horizontal, 7)
+            .padding(.vertical, 4)
+            .background(theme.accent.opacity(0.15), in: Capsule())
+            .foregroundStyle(theme.accent)
+            .lineLimit(1)
     }
 
     private var purchaseButton: some View {
@@ -331,6 +402,10 @@ public struct ClaudePaywallView: View {
         .padding(.horizontal, 8)
     }
 
+    private var usesStackedPlanLayout: Bool {
+        purchases.products.count >= 3 || dynamicTypeSize.isAccessibilitySize
+    }
+
     private var planColumns: [GridItem] {
         if purchases.products.count <= 1 || dynamicTypeSize.isAccessibilitySize {
             return [GridItem(.flexible())]
@@ -355,6 +430,12 @@ public struct ClaudePaywallView: View {
             return configuration.purchaseButtonTitle
         }
         return "\(configuration.purchaseButtonTitle) with \(selectedProduct.planLabel)"
+    }
+
+    private func select(_ product: StoreProduct) {
+        withAnimation(.snappy) {
+            selectedProductID = product.id
+        }
     }
 
     private func selectDefaultPlanIfNeeded() {

@@ -5,11 +5,10 @@ import XCTest
 
 @MainActor
 final class DemoTests: XCTestCase {
-    func testPurchaseConfigurationUsesAllSupportedPlansInOrder() {
+    func testPurchaseConfigurationUsesThreeDefaultPlansInOrder() {
         XCTAssertEqual(
             DemoConfiguration.purchases.productIDs,
             [
-                DemoConfiguration.weeklyProductID,
                 DemoConfiguration.monthlyProductID,
                 DemoConfiguration.yearlyProductID,
                 DemoConfiguration.lifetimeProductID,
@@ -21,17 +20,46 @@ final class DemoTests: XCTestCase {
         )
     }
 
-    func testSimulatedCatalogContainsWeeklyAndLifetimePlans() {
-        let weekly = DemoConfiguration.simulatedProducts.first {
-            $0.id == DemoConfiguration.weeklyProductID
+    func testSimulatedCatalogContainsRecurringAndLifetimePlans() {
+        let monthly = DemoConfiguration.simulatedProducts.first {
+            $0.id == DemoConfiguration.monthlyProductID
         }
         let lifetime = DemoConfiguration.simulatedProducts.first {
             $0.id == DemoConfiguration.lifetimeProductID
         }
 
-        XCTAssertEqual(weekly?.subscriptionPeriod, .init(value: 1, unit: .week))
+        XCTAssertEqual(monthly?.subscriptionPeriod, .init(value: 1, unit: .month))
         XCTAssertTrue(lifetime?.isLifetime == true)
         XCTAssertNil(lifetime?.subscriptionPeriod)
+    }
+
+    func testRuntimeSimulatedPlanDefaultsMatchDemoCatalog() {
+        let configuration = DemoSimulatedPlanConfiguration.defaults
+
+        XCTAssertEqual(
+            configuration.purchaseConfiguration.productIDs,
+            DemoConfiguration.purchases.productIDs
+        )
+        XCTAssertEqual(
+            configuration.products.map(\.id),
+            DemoConfiguration.simulatedProducts.map(\.id)
+        )
+    }
+
+    func testRuntimeSimulatedPlanConfigurationRepairsDisabledPreferredPlan() {
+        var configuration = DemoSimulatedPlanConfiguration.defaults
+        configuration.plans[1].isEnabled = false
+
+        let normalized = configuration.normalized()
+
+        XCTAssertEqual(normalized.preferredProductID, DemoConfiguration.monthlyProductID)
+        XCTAssertEqual(
+            normalized.purchaseConfiguration.productIDs,
+            [
+                DemoConfiguration.monthlyProductID,
+                DemoConfiguration.lifetimeProductID,
+            ]
+        )
     }
 
     func testModernPaywallPrefersAndHighlightsYearlyProduct() {

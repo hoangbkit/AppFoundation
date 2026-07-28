@@ -23,7 +23,9 @@ final class DemoProCelebrationTests: XCTestCase {
 
         XCTAssertTrue(purchases.hasPro)
         XCTAssertEqual(purchases.activeProduct?.id, lifetime.id)
-        XCTAssertEqual(purchases.features.count, 4)
+        XCTAssertEqual(purchases.features.count, 6)
+        XCTAssertEqual(purchases.features.first?.title, "Reusable components")
+        XCTAssertEqual(purchases.features.last?.title, "Backup history")
         XCTAssertTrue(configuration.planTitle.isEmpty)
         XCTAssertTrue(configuration.rows.isEmpty)
     }

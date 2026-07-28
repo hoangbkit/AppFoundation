@@ -160,7 +160,6 @@ enum DemoConfiguration {
         FoundationPaywallConfiguration(
             title: "Make every app premium",
             subtitle: "Monthly, yearly, and lifetime plans in the gradient style.",
-            features: purchases.features.map(FoundationPaywallFeature.init),
             purchaseButtonTitle: "Unlock Demo Pro",
             highlightedProductID: activePreferredProductID
         )
@@ -170,7 +169,6 @@ enum DemoConfiguration {
         FoundationPaywallConfiguration(
             title: "Get more Demo",
             subtitle: "Choose monthly, yearly, or lifetime access",
-            features: purchases.features.map(FoundationPaywallFeature.init),
             purchaseButtonTitle: "Continue",
             highlightedProductID: activePreferredProductID,
             privacyURL: URL(string: "https://example.com/privacy"),

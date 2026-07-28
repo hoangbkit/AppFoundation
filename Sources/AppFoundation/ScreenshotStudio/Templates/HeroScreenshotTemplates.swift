@@ -38,10 +38,6 @@
 
           visual
             .screenshotTemplateFill()
-            .screenshotTemplateSurface(
-              cornerRadius: metrics.cornerRadius,
-              shadowRadius: metrics.visualShadowRadius
-            )
 
           footer
             .frame(maxWidth: .infinity, alignment: .leading)

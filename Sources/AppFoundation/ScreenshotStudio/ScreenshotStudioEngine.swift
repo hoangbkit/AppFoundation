@@ -4,6 +4,9 @@
   import ImageIO
   import SwiftUI
   import UniformTypeIdentifiers
+  #if canImport(UIKit)
+    import UIKit
+  #endif
 
   public enum ScreenshotStudioColorScheme: String, CaseIterable, Identifiable, Sendable {
     case light
@@ -178,6 +181,14 @@
         colorScheme: colorScheme.swiftUIColorScheme
       )
 
+      #if canImport(UIKit)
+        return try renderHostedCGImage(
+          content: content,
+          pointSize: pointSize,
+          scale: CGFloat(preset.scale),
+          expectedPixelSize: preset.pixelSize
+        )
+      #else
       let renderer = ImageRenderer(content: content)
       renderer.proposedSize = ProposedViewSize(
         width: pointSize.width,
@@ -202,7 +213,87 @@
       }
 
       return cgImage
+      #endif
     }
+
+    #if canImport(UIKit)
+      private func renderHostedCGImage<Content: View>(
+        content: Content,
+        pointSize: CGSize,
+        scale: CGFloat,
+        expectedPixelSize: ScreenshotPixelSize
+      ) throws -> CGImage {
+        let frame = CGRect(origin: .zero, size: pointSize)
+        let host = UIHostingController(rootView: content)
+        host.safeAreaRegions = []
+        host.view.frame = frame
+        host.view.backgroundColor = .clear
+        host.view.insetsLayoutMarginsFromSafeArea = false
+
+        let container = UIViewController()
+        container.view.frame = frame
+        container.view.backgroundColor = .clear
+        container.addChild(host)
+        container.view.addSubview(host.view)
+        host.didMove(toParent: container)
+
+        let window: UIWindow
+        if let scene = UIApplication.shared.connectedScenes
+          .compactMap({ $0 as? UIWindowScene })
+          .first
+        {
+          window = UIWindow(windowScene: scene)
+        } else {
+          window = UIWindow(frame: frame)
+        }
+        window.frame = frame
+        window.windowLevel = UIWindow.Level(rawValue: -1)
+        window.rootViewController = container
+        window.isHidden = false
+
+        container.view.setNeedsLayout()
+        container.view.layoutIfNeeded()
+        host.view.setNeedsLayout()
+        host.view.layoutIfNeeded()
+        CATransaction.flush()
+
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = scale
+        format.opaque = true
+        format.preferredRange = .standard
+
+        let renderer = UIGraphicsImageRenderer(size: pointSize, format: format)
+        let image = renderer.image { context in
+          let rendered = host.view.drawHierarchy(in: frame, afterScreenUpdates: true)
+          if !rendered {
+            host.view.layer.render(in: context.cgContext)
+          }
+        }
+
+        window.isHidden = true
+        host.willMove(toParent: nil)
+        host.view.removeFromSuperview()
+        host.removeFromParent()
+        window.rootViewController = nil
+
+        guard let cgImage = image.cgImage else {
+          throw ScreenshotStudioError.renderFailed(screenshot: "Hosted SwiftUI view")
+        }
+
+        let actualSize = ScreenshotPixelSize(
+          width: cgImage.width,
+          height: cgImage.height
+        )
+        guard actualSize == expectedPixelSize else {
+          throw ScreenshotStudioError.unexpectedPixelSize(
+            expected: expectedPixelSize,
+            actual: actualSize
+          )
+        }
+
+        return cgImage
+      }
+    #endif
 
     private func pngData(for image: CGImage) -> Data? {
       let data = NSMutableData()

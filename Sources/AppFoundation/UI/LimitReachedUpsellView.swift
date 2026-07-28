@@ -1,7 +1,8 @@
 #if canImport(SwiftUI) && canImport(StoreKit)
+import StoreKit
 import SwiftUI
 
-public struct LimitReachedComparisonRow: Identifiable, Hashable {
+public struct LimitReachedComparisonRow: Identifiable, Hashable, Sendable {
     public let id: String
     public var feature: String
     public var freeValue: String
@@ -18,9 +19,18 @@ public struct LimitReachedComparisonRow: Identifiable, Hashable {
         self.freeValue = freeValue
         self.proValue = proValue
     }
+
+    public init(_ feature: PurchaseFeature) {
+        self.init(
+            id: feature.id,
+            feature: feature.title,
+            freeValue: feature.freeValue,
+            proValue: feature.proValue
+        )
+    }
 }
 
-/// App-owned copy and limits for a reusable "limit reached" upsell.
+/// App-owned copy for a reusable "limit reached" upsell.
 public struct LimitReachedUpsellConfiguration {
     public var navigationTitle: String
     public var title: String
@@ -31,7 +41,10 @@ public struct LimitReachedUpsellConfiguration {
     public var featureColumnTitle: String
     public var freeColumnTitle: String
     public var proColumnTitle: String
+
+    /// Optional local override. Leave empty to use `PurchaseManager.features`.
     public var rows: [LimitReachedComparisonRow]
+
     public var unlockButtonTitle: String
     public var stayFreeButtonTitle: String
     public var comparisonAccessibilityLabel: String
@@ -47,7 +60,7 @@ public struct LimitReachedUpsellConfiguration {
         featureColumnTitle: String = "Feature",
         freeColumnTitle: String = "Free",
         proColumnTitle: String = "Pro",
-        rows: [LimitReachedComparisonRow],
+        rows: [LimitReachedComparisonRow] = [],
         unlockButtonTitle: String = "Unlock Pro",
         stayFreeButtonTitle: String = "Stay Free",
         comparisonAccessibilityLabel: String = "Free and Pro comparison",
@@ -74,6 +87,7 @@ public struct LimitReachedUpsellConfiguration {
 public struct LimitReachedUpsellView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appFoundationTheme) private var environmentTheme
+    @Environment(PurchaseManager.self) private var purchaseManager
 
     private let configuration: LimitReachedUpsellConfiguration
     private let onUnlockPro: () -> Void
@@ -97,7 +111,7 @@ public struct LimitReachedUpsellView: View {
                 ScrollView {
                     VStack(spacing: 22) {
                         header
-                        comparisonCard
+                        if !resolvedRows.isEmpty { comparisonCard }
                         actions
                     }
                     .padding(.horizontal, 20)
@@ -110,10 +124,8 @@ public struct LimitReachedUpsellView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close", systemImage: "xmark") {
-                        dismiss()
-                    }
-                    .labelStyle(.iconOnly)
+                    Button("Close", systemImage: "xmark") { dismiss() }
+                        .labelStyle(.iconOnly)
                 }
             }
             .toolbarBackground(.hidden, for: .navigationBar)
@@ -131,9 +143,7 @@ public struct LimitReachedUpsellView: View {
                 .foregroundStyle(theme.accentColor)
                 .frame(width: 78, height: 78)
                 .background(theme.elevatedSurfaceColor, in: Circle())
-                .overlay {
-                    Circle().strokeBorder(theme.borderColor)
-                }
+                .overlay { Circle().strokeBorder(theme.borderColor) }
 
             VStack(spacing: 7) {
                 Text(configuration.title)
@@ -185,11 +195,9 @@ public struct LimitReachedUpsellView: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 9)
 
-            Divider()
-                .overlay(theme.borderColor)
-                .gridCellColumns(3)
+            Divider().overlay(theme.borderColor).gridCellColumns(3)
 
-            ForEach(Array(configuration.rows.enumerated()), id: \.element.id) { index, row in
+            ForEach(Array(resolvedRows.enumerated()), id: \.element.id) { index, row in
                 GridRow {
                     Text(row.feature)
                         .font(.caption.weight(.semibold))
@@ -207,7 +215,7 @@ public struct LimitReachedUpsellView: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 9)
 
-                if index < configuration.rows.count - 1 {
+                if index < resolvedRows.count - 1 {
                     Divider()
                         .overlay(theme.borderColor.opacity(0.7))
                         .gridCellColumns(3)
@@ -242,6 +250,11 @@ public struct LimitReachedUpsellView: View {
         }
     }
 
+    private var resolvedRows: [LimitReachedComparisonRow] {
+        if !configuration.rows.isEmpty { return configuration.rows }
+        return purchaseManager.features.map(LimitReachedComparisonRow.init)
+    }
+
     private var theme: AppTheme {
         configuration.themeOverride ?? environmentTheme
     }
@@ -269,9 +282,7 @@ public struct LimitReachedUpsellFlow<Paywall: View>: View {
                     .transition(.move(edge: .trailing).combined(with: .opacity))
             } else {
                 LimitReachedUpsellView(configuration: configuration) {
-                    withAnimation(.snappy) {
-                        showsPaywall = true
-                    }
+                    withAnimation(.snappy) { showsPaywall = true }
                 }
                 .transition(.move(edge: .leading).combined(with: .opacity))
             }

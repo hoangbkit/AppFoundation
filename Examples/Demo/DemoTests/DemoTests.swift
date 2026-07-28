@@ -62,7 +62,7 @@ final class DemoTests: XCTestCase {
         )
     }
 
-    func testModernPaywallPrefersAndHighlightsYearlyProduct() {
+    func testModernPaywallUsesRegisteredPurchaseCatalog() {
         XCTAssertEqual(
             DemoConfiguration.modernPaywall.preferredProductID,
             DemoConfiguration.purchases.preferredProductID
@@ -71,7 +71,8 @@ final class DemoTests: XCTestCase {
             DemoConfiguration.modernPaywall.highlightedProductID,
             DemoConfiguration.yearlyProductID
         )
-        XCTAssertFalse(DemoConfiguration.modernPaywall.features.isEmpty)
+        XCTAssertTrue(DemoConfiguration.modernPaywall.features.isEmpty)
+        XCTAssertEqual(DemoConfiguration.purchases.features.count, 4)
     }
 
     func testAllPaywallsFollowActiveThemeByDefault() {
@@ -80,9 +81,11 @@ final class DemoTests: XCTestCase {
 
         XCTAssertTrue(DemoConfiguration.legacyPaywall.followsActiveTheme)
         XCTAssertNil(DemoConfiguration.legacyPaywall.themeOverride)
+        XCTAssertTrue(DemoConfiguration.legacyPaywall.features.isEmpty)
 
         XCTAssertTrue(DemoConfiguration.legacyClaudePaywall.followsActiveTheme)
         XCTAssertNil(DemoConfiguration.legacyClaudePaywall.themeOverride)
+        XCTAssertTrue(DemoConfiguration.legacyClaudePaywall.features.isEmpty)
     }
 
     func testSettingsFollowActiveThemeByDefault() {

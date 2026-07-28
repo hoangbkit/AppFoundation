@@ -7,6 +7,7 @@ struct HomeView: View {
     @Environment(ThemeManager.self) private var themes
 
     @State private var isShowingPaywall = false
+    @State private var isShowingCelebration = false
     @State private var isShowingSettings = false
     @State private var isShowingOnboarding = false
     @State private var isShowingUpsell = false
@@ -65,17 +66,28 @@ struct HomeView: View {
 
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        isShowingPaywall = true
+                        if purchases.hasPro {
+                            isShowingCelebration = true
+                        } else {
+                            isShowingPaywall = true
+                        }
                     } label: {
                         Image(systemName: "crown.fill")
                     }
-                    .accessibilityLabel("Open Claude paywall")
+                    .accessibilityLabel(
+                        purchases.hasPro ? "Open AF Pro celebration" : "Unlock Demo Pro"
+                    )
                 }
             }
             .sheet(isPresented: $isShowingPaywall) {
                 ClaudePaywallView(
                     purchases: purchases,
                     configuration: DemoConfiguration.legacyClaudePaywall
+                )
+            }
+            .sheet(isPresented: $isShowingCelebration) {
+                FoundationProCelebrationView(
+                    configuration: DemoConfiguration.proCelebration(for: purchases)
                 )
             }
             .sheet(isPresented: $isShowingUpsell) {

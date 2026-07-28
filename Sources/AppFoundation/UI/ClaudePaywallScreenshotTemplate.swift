@@ -31,6 +31,7 @@ public struct ClaudePaywallScreenshotTemplate: View {
                 initialSelectedProductID: selectedProductID,
                 rendersForScreenshot: true
             )
+            .environment(purchases)
         }
     }
 }

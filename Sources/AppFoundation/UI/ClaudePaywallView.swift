@@ -7,13 +7,26 @@ public struct ClaudePaywallView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appFoundationTheme) private var environmentTheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(PurchaseManager.self) private var environmentPurchaseManager
 
-    private let purchases: PurchaseController
+    private let purchaseManagerOverride: PurchaseController?
     private let configuration: FoundationPaywallConfiguration
     private let rendersForScreenshot: Bool
 
     @State private var selectedProductID: String?
     @State private var restoreMessage: String?
+
+    public init(
+        configuration: FoundationPaywallConfiguration,
+        initialSelectedProductID: String? = nil
+    ) {
+        self.purchaseManagerOverride = nil
+        self.configuration = configuration
+        self.rendersForScreenshot = false
+        _selectedProductID = State(
+            initialValue: initialSelectedProductID ?? configuration.highlightedProductID
+        )
+    }
 
     public init(
         purchases: PurchaseController,
@@ -34,7 +47,7 @@ public struct ClaudePaywallView: View {
         initialSelectedProductID: String?,
         rendersForScreenshot: Bool
     ) {
-        self.purchases = purchases
+        self.purchaseManagerOverride = purchases
         self.configuration = configuration
         self.rendersForScreenshot = rendersForScreenshot
         _selectedProductID = State(
@@ -69,10 +82,8 @@ public struct ClaudePaywallView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close", systemImage: "xmark") {
-                        dismiss()
-                    }
-                    .labelStyle(.iconOnly)
+                    Button("Close", systemImage: "xmark") { dismiss() }
+                        .labelStyle(.iconOnly)
                 }
             }
             .toolbarBackground(.hidden, for: .navigationBar)
@@ -161,8 +172,10 @@ public struct ClaudePaywallView: View {
                 purchaseButton
             }
 
-            Divider().overlay(theme.border)
-            featureList
+            if !resolvedFeatures.isEmpty {
+                Divider().overlay(theme.border)
+                featureList
+            }
         }
         .padding(20)
         .background(
@@ -217,18 +230,12 @@ public struct ClaudePaywallView: View {
         let isSelected = selectedProductID == product.id
         let optionRadius = min(theme.cardCornerRadius, 16)
 
-        return Button {
-            select(product)
-        } label: {
+        return Button { select(product) } label: {
             VStack(alignment: .leading, spacing: 9) {
                 HStack(alignment: .top) {
                     selectionIndicator(isSelected: isSelected)
-
                     Spacer(minLength: 6)
-
-                    if let badge {
-                        planBadge(badge)
-                    }
+                    if let badge { planBadge(badge) }
                 }
 
                 Text(product.planLabel)
@@ -264,9 +271,7 @@ public struct ClaudePaywallView: View {
         let isSelected = selectedProductID == product.id
         let optionRadius = min(theme.cardCornerRadius, 16)
 
-        return Button {
-            select(product)
-        } label: {
+        return Button { select(product) } label: {
             HStack(spacing: 12) {
                 selectionIndicator(isSelected: isSelected)
 
@@ -274,7 +279,6 @@ public struct ClaudePaywallView: View {
                     Text(product.planLabel)
                         .font(.headline)
                         .foregroundStyle(theme.primaryForeground)
-
                     Text(product.billingDescription)
                         .font(.caption)
                         .foregroundStyle(theme.secondaryForeground)
@@ -284,10 +288,7 @@ public struct ClaudePaywallView: View {
                 Spacer(minLength: 10)
 
                 VStack(alignment: .trailing, spacing: 5) {
-                    if let badge {
-                        planBadge(badge)
-                    }
-
+                    if let badge { planBadge(badge) }
                     Text(product.displayPrice)
                         .font(.title3.weight(.bold))
                         .foregroundStyle(theme.primaryForeground)
@@ -355,10 +356,7 @@ public struct ClaudePaywallView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
         }
-        .background(
-            Color.white,
-            in: Capsule()
-        )
+        .background(Color.white, in: Capsule())
         .foregroundStyle(.black)
         .shadow(color: .black.opacity(0.16), radius: 12, y: 6)
         .disabled(selectedProduct == nil || purchases.isBusy)
@@ -370,14 +368,19 @@ public struct ClaudePaywallView: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(theme.primaryForeground)
 
-            ForEach(configuration.features) { feature in
+            ForEach(resolvedFeatures) { feature in
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "checkmark")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(theme.accent)
-                    Text(feature.message)
-                        .font(.subheadline)
-                        .foregroundStyle(theme.primaryForeground)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(feature.title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(theme.primaryForeground)
+                        Text(feature.message)
+                            .font(.subheadline)
+                            .foregroundStyle(theme.secondaryForeground)
+                    }
                 }
             }
         }
@@ -400,6 +403,15 @@ public struct ClaudePaywallView: View {
             .foregroundStyle(theme.accent)
         }
         .padding(.horizontal, 8)
+    }
+
+    private var purchases: PurchaseController {
+        purchaseManagerOverride ?? environmentPurchaseManager
+    }
+
+    private var resolvedFeatures: [FoundationPaywallFeature] {
+        if !configuration.features.isEmpty { return configuration.features }
+        return purchases.features.map(FoundationPaywallFeature.init)
     }
 
     private var usesStackedPlanLayout: Bool {
@@ -426,24 +438,18 @@ public struct ClaudePaywallView: View {
     }
 
     private var purchaseButtonTitle: String {
-        guard let selectedProduct else {
-            return configuration.purchaseButtonTitle
-        }
+        guard let selectedProduct else { return configuration.purchaseButtonTitle }
         return "\(configuration.purchaseButtonTitle) with \(selectedProduct.planLabel)"
     }
 
     private func select(_ product: StoreProduct) {
-        withAnimation(.snappy) {
-            selectedProductID = product.id
-        }
+        withAnimation(.snappy) { selectedProductID = product.id }
     }
 
     private func selectDefaultPlanIfNeeded() {
         guard selectedProductID == nil
             || purchases.product(withID: selectedProductID ?? "") == nil
-        else {
-            return
-        }
+        else { return }
         selectedProductID = purchases.preferredProduct?.id
     }
 

@@ -26,9 +26,9 @@ struct PurchaseUpsellDemoView: View {
 
                 Section("Limit reached upsell") {
                     VStack(alignment: .leading, spacing: 8) {
-                        Label("MiLove-style limit flow", systemImage: "exclamationmark.circle.fill")
+                        Label("Catalog-driven purchase flow", systemImage: "exclamationmark.circle.fill")
                             .font(.headline)
-                        Text("Preview the reusable stay-free comparison before transitioning into the app-owned paywall.")
+                        Text("The paywall and Free-vs-Pro table both read the same registered features from PurchaseManager.")
                             .font(.caption)
                             .foregroundStyle(theme.secondaryForegroundColor)
                     }
@@ -57,19 +57,13 @@ struct PurchaseUpsellDemoView: View {
         .toolbarBackground(.hidden, for: .navigationBar)
         .tint(theme.accentColor)
         .sheet(isPresented: $isShowingPaywall) {
-            PaywallView(
-                purchaseManager: purchases,
-                configuration: DemoConfiguration.modernPaywall
-            )
+            PaywallView(configuration: DemoConfiguration.modernPaywall)
         }
         .sheet(isPresented: $isShowingLimitUpsell) {
             LimitReachedUpsellFlow(
                 configuration: DemoConfiguration.limitReachedUpsell
             ) {
-                PaywallView(
-                    purchaseManager: purchases,
-                    configuration: DemoConfiguration.modernPaywall
-                )
+                PaywallView(configuration: DemoConfiguration.modernPaywall)
             }
         }
         .animation(.smooth, value: theme.id)

@@ -17,9 +17,18 @@ public struct FoundationProComparisonRow: Identifiable, Hashable, Sendable {
         self.freeValue = freeValue
         self.proValue = proValue
     }
+
+    public init(_ feature: PurchaseFeature) {
+        self.init(
+            id: feature.id,
+            feature: feature.title,
+            freeValue: feature.freeValue,
+            proValue: feature.proValue
+        )
+    }
 }
 
-/// App-owned copy and feature comparison content for a reusable Pro celebration screen.
+/// App-owned copy for a reusable Pro celebration screen.
 public struct FoundationProCelebrationConfiguration: Sendable {
     public var navigationTitle: String
     public var doneButtonTitle: String
@@ -27,12 +36,20 @@ public struct FoundationProCelebrationConfiguration: Sendable {
     public var title: String
     public var message: String
     public var statusSymbolName: String
+
+    /// Optional local override. Leave empty to show the active purchased product.
     public var planTitle: String
+
+    /// Optional local override. Leave empty to derive entitlement status from the manager.
     public var statusMessage: String
+
     public var featureColumnTitle: String
     public var freeColumnTitle: String
     public var proColumnTitle: String
+
+    /// Optional local override. Leave empty to use `PurchaseManager.features`.
     public var rows: [FoundationProComparisonRow]
+
     public var comparisonAccessibilityLabel: String
     public var themeOverride: AppTheme?
 
@@ -43,12 +60,12 @@ public struct FoundationProCelebrationConfiguration: Sendable {
         title: String,
         message: String,
         statusSymbolName: String = "checkmark.seal.fill",
-        planTitle: String,
-        statusMessage: String,
+        planTitle: String = "",
+        statusMessage: String = "",
         featureColumnTitle: String = "Feature",
         freeColumnTitle: String = "Free",
         proColumnTitle: String = "Pro",
-        rows: [FoundationProComparisonRow],
+        rows: [FoundationProComparisonRow] = [],
         comparisonAccessibilityLabel: String = "Free and Pro comparison",
         themeOverride: AppTheme? = nil
     ) {
@@ -69,13 +86,15 @@ public struct FoundationProCelebrationConfiguration: Sendable {
     }
 }
 
-#if canImport(SwiftUI)
+#if canImport(SwiftUI) && canImport(StoreKit)
+import StoreKit
 import SwiftUI
 
 /// A theme-aware Pro entitlement celebration screen adapted from MiLove.
 public struct FoundationProCelebrationView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appFoundationTheme) private var environmentTheme
+    @Environment(PurchaseManager.self) private var purchaseManager
 
     private let configuration: FoundationProCelebrationConfiguration
 
@@ -92,7 +111,7 @@ public struct FoundationProCelebrationView: View {
                     VStack(spacing: 20) {
                         celebrationHeader
                         statusCard
-                        comparisonTable
+                        if !resolvedRows.isEmpty { comparisonTable }
                     }
                     .padding(20)
                     .padding(.bottom, 24)
@@ -103,9 +122,7 @@ public struct FoundationProCelebrationView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(configuration.doneButtonTitle) {
-                        dismiss()
-                    }
+                    Button(configuration.doneButtonTitle) { dismiss() }
                 }
             }
             .toolbarBackground(.hidden, for: .navigationBar)
@@ -122,9 +139,7 @@ public struct FoundationProCelebrationView: View {
                 Circle()
                     .fill(theme.elevatedSurfaceColor.opacity(0.74))
                     .frame(width: 112, height: 112)
-                    .overlay {
-                        Circle().strokeBorder(theme.borderColor)
-                    }
+                    .overlay { Circle().strokeBorder(theme.borderColor) }
 
                 theme.gradient
                     .frame(width: 82, height: 82)
@@ -137,11 +152,7 @@ public struct FoundationProCelebrationView: View {
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(theme.primaryForegroundColor)
             }
-            .shadow(
-                color: theme.accentColor.opacity(0.28),
-                radius: 34,
-                y: 14
-            )
+            .shadow(color: theme.accentColor.opacity(0.28), radius: 34, y: 14)
 
             VStack(spacing: 6) {
                 Text(configuration.title)
@@ -169,16 +180,14 @@ public struct FoundationProCelebrationView: View {
                     .foregroundStyle(theme.accentColor)
                     .frame(width: 46, height: 46)
                     .background(theme.accentColor.opacity(0.13), in: Circle())
-                    .overlay {
-                        Circle().strokeBorder(theme.borderColor)
-                    }
+                    .overlay { Circle().strokeBorder(theme.borderColor) }
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(configuration.planTitle)
+                    Text(resolvedPlanTitle)
                         .font(.headline.bold())
                         .foregroundStyle(theme.primaryForegroundColor)
 
-                    Text(configuration.statusMessage)
+                    Text(resolvedStatusMessage)
                         .font(.caption)
                         .foregroundStyle(theme.secondaryForegroundColor)
                         .fixedSize(horizontal: false, vertical: true)
@@ -206,11 +215,9 @@ public struct FoundationProCelebrationView: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 9)
 
-            Divider()
-                .overlay(theme.borderColor)
-                .gridCellColumns(3)
+            Divider().overlay(theme.borderColor).gridCellColumns(3)
 
-            ForEach(Array(configuration.rows.enumerated()), id: \.element.id) { index, row in
+            ForEach(Array(resolvedRows.enumerated()), id: \.element.id) { index, row in
                 GridRow {
                     Text(row.feature)
                         .font(.caption.weight(.semibold))
@@ -229,7 +236,7 @@ public struct FoundationProCelebrationView: View {
                 .padding(.vertical, 9)
                 .background(theme.accentColor.opacity(0.035))
 
-                if index < configuration.rows.count - 1 {
+                if index < resolvedRows.count - 1 {
                     Divider()
                         .overlay(theme.borderColor.opacity(0.7))
                         .gridCellColumns(3)
@@ -246,6 +253,30 @@ public struct FoundationProCelebrationView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(configuration.comparisonAccessibilityLabel)
+    }
+
+    private var resolvedPlanTitle: String {
+        if !configuration.planTitle.isEmpty { return configuration.planTitle }
+        return purchaseManager.activeProduct?.displayName ?? "Pro"
+    }
+
+    private var resolvedStatusMessage: String {
+        if !configuration.statusMessage.isEmpty { return configuration.statusMessage }
+
+        #if DEBUG
+        if purchaseManager.isUsingSimulatedPurchases {
+            return "Pro is active through the local purchase simulator."
+        }
+        #endif
+
+        return purchaseManager.hasPro
+            ? "Your purchase is active and every Pro feature is unlocked."
+            : "No active Pro purchase was found."
+    }
+
+    private var resolvedRows: [FoundationProComparisonRow] {
+        if !configuration.rows.isEmpty { return configuration.rows }
+        return purchaseManager.features.map(FoundationProComparisonRow.init)
     }
 
     private var theme: AppTheme {

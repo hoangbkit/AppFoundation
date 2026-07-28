@@ -29,6 +29,16 @@ final class FoundationProCelebrationViewTests: XCTestCase {
         XCTAssertNil(configuration.themeOverride)
     }
 
+    func testConfigurationDefaultsToPlanAwareThankYouCopy() {
+        let configuration = FoundationProCelebrationConfiguration()
+
+        XCTAssertTrue(configuration.title.isEmpty)
+        XCTAssertEqual(
+            configuration.message,
+            "Thanks for supporting \(AppMetadata.current().name) and unlocking the complete Pro experience"
+        )
+    }
+
     func testComparisonRowUsesFeatureAsDefaultIdentifier() {
         let row = FoundationProComparisonRow(
             feature: "Themes",

@@ -33,6 +33,8 @@ public struct FoundationProCelebrationConfiguration: Sendable {
     public var navigationTitle: String
     public var doneButtonTitle: String
     public var symbolName: String
+
+    /// Optional local override. Leave empty to show the active plan, such as `Lifetime Pro`.
     public var title: String
     public var message: String
     public var statusSymbolName: String
@@ -57,8 +59,8 @@ public struct FoundationProCelebrationConfiguration: Sendable {
         navigationTitle: String = "Pro",
         doneButtonTitle: String = "Done",
         symbolName: String = "diamond.fill",
-        title: String,
-        message: String,
+        title: String = "",
+        message: String = "Thanks for supporting \(AppMetadata.current().name) and unlocking the complete Pro experience",
         statusSymbolName: String = "checkmark.seal.fill",
         planTitle: String = "",
         statusMessage: String = "",
@@ -94,6 +96,7 @@ import SwiftUI
 public struct FoundationProCelebrationView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appFoundationTheme) private var environmentTheme
+    @Environment(\.requestReview) private var requestReview
     @Environment(PurchaseManager.self) private var purchaseManager
 
     private let configuration: FoundationProCelebrationConfiguration
@@ -110,7 +113,7 @@ public struct FoundationProCelebrationView: View {
                 ScrollView {
                     VStack(spacing: 20) {
                         celebrationHeader
-                        statusCard
+                        reviewCard
                         if !resolvedRows.isEmpty { comparisonTable }
                     }
                     .padding(20)
@@ -147,7 +150,7 @@ public struct FoundationProCelebrationView: View {
                     .opacity(0.55)
                     .blur(radius: 4)
 
-                Image(systemName: configuration.symbolName)
+                Image(systemName: "crown.fill")
                     .font(.system(size: 48, weight: .semibold))
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(theme.primaryForegroundColor)
@@ -155,7 +158,7 @@ public struct FoundationProCelebrationView: View {
             .shadow(color: theme.accentColor.opacity(0.28), radius: 34, y: 14)
 
             VStack(spacing: 6) {
-                Text(configuration.title)
+                Text(resolvedTitle)
                     .font(.largeTitle.bold())
                     .foregroundStyle(theme.primaryForegroundColor)
                     .multilineTextAlignment(.center)
@@ -171,8 +174,10 @@ public struct FoundationProCelebrationView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private var statusCard: some View {
-        AppThemeCard(theme: theme) {
+    private var reviewCard: some View {
+        Button {
+            requestReview()
+        } label: {
             HStack(spacing: 13) {
                 Image(systemName: configuration.statusSymbolName)
                     .font(.system(size: 21, weight: .semibold))
@@ -182,20 +187,46 @@ public struct FoundationProCelebrationView: View {
                     .background(theme.accentColor.opacity(0.13), in: Circle())
                     .overlay { Circle().strokeBorder(theme.borderColor) }
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(resolvedPlanTitle)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Enjoying \(appName)?")
                         .font(.headline.bold())
                         .foregroundStyle(theme.primaryForegroundColor)
-
-                    Text(resolvedStatusMessage)
-                        .font(.caption)
-                        .foregroundStyle(theme.secondaryForegroundColor)
+                        .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
+
+                    HStack(spacing: 8) {
+                        HStack(spacing: 2) {
+                            ForEach(0..<5, id: \.self) { _ in
+                                Image(systemName: "star.fill")
+                            }
+                        }
+                        .font(.caption2)
+                        .foregroundStyle(theme.accentColor)
+                        .accessibilityHidden(true)
+
+                        Text("Leave a review")
+                            .font(.caption)
+                            .foregroundStyle(theme.secondaryForegroundColor)
+                    }
                 }
+                .layoutPriority(1)
 
                 Spacer(minLength: 0)
             }
+            .padding(18)
+            .frame(maxWidth: .infinity)
+            .background(
+                celebrationCardBackground,
+                in: RoundedRectangle(cornerRadius: celebrationCardCornerRadius, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: celebrationCardCornerRadius, style: .continuous)
+                    .strokeBorder(celebrationCardBorder)
+            }
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Leave a review for \(appName)")
     }
 
     private var comparisonTable: some View {
@@ -215,7 +246,9 @@ public struct FoundationProCelebrationView: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 9)
 
-            Divider().overlay(theme.borderColor).gridCellColumns(3)
+            Divider()
+                .overlay(theme.borderColor.opacity(0.45))
+                .gridCellColumns(3)
 
             ForEach(Array(resolvedRows.enumerated()), id: \.element.id) { index, row in
                 GridRow {
@@ -234,49 +267,52 @@ public struct FoundationProCelebrationView: View {
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 9)
-                .background(theme.accentColor.opacity(0.035))
+                .background(Color.clear)
 
                 if index < resolvedRows.count - 1 {
                     Divider()
-                        .overlay(theme.borderColor.opacity(0.7))
+                        .overlay(theme.borderColor.opacity(0.35))
                         .gridCellColumns(3)
                 }
             }
         }
         .background(
-            theme.elevatedSurfaceColor,
-            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+            celebrationCardBackground,
+            in: RoundedRectangle(cornerRadius: celebrationCardCornerRadius, style: .continuous)
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(theme.borderColor)
+            RoundedRectangle(cornerRadius: celebrationCardCornerRadius, style: .continuous)
+                .strokeBorder(celebrationCardBorder)
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(configuration.comparisonAccessibilityLabel)
     }
 
-    private var resolvedPlanTitle: String {
-        if !configuration.planTitle.isEmpty { return configuration.planTitle }
-        return purchaseManager.activeProduct?.displayName ?? "Pro"
-    }
-
-    private var resolvedStatusMessage: String {
-        if !configuration.statusMessage.isEmpty { return configuration.statusMessage }
-
-        #if DEBUG
-        if purchaseManager.isUsingSimulatedPurchases {
-            return "Pro is active through the local purchase simulator."
-        }
-        #endif
-
-        return purchaseManager.hasPro
-            ? "Your purchase is active and every Pro feature is unlocked."
-            : "No active Pro purchase was found."
-    }
-
     private var resolvedRows: [FoundationProComparisonRow] {
         if !configuration.rows.isEmpty { return configuration.rows }
         return purchaseManager.features.map(FoundationProComparisonRow.init)
+    }
+
+    private var resolvedTitle: String {
+        if !configuration.title.isEmpty { return configuration.title }
+        guard let planLabel = purchaseManager.activeProduct?.planLabel else { return "Pro plan" }
+        return "\(planLabel) Pro"
+    }
+
+    private var appName: String {
+        AppMetadata.current().name
+    }
+
+    private var celebrationCardCornerRadius: CGFloat {
+        CGFloat(theme.appearance.cardCornerRadius)
+    }
+
+    private var celebrationCardBackground: Color {
+        theme.elevatedSurfaceColor.opacity(0.62)
+    }
+
+    private var celebrationCardBorder: Color {
+        theme.borderColor.opacity(0.45)
     }
 
     private var theme: AppTheme {

@@ -157,15 +157,6 @@ public struct ClaudePaywallView: View {
 
     private var planCard: some View {
         VStack(alignment: .leading, spacing: 20) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Pro")
-                    .font(.system(size: 26, weight: .semibold, design: .serif))
-                    .foregroundStyle(theme.primaryForeground)
-                Text("Choose the plan that fits you")
-                    .font(.subheadline)
-                    .foregroundStyle(theme.secondaryForeground)
-            }
-
             productContent
 
             if !purchases.products.isEmpty {
@@ -244,6 +235,9 @@ public struct ClaudePaywallView: View {
                 Text(product.displayPrice)
                     .font(.title2.weight(.bold))
                     .foregroundStyle(theme.primaryForeground)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.55)
+                    .allowsTightening(true)
                 Text(product.isLifetime ? "Pay once" : product.billingDescription)
                     .font(.footnote)
                     .foregroundStyle(theme.secondaryForeground)
@@ -293,7 +287,8 @@ public struct ClaudePaywallView: View {
                         .font(.title3.weight(.bold))
                         .foregroundStyle(theme.primaryForeground)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.75)
+                        .minimumScaleFactor(0.55)
+                        .allowsTightening(true)
                 }
             }
             .padding(.horizontal, 14)
@@ -370,17 +365,13 @@ public struct ClaudePaywallView: View {
 
             ForEach(resolvedFeatures) { feature in
                 HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: "checkmark")
+                    Image(systemName: feature.systemImage)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(theme.accent)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(feature.title)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(theme.primaryForeground)
-                        Text(feature.message)
-                            .font(.subheadline)
-                            .foregroundStyle(theme.secondaryForeground)
-                    }
+                        .frame(width: 20)
+                    Text(feature.message)
+                        .font(.subheadline)
+                        .foregroundStyle(theme.primaryForeground)
                 }
             }
         }
@@ -415,7 +406,7 @@ public struct ClaudePaywallView: View {
     }
 
     private var usesStackedPlanLayout: Bool {
-        purchases.products.count >= 3 || dynamicTypeSize.isAccessibilitySize
+        purchases.products.count != 2 || dynamicTypeSize.isAccessibilitySize
     }
 
     private var planColumns: [GridItem] {
@@ -454,24 +445,9 @@ public struct ClaudePaywallView: View {
     }
 
     private func badge(for product: StoreProduct) -> String? {
-        if configuration.highlightedProductID == product.id {
-            return configuration.highlightedProductBadge
-        }
-
-        guard product.subscriptionPeriod?.unit == .year,
-              let monthly = purchases.products.first(where: {
-                  $0.subscriptionPeriod?.unit == .month && $0.subscriptionPeriod?.value == 1
-              }),
-              monthly.price > 0
-        else {
-            return nil
-        }
-
-        let yearlyCostAtMonthlyRate = monthly.price * 12
-        let savings = Int(
-            ((yearlyCostAtMonthlyRate - product.price) / yearlyCostAtMonthlyRate * 100).rounded()
-        )
-        return savings > 0 ? "Save \(savings)%" : nil
+        configuration.highlightedProductID == product.id
+            ? configuration.highlightedProductBadge
+            : nil
     }
 
     private func restore() {

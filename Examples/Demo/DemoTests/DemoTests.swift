@@ -16,7 +16,7 @@ final class DemoTests: XCTestCase {
         )
         XCTAssertEqual(
             DemoConfiguration.purchases.preferredProductID,
-            DemoConfiguration.yearlyProductID
+            DemoConfiguration.lifetimeProductID
         )
     }
 
@@ -52,7 +52,7 @@ final class DemoTests: XCTestCase {
 
     func testRuntimeSimulatedPlanConfigurationRepairsDisabledPreferredPlan() {
         var configuration = DemoSimulatedPlanConfiguration.defaults
-        configuration.plans[1].isEnabled = false
+        configuration.plans[2].isEnabled = false
 
         let normalized = configuration.normalized()
 
@@ -77,7 +77,7 @@ final class DemoTests: XCTestCase {
         )
         XCTAssertEqual(
             DemoConfiguration.modernPaywall.highlightedProductID,
-            DemoConfiguration.yearlyProductID
+            DemoConfiguration.lifetimeProductID
         )
         XCTAssertTrue(DemoConfiguration.modernPaywall.features.isEmpty)
         XCTAssertEqual(DemoConfiguration.purchases.features.count, 6)

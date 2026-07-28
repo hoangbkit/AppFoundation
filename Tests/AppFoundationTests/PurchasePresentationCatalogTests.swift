@@ -41,5 +41,16 @@ final class PurchasePresentationCatalogTests: XCTestCase {
         XCTAssertTrue(celebration.planTitle.isEmpty)
         XCTAssertTrue(celebration.statusMessage.isEmpty)
     }
+
+    func testFoundationPaywallDefaultsToAppSpecificCopy() {
+        let configuration = FoundationPaywallConfiguration()
+        let appName = AppMetadata.current().name
+
+        XCTAssertEqual(configuration.title, "\(appName) Pro")
+        XCTAssertEqual(
+            configuration.subtitle,
+            "Unlock all Pro features, choose the plan that fits you."
+        )
+    }
 }
 #endif

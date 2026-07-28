@@ -13,7 +13,7 @@ enum DemoConfiguration {
             yearlyProductID,
             lifetimeProductID,
         ],
-        preferredProductID: yearlyProductID,
+        preferredProductID: lifetimeProductID,
         features: DemoPurchaseFeatureCatalog.features
     )
 
@@ -136,8 +136,6 @@ enum DemoConfiguration {
 
     static var legacyClaudePaywall: FoundationPaywallConfiguration {
         FoundationPaywallConfiguration(
-            title: "Get more Demo",
-            subtitle: "Choose monthly, yearly, or lifetime access",
             purchaseButtonTitle: "Continue",
             highlightedProductID: activePreferredProductID,
             privacyURL: URL(string: "https://example.com/privacy"),

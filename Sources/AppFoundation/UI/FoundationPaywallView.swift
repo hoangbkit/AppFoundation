@@ -50,8 +50,8 @@ public struct FoundationPaywallConfiguration {
     /// Creates a paywall that follows the active app theme.
     public init(
         badge: String = "UNLOCK EVERYTHING",
-        title: String,
-        subtitle: String,
+        title: String = "\(AppMetadata.current().name) Pro",
+        subtitle: String = "Unlock all Pro features, choose the plan that fits you.",
         features: [FoundationPaywallFeature] = [],
         purchaseButtonTitle: String = "Continue",
         highlightedProductID: String? = nil,
@@ -77,8 +77,8 @@ public struct FoundationPaywallConfiguration {
     /// Creates a paywall with the older fixed `FoundationTheme` treatment.
     public init(
         badge: String = "UNLOCK EVERYTHING",
-        title: String,
-        subtitle: String,
+        title: String = "\(AppMetadata.current().name) Pro",
+        subtitle: String = "Unlock all Pro features, choose the plan that fits you.",
         features: [FoundationPaywallFeature] = [],
         purchaseButtonTitle: String = "Continue",
         highlightedProductID: String? = nil,

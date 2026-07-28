@@ -111,8 +111,8 @@ public struct LimitReachedUpsellView: View {
                 ScrollView {
                     VStack(spacing: 22) {
                         header
-                        if !resolvedRows.isEmpty { comparisonCard }
-                        actions
+                        unlockAction
+                        if !resolvedRows.isEmpty { comparisonTable }
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 22)
@@ -120,8 +120,6 @@ public struct LimitReachedUpsellView: View {
                 }
                 .scrollIndicators(.hidden)
             }
-            .navigationTitle(configuration.navigationTitle)
-            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close", systemImage: "xmark") { dismiss() }
@@ -138,12 +136,24 @@ public struct LimitReachedUpsellView: View {
 
     private var header: some View {
         VStack(spacing: 15) {
-            Image(systemName: configuration.symbolName)
-                .font(.system(size: 34, weight: .semibold))
-                .foregroundStyle(theme.accentColor)
-                .frame(width: 78, height: 78)
-                .background(theme.elevatedSurfaceColor, in: Circle())
-                .overlay { Circle().strokeBorder(theme.borderColor) }
+            ZStack {
+                Circle()
+                    .fill(theme.elevatedSurfaceColor.opacity(0.74))
+                    .frame(width: 112, height: 112)
+                    .overlay { Circle().strokeBorder(theme.borderColor) }
+
+                theme.gradient
+                    .frame(width: 82, height: 82)
+                    .clipShape(Circle())
+                    .opacity(0.55)
+                    .blur(radius: 4)
+
+                Image(systemName: "crown.fill")
+                    .font(.system(size: 48, weight: .semibold))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(theme.primaryForegroundColor)
+            }
+            .shadow(color: theme.accentColor.opacity(0.28), radius: 34, y: 14)
 
             VStack(spacing: 7) {
                 Text(configuration.title)
@@ -159,23 +169,6 @@ public struct LimitReachedUpsellView: View {
             }
         }
         .frame(maxWidth: .infinity)
-    }
-
-    private var comparisonCard: some View {
-        AppThemeCard(theme: theme) {
-            VStack(alignment: .leading, spacing: 14) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(configuration.comparisonTitle)
-                        .font(.headline.bold())
-                        .foregroundStyle(theme.primaryForegroundColor)
-                    Text(configuration.comparisonSubtitle)
-                        .font(.caption)
-                        .foregroundStyle(theme.secondaryForegroundColor)
-                }
-
-                comparisonTable
-            }
-        }
     }
 
     private var comparisonTable: some View {
@@ -195,7 +188,9 @@ public struct LimitReachedUpsellView: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 9)
 
-            Divider().overlay(theme.borderColor).gridCellColumns(3)
+            Divider()
+                .overlay(theme.borderColor.opacity(0.45))
+                .gridCellColumns(3)
 
             ForEach(Array(resolvedRows.enumerated()), id: \.element.id) { index, row in
                 GridRow {
@@ -217,37 +212,29 @@ public struct LimitReachedUpsellView: View {
 
                 if index < resolvedRows.count - 1 {
                     Divider()
-                        .overlay(theme.borderColor.opacity(0.7))
+                        .overlay(theme.borderColor.opacity(0.35))
                         .gridCellColumns(3)
                 }
             }
         }
         .background(
-            theme.elevatedSurfaceColor,
+            theme.elevatedSurfaceColor.opacity(0.62),
             in: RoundedRectangle(cornerRadius: 16, style: .continuous)
         )
         .overlay {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(theme.borderColor)
+                .strokeBorder(theme.borderColor.opacity(0.45))
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(configuration.comparisonAccessibilityLabel)
     }
 
-    private var actions: some View {
-        VStack(spacing: 11) {
-            Button(action: onUnlockPro) {
-                Label(configuration.unlockButtonTitle, systemImage: "crown.fill")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(LimitUpsellPrimaryButtonStyle(theme: theme))
-
-            Button(configuration.stayFreeButtonTitle) {
-                onStayFree?()
-                dismiss()
-            }
-            .buttonStyle(LimitUpsellSecondaryButtonStyle(theme: theme))
+    private var unlockAction: some View {
+        Button(action: onUnlockPro) {
+            Label(configuration.unlockButtonTitle, systemImage: "crown.fill")
+                .frame(maxWidth: .infinity)
         }
+        .buttonStyle(LimitUpsellPrimaryButtonStyle(theme: theme))
     }
 
     private var resolvedRows: [LimitReachedComparisonRow] {
@@ -313,25 +300,4 @@ private struct LimitUpsellPrimaryButtonStyle: ButtonStyle {
     }
 }
 
-private struct LimitUpsellSecondaryButtonStyle: ButtonStyle {
-    let theme: AppTheme
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.headline.weight(.semibold))
-            .foregroundStyle(theme.primaryForegroundColor)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 15)
-            .background(
-                theme.elevatedSurfaceColor.opacity(configuration.isPressed ? 0.72 : 1),
-                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(theme.borderColor)
-            }
-            .scaleEffect(configuration.isPressed ? 0.985 : 1)
-            .animation(.easeOut(duration: 0.14), value: configuration.isPressed)
-    }
-}
 #endif

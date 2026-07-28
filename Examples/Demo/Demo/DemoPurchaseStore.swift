@@ -78,7 +78,7 @@ struct DemoSimulatedPlanConfiguration: Codable, Equatable {
                     isEnabled: true
                 ),
             ],
-            preferredProductID: DemoProductID.yearly
+            preferredProductID: DemoProductID.lifetime
         )
     }
 

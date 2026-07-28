@@ -41,6 +41,10 @@ final class DemoTests: XCTestCase {
             DemoConfiguration.purchases.productIDs
         )
         XCTAssertEqual(
+            configuration.purchaseConfiguration.features,
+            DemoConfiguration.purchases.features
+        )
+        XCTAssertEqual(
             configuration.products.map(\.id),
             DemoConfiguration.simulatedProducts.map(\.id)
         )
@@ -60,6 +64,10 @@ final class DemoTests: XCTestCase {
                 DemoConfiguration.lifetimeProductID,
             ]
         )
+        XCTAssertEqual(
+            normalized.purchaseConfiguration.features,
+            DemoPurchaseFeatureCatalog.features
+        )
     }
 
     func testModernPaywallUsesRegisteredPurchaseCatalog() {
@@ -72,7 +80,7 @@ final class DemoTests: XCTestCase {
             DemoConfiguration.yearlyProductID
         )
         XCTAssertTrue(DemoConfiguration.modernPaywall.features.isEmpty)
-        XCTAssertEqual(DemoConfiguration.purchases.features.count, 4)
+        XCTAssertEqual(DemoConfiguration.purchases.features.count, 6)
     }
 
     func testAllPaywallsFollowActiveThemeByDefault() {

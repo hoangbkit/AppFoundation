@@ -1,6 +1,6 @@
 import Foundation
 
-/// Configuration shared by the StoreKit engine and reusable paywall UI.
+/// Configuration shared by the StoreKit engine and reusable purchase UI.
 public struct PurchaseConfiguration: Sendable, Equatable {
     /// Product identifiers in the order they should be presented.
     public let productIDs: [String]
@@ -11,6 +11,9 @@ public struct PurchaseConfiguration: Sendable, Equatable {
     /// Product selected by default when the catalog is loaded.
     public let preferredProductID: String?
 
+    /// App capabilities shown by paywalls, limit upsells, and Pro celebration views.
+    public let features: [PurchaseFeature]
+
     /// Number of catalog loading attempts before surfacing an error.
     public let productLoadAttempts: Int
 
@@ -18,6 +21,7 @@ public struct PurchaseConfiguration: Sendable, Equatable {
         productIDs: [String],
         entitledProductIDs: Set<String>? = nil,
         preferredProductID: String? = nil,
+        features: [PurchaseFeature] = [],
         productLoadAttempts: Int = 3
     ) {
         let normalizedProductIDs = Self.uniqueNonEmptyValues(productIDs)
@@ -33,6 +37,7 @@ public struct PurchaseConfiguration: Sendable, Equatable {
             let normalized = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
             return normalizedProductIDs.contains(normalized) ? normalized : nil
         }
+        self.features = Self.uniqueFeatures(features)
         self.productLoadAttempts = max(1, productLoadAttempts)
     }
 
@@ -45,6 +50,14 @@ public struct PurchaseConfiguration: Sendable, Equatable {
                 return nil
             }
             return normalized
+        }
+    }
+
+    private static func uniqueFeatures(_ features: [PurchaseFeature]) -> [PurchaseFeature] {
+        var seen = Set<String>()
+
+        return features.filter { feature in
+            !feature.id.isEmpty && seen.insert(feature.id).inserted
         }
     }
 }

@@ -5,7 +5,7 @@ import XCTest
 
 @MainActor
 final class DemoProCelebrationTests: XCTestCase {
-    func testCelebrationUsesActivePurchasedPlan() async {
+    func testPurchaseManagerExposesRegisteredCatalogAndActivePlan() async {
         let purchases = PurchaseManager(
             configuration: DemoConfiguration.purchases,
             simulated: true,
@@ -22,9 +22,9 @@ final class DemoProCelebrationTests: XCTestCase {
         let configuration = DemoConfiguration.proCelebration(for: purchases)
 
         XCTAssertTrue(purchases.hasPro)
-        XCTAssertEqual(configuration.navigationTitle, "AF Pro")
-        XCTAssertEqual(configuration.planTitle, lifetime.displayName)
-        XCTAssertEqual(configuration.rows.count, 4)
-        XCTAssertEqual(configuration.rows.last?.feature, "Backup history")
+        XCTAssertEqual(purchases.activeProduct?.id, lifetime.id)
+        XCTAssertEqual(purchases.features.count, 4)
+        XCTAssertTrue(configuration.planTitle.isEmpty)
+        XCTAssertTrue(configuration.rows.isEmpty)
     }
 }

@@ -14,40 +14,7 @@ enum DemoConfiguration {
             lifetimeProductID,
         ],
         preferredProductID: yearlyProductID,
-        features: [
-            PurchaseFeature(
-                id: "projects",
-                systemImage: "square.grid.2x2.fill",
-                title: "Projects",
-                message: "Create and manage as many projects as you need.",
-                freeValue: "Up to 3",
-                proValue: "Unlimited"
-            ),
-            PurchaseFeature(
-                id: "exports",
-                systemImage: "square.and.arrow.up",
-                title: "Exports",
-                message: "Export polished images and reusable project output without weekly limits.",
-                freeValue: "3 / week",
-                proValue: "Unlimited"
-            ),
-            PurchaseFeature(
-                id: "themes",
-                systemImage: "paintpalette.fill",
-                title: "Themes",
-                message: "Use every AppFoundation theme and entitlement-aware preview.",
-                freeValue: "1",
-                proValue: "All"
-            ),
-            PurchaseFeature(
-                id: "backup-history",
-                systemImage: "archivebox.fill",
-                title: "Backup history",
-                message: "Keep complete validated backup history instead of only the latest package.",
-                freeValue: "Latest",
-                proValue: "Complete"
-            ),
-        ]
+        features: DemoPurchaseFeatureCatalog.features
     )
 
     static let simulatedProducts: [PurchaseProduct] = [
@@ -150,10 +117,12 @@ enum DemoConfiguration {
 
     static let limitReachedUpsell = LimitReachedUpsellConfiguration(
         title: "Free limit reached",
-        message: "The Demo free plan has reached its sample creation limit. Existing content remains available, or you can unlock Demo Pro for unlimited access.",
+        message: "The Demo free plan has reached its sample limit. Existing work remains available, or you can unlock Demo Pro for the complete AppFoundation showcase.",
         symbolName: "shippingbox.and.arrow.backward.fill",
+        comparisonTitle: "Demo Free vs Demo Pro",
+        comparisonSubtitle: "Unlock the complete component, export, theme, widget, and backup experience.",
         unlockButtonTitle: "Unlock Demo Pro",
-        comparisonAccessibilityLabel: "Demo Free and Demo Pro comparison"
+        comparisonAccessibilityLabel: "Demo Free and Demo Pro feature comparison"
     )
 
     static var legacyPaywall: FoundationPaywallConfiguration {

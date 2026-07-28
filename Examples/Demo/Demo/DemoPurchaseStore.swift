@@ -91,7 +91,8 @@ struct DemoSimulatedPlanConfiguration: Codable, Equatable {
         let productIDs = normalized.enabledPlans.map(\.productID)
         return PurchaseConfiguration(
             productIDs: productIDs,
-            preferredProductID: normalized.preferredProductID
+            preferredProductID: normalized.preferredProductID,
+            features: DemoPurchaseFeatureCatalog.features
         )
     }
 

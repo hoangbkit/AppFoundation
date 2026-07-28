@@ -80,13 +80,13 @@ struct HomeView: View {
                 }
             }
             .sheet(isPresented: $isShowingPaywall) {
-                ClaudePaywallView(
+                ProPaywallView(
                     purchases: purchases,
-                    configuration: DemoConfiguration.legacyClaudePaywall
+                    configuration: DemoConfiguration.proPaywall
                 )
             }
             .sheet(isPresented: $isShowingCelebration) {
-                FoundationProCelebrationView(
+                ProCelebrationView(
                     configuration: DemoConfiguration.proCelebration(for: purchases)
                 )
             }

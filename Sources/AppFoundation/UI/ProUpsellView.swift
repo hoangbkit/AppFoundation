@@ -84,7 +84,7 @@ public struct LimitReachedUpsellConfiguration {
 }
 
 /// The reusable first step of a limit-reached flow, adapted from MiLove.
-public struct LimitReachedUpsellView: View {
+public struct ProUpsellView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appFoundationTheme) private var environmentTheme
     @Environment(PurchaseManager.self) private var purchaseManager
@@ -136,24 +136,7 @@ public struct LimitReachedUpsellView: View {
 
     private var header: some View {
         VStack(spacing: 15) {
-            ZStack {
-                Circle()
-                    .fill(theme.elevatedSurfaceColor.opacity(0.74))
-                    .frame(width: 112, height: 112)
-                    .overlay { Circle().strokeBorder(theme.borderColor) }
-
-                theme.gradient
-                    .frame(width: 82, height: 82)
-                    .clipShape(Circle())
-                    .opacity(0.55)
-                    .blur(radius: 4)
-
-                Image(systemName: "crown.fill")
-                    .font(.system(size: 48, weight: .semibold))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(theme.primaryForegroundColor)
-            }
-            .shadow(color: theme.accentColor.opacity(0.28), radius: 34, y: 14)
+            ProCrownIcon()
 
             VStack(spacing: 7) {
                 Text(configuration.title)
@@ -268,7 +251,7 @@ public struct LimitReachedUpsellFlow<Paywall: View>: View {
                 paywall()
                     .transition(.move(edge: .trailing).combined(with: .opacity))
             } else {
-                LimitReachedUpsellView(configuration: configuration) {
+                ProUpsellView(configuration: configuration) {
                     withAnimation(.snappy) { showsPaywall = true }
                 }
                 .transition(.move(edge: .leading).combined(with: .opacity))

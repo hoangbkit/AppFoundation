@@ -51,7 +51,7 @@ public struct FoundationPaywallConfiguration {
     public init(
         badge: String = "UNLOCK EVERYTHING",
         title: String = "\(AppMetadata.current().name) Pro",
-        subtitle: String = "Unlock all Pro features, choose the plan that fits you.",
+        subtitle: String = "Unlock all Pro features,\nchoose the plan that fits you.",
         features: [FoundationPaywallFeature] = [],
         purchaseButtonTitle: String = "Continue",
         highlightedProductID: String? = nil,
@@ -78,7 +78,7 @@ public struct FoundationPaywallConfiguration {
     public init(
         badge: String = "UNLOCK EVERYTHING",
         title: String = "\(AppMetadata.current().name) Pro",
-        subtitle: String = "Unlock all Pro features, choose the plan that fits you.",
+        subtitle: String = "Unlock all Pro features,\nchoose the plan that fits you.",
         features: [FoundationPaywallFeature] = [],
         purchaseButtonTitle: String = "Continue",
         highlightedProductID: String? = nil,
@@ -208,6 +208,7 @@ public struct FoundationPaywallView: View {
                 .multilineTextAlignment(.center)
                 .lineSpacing(4)
                 .padding(.horizontal, 8)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

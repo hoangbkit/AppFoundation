@@ -1,7 +1,7 @@
 import XCTest
 @testable import AppFoundation
 
-final class FoundationProCelebrationViewTests: XCTestCase {
+final class ProCelebrationViewTests: XCTestCase {
     func testConfigurationUsesCelebrationDefaults() {
         let rows = [
             FoundationProComparisonRow(

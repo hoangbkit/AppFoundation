@@ -91,9 +91,9 @@ final class DemoTests: XCTestCase {
         XCTAssertNil(DemoConfiguration.legacyPaywall.themeOverride)
         XCTAssertTrue(DemoConfiguration.legacyPaywall.features.isEmpty)
 
-        XCTAssertTrue(DemoConfiguration.legacyClaudePaywall.followsActiveTheme)
-        XCTAssertNil(DemoConfiguration.legacyClaudePaywall.themeOverride)
-        XCTAssertTrue(DemoConfiguration.legacyClaudePaywall.features.isEmpty)
+        XCTAssertTrue(DemoConfiguration.proPaywall.followsActiveTheme)
+        XCTAssertNil(DemoConfiguration.proPaywall.themeOverride)
+        XCTAssertTrue(DemoConfiguration.proPaywall.features.isEmpty)
     }
 
     func testSettingsFollowActiveThemeByDefault() {

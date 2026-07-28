@@ -1,6 +1,6 @@
 # Theme-aware paywalls
 
-`PaywallView`, `FoundationPaywallView`, and `ClaudePaywallView` automatically follow the active `AppTheme` installed at the app root.
+`PaywallView`, `FoundationPaywallView`, and `ProPaywallView` automatically follow the active `AppTheme` installed at the app root.
 
 ```swift
 @State private var themes = ThemeManager(

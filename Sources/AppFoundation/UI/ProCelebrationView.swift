@@ -93,7 +93,7 @@ import StoreKit
 import SwiftUI
 
 /// A theme-aware Pro entitlement celebration screen adapted from MiLove.
-public struct FoundationProCelebrationView: View {
+public struct ProCelebrationView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appFoundationTheme) private var environmentTheme
     @Environment(\.requestReview) private var requestReview
@@ -138,24 +138,7 @@ public struct FoundationProCelebrationView: View {
 
     private var celebrationHeader: some View {
         VStack(spacing: 13) {
-            ZStack {
-                Circle()
-                    .fill(theme.elevatedSurfaceColor.opacity(0.74))
-                    .frame(width: 112, height: 112)
-                    .overlay { Circle().strokeBorder(theme.borderColor) }
-
-                theme.gradient
-                    .frame(width: 82, height: 82)
-                    .clipShape(Circle())
-                    .opacity(0.55)
-                    .blur(radius: 4)
-
-                Image(systemName: "crown.fill")
-                    .font(.system(size: 48, weight: .semibold))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(theme.primaryForegroundColor)
-            }
-            .shadow(color: theme.accentColor.opacity(0.28), radius: 34, y: 14)
+            ProCrownIcon()
 
             VStack(spacing: 6) {
                 Text(resolvedTitle)
@@ -319,4 +302,5 @@ public struct FoundationProCelebrationView: View {
         configuration.themeOverride ?? environmentTheme
     }
 }
+
 #endif

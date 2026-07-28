@@ -52,7 +52,7 @@ Make purchases the strongest and simplest public capability.
 - Preserve live StoreKit verification, transaction updates, product retry, restore, and Debug-only simulation.
 - Add `PremiumFeature`, `PremiumAccessPolicy`, and access decisions that keep existing user content accessible after expiry.
 - Add the primary theme-aware `PaywallView` for weekly, monthly, yearly, and lifetime plans.
-- Keep `FoundationPaywallView` and `ClaudePaywallView` compatible while presenting the same complete product catalog.
+- Keep `FoundationPaywallView` and `ProPaywallView` compatible while presenting the same complete product catalog.
 - Add normalized recurring/lifetime plan metadata and accurate mixed-catalog legal disclosure.
 - Add reusable `PremiumGate`, `PremiumBadge`, `PremiumButton`, `LockedFeatureOverlay`, and `SubscriptionSettingsSection` components.
 - Keep localized prices and product ordering app-configured.

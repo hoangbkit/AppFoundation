@@ -49,7 +49,7 @@ final class PurchasePresentationCatalogTests: XCTestCase {
         XCTAssertEqual(configuration.title, "\(appName) Pro")
         XCTAssertEqual(
             configuration.subtitle,
-            "Unlock all Pro features, choose the plan that fits you."
+            "Unlock all Pro features,\nchoose the plan that fits you."
         )
     }
 }

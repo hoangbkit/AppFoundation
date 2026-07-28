@@ -69,7 +69,7 @@ AppFoundation follows semantic versioning while its public API remains in the `0
 
 - Applied polished default presentation across Screenshot Studio, Promo Video Studio, and Widget Showcase.
 - Refined compact and regular-size Studio layouts, preview surfaces, inspector sections, navigation chrome, and control styling.
-- Polished reusable onboarding and `ClaudePaywallView` presentation.
+- Polished reusable onboarding and `ProPaywallView` presentation.
 - Reorganized the Demo from tab-heavy navigation into a focused Home and Settings structure.
 - Simplified Developer Tools navigation and standardized the Demo's package showcases.
 
@@ -146,7 +146,7 @@ AppFoundation follows semantic versioning while its public API remains in the `0
 ### Added
 
 - Added `ProPlanSettingsSection` and configurable Pro-plan settings presentation.
-- Added `LimitReachedUpsellView`, comparison rows, and `LimitReachedUpsellFlow` for reusable Free-versus-Pro upgrade flows.
+- Added `ProUpsellView`, comparison rows, and `LimitReachedUpsellFlow` for reusable Free-versus-Pro upgrade flows.
 - Added optional paywall configuration to `FoundationSettingsView`.
 - Added a Demo screen covering Pro settings and limit-reached upsells.
 
@@ -163,7 +163,7 @@ AppFoundation follows semantic versioning while its public API remains in the `0
 - Added Debug-only in-process purchase simulation and runtime switching.
 - Added weekly, monthly, yearly, and non-consumable lifetime plan support.
 - Added `PurchasePlanKind`, plan labels, billing descriptions, recurring/lifetime helpers, and catalog-aware legal disclosure.
-- Added `PaywallView`, `FoundationPaywallView`, and `ClaudePaywallView` with active-theme support and adaptive catalog layouts.
+- Added `PaywallView`, `FoundationPaywallView`, and `ProPaywallView` with active-theme support and adaptive catalog layouts.
 - Added premium gates, badges, buttons, locked overlays, and safe post-expiry access decisions for existing user content.
 
 ### Themes and reusable UI

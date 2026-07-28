@@ -3,7 +3,7 @@ import StoreKit
 import SwiftUI
 
 /// A compact, plan-focused paywall style supporting recurring and lifetime plans.
-public struct ClaudePaywallView: View {
+public struct ProPaywallView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appFoundationTheme) private var environmentTheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -145,18 +145,31 @@ public struct ClaudePaywallView: View {
 
     private var header: some View {
         VStack(spacing: 10) {
+            ProCrownIcon()
+
             Text(configuration.title)
                 .font(.system(size: 32, weight: .semibold, design: .rounded))
                 .foregroundStyle(theme.primaryForeground)
             Text(configuration.subtitle)
                 .font(.title3)
                 .foregroundStyle(theme.secondaryForeground)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .multilineTextAlignment(.center)
     }
 
     private var planCard: some View {
         VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Pro")
+                    .font(.system(size: 26, weight: .semibold, design: .serif))
+                    .foregroundStyle(theme.primaryForeground)
+
+                Text("Choose the plan that fits you")
+                    .font(.subheadline)
+                    .foregroundStyle(theme.secondaryForeground)
+            }
+
             productContent
 
             if !purchases.products.isEmpty {

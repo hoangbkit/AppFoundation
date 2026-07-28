@@ -146,9 +146,9 @@ private enum DemoScreenshotCatalog {
         title: "Subscription Review",
         filename: "Demo Pro subscription paywall"
       ) {
-        ClaudePaywallScreenshotTemplate(
+        ProPaywallScreenshotTemplate(
           purchases: purchases,
-          configuration: DemoConfiguration.legacyClaudePaywall
+          configuration: DemoConfiguration.proPaywall
         )
       }
     }
@@ -174,7 +174,7 @@ private struct DemoSelectedScreenshotControls: View {
       case "native-studio":
         Toggle("Highlight exact export", isOn: $settings.highlightExport)
       case "subscription-review":
-        LabeledContent("Paywall", value: "ClaudePaywallView")
+        LabeledContent("Paywall", value: "ProPaywallView")
       default:
         LabeledContent("Template", value: context.selectedScreenshotTitle)
       }

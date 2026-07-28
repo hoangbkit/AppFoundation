@@ -90,7 +90,7 @@ Verified StoreKit transactions remain the source of truth. Do not mirror `hasPro
 - Debug-only in-process purchase simulation
 - `PurchaseManager` and simple `hasPro` entitlement access
 - Weekly, monthly, yearly, and non-consumable lifetime plans
-- Theme-aware `PaywallView`, `FoundationPaywallView`, and `ClaudePaywallView`
+- Theme-aware `PaywallView`, `FoundationPaywallView`, and `ProPaywallView`
 - Premium gates, badges, locked overlays, settings sections, and limit-reached upsells
 - Access policy that can keep existing user-created content available after entitlement expiry
 

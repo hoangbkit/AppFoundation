@@ -33,7 +33,7 @@ struct SimulatedPlansEditorView: View {
             } header: {
                 Text("Plans")
             } footer: {
-                Text("Enabled plans are shown by the Demo paywalls in this order. Three or more plans use ClaudePaywallView’s compact stacked layout.")
+                Text("Enabled plans are shown by the Demo paywalls in this order. Three or more plans use ProPaywallView’s compact stacked layout.")
             }
             .listRowBackground(theme.surfaceColor)
 
@@ -47,7 +47,7 @@ struct SimulatedPlansEditorView: View {
             } header: {
                 Text("Default selection")
             } footer: {
-                Text("This plan is selected initially and receives ClaudePaywallView’s BEST VALUE badge.")
+                Text("This plan is selected initially and receives ProPaywallView’s BEST VALUE badge.")
             }
             .listRowBackground(theme.surfaceColor)
 

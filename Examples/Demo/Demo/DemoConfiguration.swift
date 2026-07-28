@@ -134,7 +134,7 @@ enum DemoConfiguration {
         )
     }
 
-    static var legacyClaudePaywall: FoundationPaywallConfiguration {
+    static var proPaywall: FoundationPaywallConfiguration {
         FoundationPaywallConfiguration(
             purchaseButtonTitle: "Continue",
             highlightedProductID: activePreferredProductID,

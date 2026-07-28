@@ -13,7 +13,41 @@ enum DemoConfiguration {
             yearlyProductID,
             lifetimeProductID,
         ],
-        preferredProductID: yearlyProductID
+        preferredProductID: yearlyProductID,
+        features: [
+            PurchaseFeature(
+                id: "projects",
+                systemImage: "square.grid.2x2.fill",
+                title: "Projects",
+                message: "Create and manage as many projects as you need.",
+                freeValue: "Up to 3",
+                proValue: "Unlimited"
+            ),
+            PurchaseFeature(
+                id: "exports",
+                systemImage: "square.and.arrow.up",
+                title: "Exports",
+                message: "Export polished images and reusable project output without weekly limits.",
+                freeValue: "3 / week",
+                proValue: "Unlimited"
+            ),
+            PurchaseFeature(
+                id: "themes",
+                systemImage: "paintpalette.fill",
+                title: "Themes",
+                message: "Use every AppFoundation theme and entitlement-aware preview.",
+                freeValue: "1",
+                proValue: "All"
+            ),
+            PurchaseFeature(
+                id: "backup-history",
+                systemImage: "archivebox.fill",
+                title: "Backup history",
+                message: "Keep complete validated backup history instead of only the latest package.",
+                freeValue: "Latest",
+                proValue: "Complete"
+            ),
+        ]
     )
 
     static let simulatedProducts: [PurchaseProduct] = [
@@ -106,26 +140,6 @@ enum DemoConfiguration {
                 : "Choose monthly, yearly, or lifetime access through StoreKit.",
             planTitle: "Demo Pro",
             planSubtitle: "Monthly, yearly, or lifetime access",
-            features: [
-                PaywallFeature(
-                    id: "exports",
-                    systemImage: "square.and.arrow.up",
-                    title: "Premium exports",
-                    message: "Exercise image rendering, rounded PNG output, and sharing."
-                ),
-                PaywallFeature(
-                    id: "backups",
-                    systemImage: "archivebox",
-                    title: "Validated backups",
-                    message: "Create and verify versioned packages with assets and checksums."
-                ),
-                PaywallFeature(
-                    id: "themes",
-                    systemImage: "paintpalette",
-                    title: "Pro themes",
-                    message: "Try the existing reusable theme preview and entitlement flow."
-                ),
-            ],
             preferredProductID: activePreferredProductID,
             highlightedProductID: activePreferredProductID,
             purchaseButtonTitle: "Unlock Demo Pro",
@@ -138,12 +152,6 @@ enum DemoConfiguration {
         title: "Free limit reached",
         message: "The Demo free plan has reached its sample creation limit. Existing content remains available, or you can unlock Demo Pro for unlimited access.",
         symbolName: "shippingbox.and.arrow.backward.fill",
-        rows: [
-            LimitReachedComparisonRow(feature: "Projects", freeValue: "Up to 3", proValue: "Unlimited"),
-            LimitReachedComparisonRow(feature: "Exports", freeValue: "3 / week", proValue: "Unlimited"),
-            LimitReachedComparisonRow(feature: "Themes", freeValue: "1", proValue: "All"),
-            LimitReachedComparisonRow(feature: "Backup history", freeValue: "Latest", proValue: "Complete"),
-        ],
         unlockButtonTitle: "Unlock Demo Pro",
         comparisonAccessibilityLabel: "Demo Free and Demo Pro comparison"
     )
@@ -152,20 +160,7 @@ enum DemoConfiguration {
         FoundationPaywallConfiguration(
             title: "Make every app premium",
             subtitle: "Monthly, yearly, and lifetime plans in the gradient style.",
-            features: [
-                FoundationPaywallFeature(
-                    id: "storekit",
-                    systemImage: "checkmark.shield.fill",
-                    title: "Verified entitlements",
-                    message: "No UserDefaults boolean as the source of truth."
-                ),
-                FoundationPaywallFeature(
-                    id: "lifecycle",
-                    systemImage: "arrow.triangle.2.circlepath",
-                    title: "Automatic refresh",
-                    message: "Refreshes at launch, after transactions, restores, and app activation."
-                ),
-            ],
+            features: purchases.features.map(FoundationPaywallFeature.init),
             purchaseButtonTitle: "Unlock Demo Pro",
             highlightedProductID: activePreferredProductID
         )
@@ -175,20 +170,7 @@ enum DemoConfiguration {
         FoundationPaywallConfiguration(
             title: "Get more Demo",
             subtitle: "Choose monthly, yearly, or lifetime access",
-            features: [
-                FoundationPaywallFeature(
-                    id: "pro-features",
-                    systemImage: "checkmark",
-                    title: "Pro",
-                    message: "Unlock every Pro feature in Demo"
-                ),
-                FoundationPaywallFeature(
-                    id: "updates",
-                    systemImage: "checkmark",
-                    title: "Updates",
-                    message: "Priority access to new updates"
-                ),
-            ],
+            features: purchases.features.map(FoundationPaywallFeature.init),
             purchaseButtonTitle: "Continue",
             highlightedProductID: activePreferredProductID,
             privacyURL: URL(string: "https://example.com/privacy"),

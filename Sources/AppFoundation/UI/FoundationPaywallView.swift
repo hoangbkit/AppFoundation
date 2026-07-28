@@ -25,7 +25,10 @@ public struct FoundationPaywallConfiguration {
     public let badge: String
     public let title: String
     public let subtitle: String
+
+    /// Optional local override. Leave empty to use `PurchaseManager.features`.
     public let features: [FoundationPaywallFeature]
+
     public let purchaseButtonTitle: String
     public let highlightedProductID: String?
     public let highlightedProductBadge: String
@@ -49,7 +52,7 @@ public struct FoundationPaywallConfiguration {
         badge: String = "UNLOCK EVERYTHING",
         title: String,
         subtitle: String,
-        features: [FoundationPaywallFeature],
+        features: [FoundationPaywallFeature] = [],
         purchaseButtonTitle: String = "Continue",
         highlightedProductID: String? = nil,
         highlightedProductBadge: String = "BEST VALUE",
@@ -76,7 +79,7 @@ public struct FoundationPaywallConfiguration {
         badge: String = "UNLOCK EVERYTHING",
         title: String,
         subtitle: String,
-        features: [FoundationPaywallFeature],
+        features: [FoundationPaywallFeature] = [],
         purchaseButtonTitle: String = "Continue",
         highlightedProductID: String? = nil,
         highlightedProductBadge: String = "BEST VALUE",
@@ -103,18 +106,24 @@ public struct FoundationPaywallConfiguration {
 public struct FoundationPaywallView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appFoundationTheme) private var environmentTheme
+    @Environment(PurchaseManager.self) private var environmentPurchaseManager
 
-    private let purchases: PurchaseController
+    private let purchaseManagerOverride: PurchaseController?
     private let configuration: FoundationPaywallConfiguration
 
     @State private var selectedProductID: String?
     @State private var restoreMessage: String?
 
+    public init(configuration: FoundationPaywallConfiguration) {
+        self.purchaseManagerOverride = nil
+        self.configuration = configuration
+    }
+
     public init(
         purchases: PurchaseController,
         configuration: FoundationPaywallConfiguration
     ) {
-        self.purchases = purchases
+        self.purchaseManagerOverride = purchases
         self.configuration = configuration
     }
 
@@ -126,7 +135,7 @@ public struct FoundationPaywallView: View {
                 ScrollView {
                     VStack(spacing: 24) {
                         hero
-                        features
+                        if !resolvedFeatures.isEmpty { features }
                         products
                         purchaseButton
                         legalFooter
@@ -140,10 +149,8 @@ public struct FoundationPaywallView: View {
             .foregroundStyle(theme.primaryForeground)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close", systemImage: "xmark") {
-                        dismiss()
-                    }
-                    .labelStyle(.iconOnly)
+                    Button("Close", systemImage: "xmark") { dismiss() }
+                        .labelStyle(.iconOnly)
                 }
             }
             .toolbarBackground(.hidden, for: .navigationBar)
@@ -207,7 +214,7 @@ public struct FoundationPaywallView: View {
     private var features: some View {
         themedCard {
             VStack(spacing: 18) {
-                ForEach(configuration.features) { feature in
+                ForEach(resolvedFeatures) { feature in
                     HStack(spacing: 14) {
                         Image(systemName: feature.systemImage)
                             .font(.title3.weight(.semibold))
@@ -278,9 +285,7 @@ public struct FoundationPaywallView: View {
         let rowRadius = min(theme.cardCornerRadius, 20)
 
         return Button {
-            withAnimation(.snappy) {
-                selectedProductID = product.id
-            }
+            withAnimation(.snappy) { selectedProductID = product.id }
         } label: {
             HStack(spacing: 14) {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
@@ -309,8 +314,7 @@ public struct FoundationPaywallView: View {
                         Text(product.planLabel)
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(theme.accent)
-                        Text("•")
-                            .foregroundStyle(theme.secondaryForeground)
+                        Text("•").foregroundStyle(theme.secondaryForeground)
                         Text(product.billingDescription)
                             .font(.caption)
                             .foregroundStyle(theme.secondaryForeground)
@@ -350,9 +354,7 @@ public struct FoundationPaywallView: View {
             }
         } label: {
             HStack(spacing: 10) {
-                if purchases.isBusy {
-                    ProgressView().tint(.white)
-                }
+                if purchases.isBusy { ProgressView().tint(.white) }
                 Text(buttonTitle)
                 Image(systemName: "arrow.right")
             }
@@ -405,6 +407,15 @@ public struct FoundationPaywallView: View {
             .shadow(color: theme.shadow, radius: 18, y: 10)
     }
 
+    private var purchases: PurchaseController {
+        purchaseManagerOverride ?? environmentPurchaseManager
+    }
+
+    private var resolvedFeatures: [FoundationPaywallFeature] {
+        if !configuration.features.isEmpty { return configuration.features }
+        return purchases.features.map(FoundationPaywallFeature.init)
+    }
+
     private var theme: PaywallThemeTokens {
         PaywallThemeTokens(
             appTheme: configuration.themeOverride ?? environmentTheme,
@@ -420,9 +431,7 @@ public struct FoundationPaywallView: View {
     }
 
     private var buttonTitle: String {
-        if case .purchasing = purchases.activity {
-            return "Processing…"
-        }
+        if case .purchasing = purchases.activity { return "Processing…" }
         return configuration.purchaseButtonTitle
     }
 
@@ -462,9 +471,7 @@ public struct FoundationPaywallView: View {
     private func selectDefaultProductIfNeeded() {
         guard selectedProductID == nil
             || purchases.product(withID: selectedProductID ?? "") == nil
-        else {
-            return
-        }
+        else { return }
         selectedProductID = purchases.preferredProduct?.id
     }
 }

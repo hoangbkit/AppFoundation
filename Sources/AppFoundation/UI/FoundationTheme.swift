@@ -26,6 +26,8 @@ public struct FoundationTheme: Sendable {
 }
 
 public struct FoundationBackground: View {
+    @Environment(\.appFoundationVisualStyle) private var visualStyle
+
     private let theme: FoundationTheme
 
     public init(theme: FoundationTheme = .indigo) {
@@ -33,8 +35,25 @@ public struct FoundationBackground: View {
     }
 
     public var body: some View {
-        theme.background
+        backgroundContent
             .ignoresSafeArea()
+            .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private var backgroundContent: some View {
+        switch visualStyle.background {
+        case .automatic, .atmospheric:
+            atmosphericBackground
+        case .solid:
+            theme.background
+        case .systemGrouped:
+            systemGroupedBackground
+        }
+    }
+
+    private var atmosphericBackground: some View {
+        theme.background
             .overlay {
                 ZStack {
                     Circle()
@@ -50,11 +69,22 @@ public struct FoundationBackground: View {
                         .offset(x: 180, y: 340)
                 }
             }
-            .accessibilityHidden(true)
+    }
+
+    private var systemGroupedBackground: Color {
+        #if os(iOS) || os(tvOS) || os(visionOS)
+        Color(uiColor: .systemGroupedBackground)
+        #elseif os(macOS)
+        Color(nsColor: .windowBackgroundColor)
+        #else
+        theme.background
+        #endif
     }
 }
 
 public struct FoundationCard<Content: View>: View {
+    @Environment(\.appFoundationVisualStyle) private var visualStyle
+
     private let theme: FoundationTheme
     private let content: Content
 
@@ -67,18 +97,79 @@ public struct FoundationCard<Content: View>: View {
     }
 
     public var body: some View {
+        let radius = visualStyle.resolvedCornerRadius(fallback: theme.cardCornerRadius)
+
         content
             .padding(20)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: theme.cardCornerRadius))
-            .overlay {
-                RoundedRectangle(cornerRadius: theme.cardCornerRadius)
-                    .stroke(.white.opacity(0.20), lineWidth: 1)
-            }
-            .shadow(color: .black.opacity(0.08), radius: 24, y: 12)
+            .background { cardBackground(radius: radius) }
+            .overlay { cardBorder(radius: radius) }
+            .shadow(color: shadowColor, radius: shadowRadius, y: shadowOffset)
+    }
+
+    @ViewBuilder
+    private func cardBackground(radius: CGFloat) -> some View {
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+
+        switch visualStyle.surface {
+        case .automatic, .material:
+            shape.fill(.regularMaterial)
+        case .solid:
+            shape.fill(theme.background)
+        case .plain:
+            shape.fill(.clear)
+        }
+    }
+
+    @ViewBuilder
+    private func cardBorder(radius: CGFloat) -> some View {
+        if visualStyle.surface != .plain {
+            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .stroke(borderColor, lineWidth: 1)
+        }
+    }
+
+    private var borderColor: Color {
+        switch visualStyle.surface {
+        case .automatic, .material:
+            .white.opacity(0.20)
+        case .solid:
+            .primary.opacity(0.10)
+        case .plain:
+            .clear
+        }
+    }
+
+    private var shadowColor: Color {
+        switch visualStyle.elevation {
+        case .none:
+            .clear
+        case .subtle:
+            .black.opacity(0.05)
+        case .automatic, .floating:
+            .black.opacity(0.08)
+        }
+    }
+
+    private var shadowRadius: CGFloat {
+        switch visualStyle.elevation {
+        case .none: 0
+        case .subtle: 8
+        case .automatic, .floating: 24
+        }
+    }
+
+    private var shadowOffset: CGFloat {
+        switch visualStyle.elevation {
+        case .none: 0
+        case .subtle: 4
+        case .automatic, .floating: 12
+        }
     }
 }
 
 public struct FoundationPill: View {
+    @Environment(\.appFoundationVisualStyle) private var visualStyle
+
     private let text: String
     private let systemImage: String?
     private let tint: Color
@@ -101,11 +192,27 @@ public struct FoundationPill: View {
         .foregroundStyle(tint)
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
-        .background(tint.opacity(0.12), in: Capsule())
+        .background(
+            tint.opacity(backgroundOpacity),
+            in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        )
+    }
+
+    private var cornerRadius: CGFloat {
+        switch visualStyle.surface {
+        case .automatic, .material: 999
+        case .solid, .plain: 7
+        }
+    }
+
+    private var backgroundOpacity: Double {
+        visualStyle.surface == .plain ? 0.07 : 0.12
     }
 }
 
 public struct FoundationPrimaryButtonStyle: ButtonStyle {
+    @Environment(\.appFoundationVisualStyle) private var visualStyle
+
     private let theme: FoundationTheme
 
     public init(theme: FoundationTheme = .indigo) {
@@ -115,22 +222,77 @@ public struct FoundationPrimaryButtonStyle: ButtonStyle {
     public func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.headline)
-            .foregroundStyle(.white)
+            .foregroundStyle(foregroundColor)
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
-            .background(
+            .background { buttonBackground(isPressed: configuration.isPressed) }
+            .shadow(color: shadowColor, radius: shadowRadius, y: shadowOffset)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .opacity(configuration.isPressed ? 0.92 : 1)
+            .animation(.snappy(duration: 0.18), value: configuration.isPressed)
+    }
+
+    @ViewBuilder
+    private func buttonBackground(isPressed: Bool) -> some View {
+        let radius = buttonCornerRadius
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+
+        switch visualStyle.primaryAction {
+        case .automatic, .gradient:
+            shape.fill(
                 LinearGradient(
                     colors: [theme.primary, theme.secondary],
                     startPoint: .leading,
                     endPoint: .trailing
-                ),
-                in: RoundedRectangle(cornerRadius: 18)
+                )
             )
-            .shadow(color: theme.primary.opacity(0.28), radius: 16, y: 8)
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
-            .opacity(configuration.isPressed ? 0.92 : 1)
-            .animation(.snappy(duration: 0.18), value: configuration.isPressed)
+        case .system, .filled:
+            shape.fill(theme.primary.opacity(isPressed ? 0.82 : 1))
+        case .monochrome:
+            shape.fill(Color.white.opacity(isPressed ? 0.84 : 1))
+        }
+    }
+
+    private var foregroundColor: Color {
+        visualStyle.primaryAction == .monochrome ? .black : .white
+    }
+
+    private var buttonCornerRadius: CGFloat {
+        let fallback: CGFloat
+        switch visualStyle.primaryAction {
+        case .system: fallback = 12
+        case .filled: fallback = 14
+        case .automatic, .gradient, .monochrome: fallback = 18
+        }
+        return visualStyle.resolvedCornerRadius(fallback: fallback)
+    }
+
+    private var shadowColor: Color {
+        switch visualStyle.elevation {
+        case .none:
+            .clear
+        case .subtle:
+            theme.primary.opacity(0.14)
+        case .automatic, .floating:
+            theme.primary.opacity(0.28)
+        }
+    }
+
+    private var shadowRadius: CGFloat {
+        switch visualStyle.elevation {
+        case .none: 0
+        case .subtle: 7
+        case .automatic, .floating: 16
+        }
+    }
+
+    private var shadowOffset: CGFloat {
+        switch visualStyle.elevation {
+        case .none: 0
+        case .subtle: 3
+        case .automatic, .floating: 8
+        }
     }
 }
 #endif

@@ -312,7 +312,8 @@ private struct FoundationOnboardingButtonStyle: ButtonStyle {
         case .system, .filled:
             shape.fill(theme.accentColor.opacity(isPressed ? 0.82 : 1))
         case .gradient:
-            shape.fill(theme.gradient.opacity(isPressed ? 0.84 : 1))
+            shape.fill(theme.gradient)
+                .opacity(isPressed ? 0.84 : 1)
         }
     }
 

@@ -1,7 +1,7 @@
 import AppFoundation
 import SwiftUI
 
-enum DemoVisualStyleOption: String, CaseIterable, Identifiable {
+enum DemoVisualStyleOption: String, CaseIterable, Hashable, Identifiable {
     case signature
     case native
     case flat

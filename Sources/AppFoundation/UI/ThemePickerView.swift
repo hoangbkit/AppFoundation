@@ -20,6 +20,8 @@ public struct DefaultThemePreview: View {
 }
 
 public struct ThemePickerView<Preview: View>: View {
+    @Environment(\.appFoundationVisualStyle) private var visualStyle
+
     private let manager: ThemeManager
     private let title: String?
     private let showsCountdown: Bool
@@ -78,14 +80,15 @@ public struct ThemePickerView<Preview: View>: View {
                     stateBadge(for: theme)
                         .padding(8)
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: previewCornerRadius, style: .continuous))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    RoundedRectangle(cornerRadius: previewCornerRadius, style: .continuous)
                         .stroke(
                             manager.isEffective(theme) ? theme.accentColor : theme.borderColor,
                             lineWidth: manager.isEffective(theme) ? 2 : 1
                         )
                 }
+                .shadow(color: previewShadowColor, radius: previewShadowRadius, y: previewShadowOffset)
 
                 HStack(spacing: 4) {
                     Text(theme.title)
@@ -157,6 +160,37 @@ public struct ThemePickerView<Preview: View>: View {
     private var countdown: String {
         let seconds = manager.previewRemainingSeconds
         return String(format: "%d:%02d", seconds / 60, seconds % 60)
+    }
+
+    private var previewCornerRadius: CGFloat {
+        visualStyle.resolvedCornerRadius(fallback: 18)
+    }
+
+    private var previewShadowColor: Color {
+        switch visualStyle.elevation {
+        case .none, .automatic:
+            .clear
+        case .subtle:
+            .black.opacity(0.06)
+        case .floating:
+            .black.opacity(0.12)
+        }
+    }
+
+    private var previewShadowRadius: CGFloat {
+        switch visualStyle.elevation {
+        case .none, .automatic: 0
+        case .subtle: 6
+        case .floating: 12
+        }
+    }
+
+    private var previewShadowOffset: CGFloat {
+        switch visualStyle.elevation {
+        case .none, .automatic: 0
+        case .subtle: 3
+        case .floating: 6
+        }
     }
 
     private func accessibilityLabel(for theme: AppTheme) -> String {

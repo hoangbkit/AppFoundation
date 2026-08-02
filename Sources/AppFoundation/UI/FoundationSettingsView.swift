@@ -80,6 +80,7 @@ public struct FoundationSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.requestReview) private var requestReview
     @Environment(\.appFoundationTheme) private var environmentTheme
+    @Environment(\.appFoundationVisualStyle) private var visualStyle
 
     private let purchases: PurchaseController?
     private let configuration: FoundationSettingsConfiguration
@@ -129,7 +130,7 @@ public struct FoundationSettingsView: View {
                     .labelStyle(.iconOnly)
                 }
             }
-            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbarBackground(toolbarVisibility, for: .navigationBar)
             .tint(accent)
             .preferredColorScheme(preferredColorScheme)
             .sheet(isPresented: $isShowingPaywall) {
@@ -221,13 +222,52 @@ public struct FoundationSettingsView: View {
     }
 
     private var primaryForeground: Color {
-        configuration.followsActiveTheme ? activeTheme.primaryForegroundColor : .primary
+        if visualStyle.background == .systemGrouped {
+            return .primary
+        }
+        return configuration.followsActiveTheme ? activeTheme.primaryForegroundColor : .primary
     }
 
     private var surface: Color {
-        configuration.followsActiveTheme
-            ? activeTheme.surfaceColor
-            : Color(uiColor: .secondarySystemGroupedBackground)
+        switch visualStyle.surface {
+        case .plain:
+            return .clear
+        case .solid where visualStyle.background == .systemGrouped:
+            return systemGroupedSurface
+        case .automatic, .solid, .material:
+            return configuration.followsActiveTheme
+                ? activeTheme.surfaceColor
+                : legacySurface
+        }
+    }
+
+    private var legacySurface: Color {
+        #if os(iOS) || os(tvOS) || os(visionOS)
+        Color(uiColor: .secondarySystemGroupedBackground)
+        #elseif os(macOS)
+        Color(nsColor: .controlBackgroundColor)
+        #else
+        configuration.theme.background
+        #endif
+    }
+
+    private var systemGroupedSurface: Color {
+        #if os(iOS) || os(tvOS) || os(visionOS)
+        Color(uiColor: .secondarySystemGroupedBackground)
+        #elseif os(macOS)
+        Color(nsColor: .controlBackgroundColor)
+        #else
+        activeTheme.surfaceColor
+        #endif
+    }
+
+    private var toolbarVisibility: Visibility {
+        switch visualStyle.navigationChrome {
+        case .system:
+            .visible
+        case .automatic, .transparent:
+            .hidden
+        }
     }
 
     private var preferredColorScheme: ColorScheme? {

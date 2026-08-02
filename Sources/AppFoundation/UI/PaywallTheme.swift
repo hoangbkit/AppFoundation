@@ -61,9 +61,29 @@ struct PaywallThemeTokens {
 }
 
 struct PaywallThemeBackground: View {
+    @Environment(\.appFoundationVisualStyle) private var visualStyle
+
     let tokens: PaywallThemeTokens
 
     var body: some View {
+        backgroundContent
+            .ignoresSafeArea()
+            .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private var backgroundContent: some View {
+        switch visualStyle.background {
+        case .automatic, .atmospheric:
+            atmosphericBackground
+        case .solid:
+            tokens.background
+        case .systemGrouped:
+            systemGroupedBackground
+        }
+    }
+
+    private var atmosphericBackground: some View {
         ZStack {
             tokens.background
 
@@ -86,8 +106,16 @@ struct PaywallThemeBackground: View {
                 endRadius: 520
             )
         }
-        .ignoresSafeArea()
-        .accessibilityHidden(true)
+    }
+
+    private var systemGroupedBackground: Color {
+        #if os(iOS) || os(tvOS) || os(visionOS)
+        Color(uiColor: .systemGroupedBackground)
+        #elseif os(macOS)
+        Color(nsColor: .windowBackgroundColor)
+        #else
+        tokens.background
+        #endif
     }
 }
 #endif

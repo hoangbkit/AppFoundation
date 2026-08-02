@@ -51,7 +51,9 @@ public struct WidgetShowcaseDetailView<Background: View>: View {
         }
         .foregroundStyle(style.primaryTextColor)
         .navigationTitle(item.title)
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .tint(style.accentColor)
     }
 
@@ -229,7 +231,9 @@ public struct WidgetInstallGuideView<Background: View>: View {
         }
         .foregroundStyle(style.primaryTextColor)
         .navigationTitle(goal.isSpecific ? "Add This Widget" : "Add a Widget")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .tint(style.accentColor)
     }
 

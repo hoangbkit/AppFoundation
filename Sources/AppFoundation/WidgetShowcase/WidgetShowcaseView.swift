@@ -86,8 +86,10 @@ public struct WidgetShowcaseView<Background: View>: View {
         }
         .foregroundStyle(style.primaryTextColor)
         .navigationTitle(guide.galleryTitle)
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.large)
         .toolbarBackground(.hidden, for: .navigationBar)
+        #endif
     }
 
     private var styledBackground: some View {

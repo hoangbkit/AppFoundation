@@ -113,15 +113,17 @@ Inject `AppAITransport` and `AppAIAttestationProviding` implementations to test 
 
 The server—not local `hasPro` state—decides whether an installation receives paid AI quota.
 
-After a verified purchase, restore, or `Transaction.updates`, send the StoreKit transaction JWS:
+After a purchase, restore, or `Transaction.updates`, verify the result and send its StoreKit JWS:
 
 ```swift
-let result = try await aiClient.syncEntitlements(
-    transactions: [transaction.jwsRepresentation]
-)
+if case .verified = verification {
+    let result = try await aiClient.syncEntitlements(
+        transactions: [verification.jwsRepresentation]
+    )
 
-print(result.access.plan)
-print(result.access.quotaLimit)
+    print(result.access.plan)
+    print(result.access.quotaLimit)
+}
 ```
 
 The request uses the same app headers, installation identity, retry behavior, and App Attest protection as generation. The server verifies Apple’s signature, certificate chain, bundle ID, environment, configured product ID, expiry, and revocation state.
@@ -132,6 +134,6 @@ To refresh all currently active StoreKit entitlements:
 let status = try await aiClient.syncCurrentEntitlements()
 ```
 
-`syncCurrentEntitlements()` is available when StoreKit can be imported. It sends only StoreKit-verified current entitlements and then returns fresh server status. Apps should still observe `Transaction.updates` and submit each newly verified transaction promptly.
+`syncCurrentEntitlements()` is available when StoreKit can be imported. It sends only StoreKit-verified current entitlements, batching requests at the server's 20-transaction limit, and then returns fresh server status. Apps should still observe `Transaction.updates` and submit each newly verified transaction promptly.
 
 Do not use local purchase state to select a paid quota or send a claimed premium flag. `AppAIStatus.plan` and `AppAIStatus.entitlement` are server-resolved.

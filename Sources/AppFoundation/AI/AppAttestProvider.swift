@@ -140,7 +140,7 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
         response: Response.Type
     ) async throws -> Response {
         let data = try encoder.encode(body)
-        var request = URLRequest(url: configuration.baseURL.appending(path: path))
+        var request = URLRequest(url: AppAIClient.endpointURL(baseURL: configuration.baseURL, path: path))
         request.httpMethod = "POST"
         request.httpBody = data
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")

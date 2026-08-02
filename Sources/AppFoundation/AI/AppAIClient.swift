@@ -27,8 +27,9 @@ public actor AppAIClient {
     private let secureStore: AppAISecureStore
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
+    private let injectedAttestationProvider: (any AppAIAttestationProviding)?
     private var installationIDCache: String?
-    private var attestationProvider: (any AppAIAttestationProviding)?
+    private var defaultAttestationProvider: (any AppAIAttestationProviding)?
 
     public init(
         configuration: AppAIClientConfiguration,
@@ -40,7 +41,8 @@ public actor AppAIClient {
         self.secureStore = AppAISecureStore(service: configuration.keychainService)
         self.encoder = Self.makeEncoder()
         self.decoder = Self.makeDecoder()
-        self.attestationProvider = attestationProvider
+        self.injectedAttestationProvider = attestationProvider
+        self.defaultAttestationProvider = nil
     }
 
     public func status() async throws -> AppAIStatus {
@@ -74,11 +76,11 @@ public actor AppAIClient {
     public func syncCurrentEntitlements() async throws -> AppAIStatus {
         var transactions: [String] = []
         for await result in Transaction.currentEntitlements {
-            guard case .verified(let transaction) = result else { continue }
-            transactions.append(transaction.jwsRepresentation)
+            guard case .verified = result else { continue }
+            transactions.append(result.jwsRepresentation)
         }
-        if !transactions.isEmpty {
-            _ = try await syncEntitlements(transactions: transactions)
+        for batch in Self.entitlementBatches(transactions) {
+            _ = try await syncEntitlements(transactions: batch)
         }
         return try await status()
     }
@@ -101,9 +103,11 @@ public actor AppAIClient {
     }
 
     public func resetInstallationIdentity() async throws {
+        try await injectedAttestationProvider?.resetKey()
+        try await defaultAttestationProvider?.resetKey()
         try await secureStore.remove(installationAccount)
         installationIDCache = nil
-        try await attestationProvider?.resetKey()
+        defaultAttestationProvider = nil
     }
 
     private var installationAccount: String { "\(configuration.appID).installation" }
@@ -122,14 +126,15 @@ public actor AppAIClient {
 
     private func resolvedAttestationProvider(installationID: String) async throws -> (any AppAIAttestationProviding)? {
         guard configuration.attestationPolicy != .disabled else { return nil }
-        if let attestationProvider { return attestationProvider }
+        if let injectedAttestationProvider { return injectedAttestationProvider }
+        if let defaultAttestationProvider { return defaultAttestationProvider }
         let provider = AppleAppAttestationProvider(
             configuration: configuration,
             installationID: installationID,
             transport: transport,
             secureStore: secureStore
         )
-        attestationProvider = provider
+        defaultAttestationProvider = provider
         return provider
     }
 
@@ -137,7 +142,7 @@ public actor AppAIClient {
         guard configuration.baseURL.scheme == "https" || configuration.baseURL.host == "localhost" else {
             throw AppAIError.invalidConfiguration("baseURL must use HTTPS.")
         }
-        var request = URLRequest(url: configuration.baseURL.appending(path: path))
+        var request = URLRequest(url: Self.endpointURL(baseURL: configuration.baseURL, path: path))
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(configuration.appID, forHTTPHeaderField: "X-App-ID")
@@ -228,5 +233,17 @@ public actor AppAIClient {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return decoder
+    }
+
+    static func endpointURL(baseURL: URL, path: String) -> URL {
+        let relativePath = path.hasPrefix("/") ? String(path.dropFirst()) : path
+        return baseURL.appending(path: relativePath)
+    }
+
+    static func entitlementBatches(_ transactions: [String]) -> [[String]] {
+        stride(from: 0, to: transactions.count, by: 20).map { start in
+            let end = min(start + 20, transactions.count)
+            return Array(transactions[start..<end])
+        }
     }
 }

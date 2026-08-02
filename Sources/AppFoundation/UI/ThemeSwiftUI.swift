@@ -112,6 +112,8 @@ public extension View {
 }
 
 public struct AppThemeBackground: View {
+    @Environment(\.appFoundationVisualStyle) private var visualStyle
+
     private let theme: AppTheme
 
     public init(theme: AppTheme) {
@@ -119,6 +121,24 @@ public struct AppThemeBackground: View {
     }
 
     public var body: some View {
+        backgroundContent
+            .ignoresSafeArea()
+            .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private var backgroundContent: some View {
+        switch visualStyle.background {
+        case .automatic, .atmospheric:
+            atmosphericBackground
+        case .solid:
+            theme.backgroundColor
+        case .systemGrouped:
+            systemGroupedBackground
+        }
+    }
+
+    private var atmosphericBackground: some View {
         ZStack {
             theme.backgroundColor
             theme.gradient
@@ -137,12 +157,22 @@ public struct AppThemeBackground: View {
                 endPoint: .bottom
             )
         }
-        .ignoresSafeArea()
-        .accessibilityHidden(true)
+    }
+
+    private var systemGroupedBackground: Color {
+        #if os(iOS) || os(tvOS) || os(visionOS)
+        Color(uiColor: .systemGroupedBackground)
+        #elseif os(macOS)
+        Color(nsColor: .windowBackgroundColor)
+        #else
+        theme.backgroundColor
+        #endif
     }
 }
 
 public struct AppThemeCard<Content: View>: View {
+    @Environment(\.appFoundationVisualStyle) private var visualStyle
+
     private let theme: AppTheme
     private let content: Content
 
@@ -152,27 +182,64 @@ public struct AppThemeCard<Content: View>: View {
     }
 
     public var body: some View {
+        let radius = visualStyle.resolvedCornerRadius(
+            fallback: CGFloat(theme.appearance.cardCornerRadius)
+        )
+
         content
             .padding(18)
-            .background(
-                theme.surfaceColor,
-                in: RoundedRectangle(
-                    cornerRadius: CGFloat(theme.appearance.cardCornerRadius),
-                    style: .continuous
-                )
-            )
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: CGFloat(theme.appearance.cardCornerRadius),
-                    style: .continuous
-                )
+            .background { cardBackground(radius: radius) }
+            .overlay { cardBorder(radius: radius) }
+            .shadow(color: shadowColor, radius: shadowRadius, y: shadowOffset)
+    }
+
+    @ViewBuilder
+    private func cardBackground(radius: CGFloat) -> some View {
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+
+        switch visualStyle.surface {
+        case .automatic, .solid:
+            shape.fill(theme.surfaceColor)
+        case .material:
+            shape.fill(.regularMaterial)
+        case .plain:
+            shape.fill(.clear)
+        }
+    }
+
+    @ViewBuilder
+    private func cardBorder(radius: CGFloat) -> some View {
+        if visualStyle.surface != .plain {
+            RoundedRectangle(cornerRadius: radius, style: .continuous)
                 .stroke(theme.borderColor, lineWidth: 1)
-            }
-            .shadow(
-                color: theme.appearance.shadow.color,
-                radius: 18,
-                y: 10
-            )
+        }
+    }
+
+    private var shadowColor: Color {
+        switch visualStyle.elevation {
+        case .none:
+            .clear
+        case .subtle:
+            theme.appearance.shadow.color.opacity(0.55)
+        case .automatic, .floating:
+            theme.appearance.shadow.color
+        }
+    }
+
+    private var shadowRadius: CGFloat {
+        switch visualStyle.elevation {
+        case .none: 0
+        case .subtle: 8
+        case .automatic, .floating: 18
+        }
+    }
+
+    private var shadowOffset: CGFloat {
+        switch visualStyle.elevation {
+        case .none: 0
+        case .subtle: 4
+        case .automatic, .floating: 10
+        }
     }
 }
 #endif

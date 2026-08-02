@@ -25,6 +25,7 @@ public struct FoundationOnboardingPage: Identifiable {
 
 public struct FoundationOnboardingView: View {
     @Environment(\.appFoundationTheme) private var environmentTheme
+    @Environment(\.appFoundationVisualStyle) private var visualStyle
 
     private let pages: [FoundationOnboardingPage]
     private let fixedTheme: FoundationTheme?
@@ -130,20 +131,10 @@ public struct FoundationOnboardingView: View {
     private func pageContent(_ page: FoundationOnboardingPage) -> some View {
         VStack(spacing: 0) {
             ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                resolvedTheme.primary.opacity(0.20),
-                                resolvedTheme.secondary.opacity(0.10),
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                iconBackground
 
                 Circle()
-                    .strokeBorder(resolvedTheme.primary.opacity(0.18))
+                    .strokeBorder(resolvedTheme.primary.opacity(iconBorderOpacity))
 
                 Image(systemName: page.systemImage)
                     .font(.system(size: 40, weight: .semibold))
@@ -152,7 +143,11 @@ public struct FoundationOnboardingView: View {
                     .contentTransition(.symbolEffect(.replace))
             }
             .frame(width: 88, height: 88)
-            .shadow(color: resolvedTheme.primary.opacity(0.14), radius: 16, y: 8)
+            .shadow(
+                color: iconShadowColor,
+                radius: iconShadowRadius,
+                y: iconShadowOffset
+            )
             .padding(.bottom, 24)
 
             Text(page.eyebrow.uppercased())
@@ -162,7 +157,7 @@ public struct FoundationOnboardingView: View {
                 .padding(.bottom, 9)
 
             Text(page.title)
-                .font(.system(size: 30, weight: .bold, design: .rounded))
+                .font(.system(size: 30, weight: .bold, design: titleFontDesign))
                 .multilineTextAlignment(.center)
                 .foregroundStyle(primaryForeground)
                 .fixedSize(horizontal: false, vertical: true)
@@ -178,6 +173,28 @@ public struct FoundationOnboardingView: View {
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 4)
         .padding(.vertical, 10)
+    }
+
+    @ViewBuilder
+    private var iconBackground: some View {
+        switch visualStyle.surface {
+        case .automatic, .material:
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            resolvedTheme.primary.opacity(0.20),
+                            resolvedTheme.secondary.opacity(0.10),
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        case .solid:
+            Circle().fill(resolvedTheme.primary.opacity(0.12))
+        case .plain:
+            Circle().fill(.clear)
+        }
     }
 
     private var pageIndicator: some View {
@@ -213,6 +230,44 @@ public struct FoundationOnboardingView: View {
         fixedTheme == nil ? environmentTheme.id : "fixed"
     }
 
+    private var titleFontDesign: Font.Design {
+        switch visualStyle.surface {
+        case .automatic, .material: .rounded
+        case .solid, .plain: .default
+        }
+    }
+
+    private var iconBorderOpacity: Double {
+        visualStyle.surface == .plain ? 0 : 0.18
+    }
+
+    private var iconShadowColor: Color {
+        switch visualStyle.elevation {
+        case .none:
+            .clear
+        case .subtle:
+            resolvedTheme.primary.opacity(0.08)
+        case .automatic, .floating:
+            resolvedTheme.primary.opacity(0.14)
+        }
+    }
+
+    private var iconShadowRadius: CGFloat {
+        switch visualStyle.elevation {
+        case .none: 0
+        case .subtle: 7
+        case .automatic, .floating: 16
+        }
+    }
+
+    private var iconShadowOffset: CGFloat {
+        switch visualStyle.elevation {
+        case .none: 0
+        case .subtle: 3
+        case .automatic, .floating: 8
+        }
+    }
+
     private static func normalizedPages(
         _ pages: [FoundationOnboardingPage]
     ) -> [FoundationOnboardingPage] {
@@ -231,17 +286,80 @@ public struct FoundationOnboardingView: View {
 }
 
 private struct FoundationOnboardingButtonStyle: ButtonStyle {
+    @Environment(\.appFoundationTheme) private var theme
+    @Environment(\.appFoundationVisualStyle) private var visualStyle
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.headline)
-            .foregroundStyle(.black)
+            .foregroundStyle(foregroundColor)
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
-            .background(.white, in: RoundedRectangle(cornerRadius: 18))
-            .shadow(color: .black.opacity(0.14), radius: 14, y: 7)
+            .background { buttonBackground(isPressed: configuration.isPressed) }
+            .shadow(color: shadowColor, radius: shadowRadius, y: shadowOffset)
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
             .animation(.snappy(duration: 0.18), value: configuration.isPressed)
+    }
+
+    @ViewBuilder
+    private func buttonBackground(isPressed: Bool) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+
+        switch visualStyle.primaryAction {
+        case .automatic, .monochrome:
+            shape.fill(Color.white.opacity(isPressed ? 0.84 : 1))
+        case .system, .filled:
+            shape.fill(theme.accentColor.opacity(isPressed ? 0.82 : 1))
+        case .gradient:
+            shape.fill(theme.gradient.opacity(isPressed ? 0.84 : 1))
+        }
+    }
+
+    private var foregroundColor: Color {
+        switch visualStyle.primaryAction {
+        case .automatic, .monochrome:
+            .black
+        case .system, .filled, .gradient:
+            accentForeground
+        }
+    }
+
+    private var accentForeground: Color {
+        let accent = theme.appearance.accent
+        let luminance = 0.2126 * accent.red + 0.7152 * accent.green + 0.0722 * accent.blue
+        return luminance > 0.58 ? .black : .white
+    }
+
+    private var cornerRadius: CGFloat {
+        visualStyle.resolvedCornerRadius(fallback: 18)
+    }
+
+    private var shadowColor: Color {
+        switch visualStyle.elevation {
+        case .none:
+            .clear
+        case .subtle:
+            .black.opacity(0.07)
+        case .automatic, .floating:
+            .black.opacity(0.14)
+        }
+    }
+
+    private var shadowRadius: CGFloat {
+        switch visualStyle.elevation {
+        case .none: 0
+        case .subtle: 7
+        case .automatic, .floating: 14
+        }
+    }
+
+    private var shadowOffset: CGFloat {
+        switch visualStyle.elevation {
+        case .none: 0
+        case .subtle: 3
+        case .automatic, .floating: 7
+        }
     }
 }
 #endif

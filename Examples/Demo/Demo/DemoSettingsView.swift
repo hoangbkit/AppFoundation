@@ -5,8 +5,12 @@ import SwiftUI
 struct DemoSettingsView: View {
     @Environment(PurchaseManager.self) private var purchases
     @Environment(ThemeManager.self) private var themes
+    @Environment(\.appFoundationVisualStyle) private var visualStyle
     @Environment(\.dismiss) private var dismiss
     @Environment(\.requestReview) private var requestReview
+
+    @AppStorage("appfoundation.demo.visual-style")
+    private var visualStyleID = DemoVisualStyleOption.signature.rawValue
 
     @State private var isShowingPaywall = false
 
@@ -45,6 +49,7 @@ struct DemoSettingsView: View {
 
                 Form {
                     premiumStatusSection
+                    visualStyleSection
 
                     #if DEBUG
                     simulatedPurchasesSection
@@ -55,7 +60,7 @@ struct DemoSettingsView: View {
                         configuration: configuration.proPlanConfiguration,
                         onUpgrade: { isShowingPaywall = true }
                     )
-                    .listRowBackground(theme.surfaceColor)
+                    .listRowBackground(rowBackground)
 
                     Section {
                         ThemePickerView(
@@ -66,9 +71,9 @@ struct DemoSettingsView: View {
                     } header: {
                         Text("App Theme")
                     } footer: {
-                        Text("Choose a theme for the Demo app. Pro themes can be previewed before upgrading.")
+                        Text("Choose a color theme for the Demo app. Pro themes can be previewed before upgrading.")
                     }
-                    .listRowBackground(theme.surfaceColor)
+                    .listRowBackground(rowBackground)
 
                     AppIconPickerSection(
                         icons: appIcons,
@@ -80,7 +85,7 @@ struct DemoSettingsView: View {
                             isShowingPaywall = true
                         }
                     )
-                    .listRowBackground(theme.surfaceColor)
+                    .listRowBackground(rowBackground)
 
                     supportSection
                     legalSection
@@ -90,14 +95,14 @@ struct DemoSettingsView: View {
                         LabeledContent("Built with", value: "AppFoundation")
                         LabeledContent("Platform", value: "iOS 26")
                     }
-                    .listRowBackground(theme.surfaceColor)
+                    .listRowBackground(rowBackground)
                 }
-                .scrollContentBackground(.hidden)
+                .scrollContentBackground(formBackgroundVisibility)
             }
-            .foregroundStyle(theme.primaryForegroundColor)
+            .foregroundStyle(primaryForeground)
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbarBackground(toolbarVisibility, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Close", systemImage: "xmark") {
@@ -132,13 +137,30 @@ struct DemoSettingsView: View {
                         .font(.headline)
                     Text(entitlementMessage)
                         .font(.caption)
-                        .foregroundStyle(theme.secondaryForegroundColor)
+                        .foregroundStyle(secondaryForeground)
                 }
 
                 Spacer(minLength: 8)
             }
         }
-        .listRowBackground(theme.surfaceColor)
+        .listRowBackground(rowBackground)
+    }
+
+    private var visualStyleSection: some View {
+        Section {
+            Picker("Built-in views", selection: visualStyleSelection) {
+                ForEach(DemoVisualStyleOption.allCases) { option in
+                    Label(option.title, systemImage: option.systemImage)
+                        .tag(option)
+                }
+            }
+            .pickerStyle(.navigationLink)
+        } header: {
+            Text("Visual Style")
+        } footer: {
+            Text("Changes AppFoundation backgrounds, surfaces, shadows, buttons, navigation chrome, onboarding, paywalls, and theme previews live.")
+        }
+        .listRowBackground(rowBackground)
     }
 
     #if DEBUG
@@ -171,7 +193,7 @@ struct DemoSettingsView: View {
             }
             .disabled(!purchases.isUsingSimulatedPurchases)
         }
-        .listRowBackground(theme.surfaceColor)
+        .listRowBackground(rowBackground)
     }
     #endif
 
@@ -216,9 +238,43 @@ struct DemoSettingsView: View {
 
     private var entitlementColor: Color {
         switch purchases.entitlementState {
-        case .checking: theme.secondaryForegroundColor
+        case .checking: secondaryForeground
         case .inactive, .active: theme.accentColor
         }
+    }
+
+    private var visualStyleSelection: Binding<DemoVisualStyleOption> {
+        Binding(
+            get: { DemoVisualStyleOption(rawValue: visualStyleID) ?? .signature },
+            set: { visualStyleID = $0.rawValue }
+        )
+    }
+
+    private var primaryForeground: Color {
+        visualStyle.background == .systemGrouped ? .primary : theme.primaryForegroundColor
+    }
+
+    private var secondaryForeground: Color {
+        visualStyle.background == .systemGrouped ? .secondary : theme.secondaryForegroundColor
+    }
+
+    private var rowBackground: Color {
+        switch visualStyle.surface {
+        case .plain:
+            .clear
+        case .solid where visualStyle.background == .systemGrouped:
+            Color(uiColor: .secondarySystemGroupedBackground)
+        case .automatic, .solid, .material:
+            theme.surfaceColor
+        }
+    }
+
+    private var formBackgroundVisibility: Visibility {
+        visualStyle.background == .systemGrouped ? .visible : .hidden
+    }
+
+    private var toolbarVisibility: Visibility {
+        visualStyle.navigationChrome == .system ? .visible : .hidden
     }
 
     @ViewBuilder
@@ -242,7 +298,7 @@ struct DemoSettingsView: View {
                 }
             }
         }
-        .listRowBackground(theme.surfaceColor)
+        .listRowBackground(rowBackground)
     }
 
     @ViewBuilder
@@ -261,7 +317,7 @@ struct DemoSettingsView: View {
                     }
                 }
             }
-            .listRowBackground(theme.surfaceColor)
+            .listRowBackground(rowBackground)
         }
     }
 }

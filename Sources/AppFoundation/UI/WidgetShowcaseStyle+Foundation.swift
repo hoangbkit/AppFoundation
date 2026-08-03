@@ -6,6 +6,7 @@ public extension WidgetShowcaseStyle {
     /// Creates widget showcase tokens from the app's active color theme and
     /// AppFoundation visual style.
     init(theme: AppTheme, visualStyle: FoundationVisualStyle) {
+        let usesSystemGroupedColors = visualStyle.background == .systemGrouped
         let backgroundColor: Color
         let gradientStartColor: Color
         let gradientEndColor: Color
@@ -35,8 +36,13 @@ public extension WidgetShowcaseStyle {
         let elevatedSurfaceColor: Color
         switch visualStyle.surface {
         case .automatic, .solid:
-            surfaceColor = theme.surfaceColor
-            elevatedSurfaceColor = theme.elevatedSurfaceColor
+            if usesSystemGroupedColors {
+                surfaceColor = Self.systemGroupedSurface
+                elevatedSurfaceColor = Self.systemGroupedElevatedSurface
+            } else {
+                surfaceColor = theme.surfaceColor
+                elevatedSurfaceColor = theme.elevatedSurfaceColor
+            }
         case .material:
             // WidgetShowcaseStyle stores concrete colors rather than ShapeStyle,
             // so use translucent theme surfaces as the closest portable mapping.
@@ -59,16 +65,38 @@ public extension WidgetShowcaseStyle {
 
         self.init(
             accentColor: theme.accentColor,
-            primaryTextColor: theme.primaryForegroundColor,
-            secondaryTextColor: theme.secondaryForegroundColor,
+            primaryTextColor: usesSystemGroupedColors ? .primary : theme.primaryForegroundColor,
+            secondaryTextColor: usesSystemGroupedColors ? .secondary : theme.secondaryForegroundColor,
             surfaceColor: surfaceColor,
             elevatedSurfaceColor: elevatedSurfaceColor,
-            borderColor: visualStyle.surface == .plain ? .clear : theme.borderColor,
+            borderColor: visualStyle.surface == .plain
+                ? .clear
+                : (usesSystemGroupedColors ? Color.primary.opacity(0.10) : theme.borderColor),
             backgroundColor: backgroundColor,
             gradientStartColor: gradientStartColor,
             gradientEndColor: gradientEndColor,
             shadowColor: shadowColor
         )
+    }
+
+    private static var systemGroupedSurface: Color {
+        #if os(iOS) || os(tvOS) || os(visionOS)
+        Color(uiColor: .secondarySystemGroupedBackground)
+        #elseif os(macOS)
+        Color(nsColor: .controlBackgroundColor)
+        #else
+        Color.primary.opacity(0.06)
+        #endif
+    }
+
+    private static var systemGroupedElevatedSurface: Color {
+        #if os(iOS) || os(tvOS) || os(visionOS)
+        Color(uiColor: .tertiarySystemGroupedBackground)
+        #elseif os(macOS)
+        Color(nsColor: .underPageBackgroundColor)
+        #else
+        Color.primary.opacity(0.10)
+        #endif
     }
 }
 #endif

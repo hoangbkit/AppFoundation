@@ -1,7 +1,7 @@
 #if canImport(SwiftUI)
 import SwiftUI
 
-public struct FoundationOnboardingPage: Identifiable {
+public struct FoundationOnboardingPage: Identifiable, Hashable, Sendable {
     public let id: String
     public let systemImage: String
     public let eyebrow: String
@@ -99,7 +99,12 @@ public struct FoundationOnboardingView: View {
                         }
                     }
                 }
-                .buttonStyle(FoundationOnboardingButtonStyle())
+                .buttonStyle(
+                    FoundationOnboardingButtonStyle(
+                        theme: resolvedTheme,
+                        accentForeground: actionAccentForeground
+                    )
+                )
                 .padding(.horizontal, 24)
                 .padding(.bottom, 18)
             }
@@ -215,11 +220,24 @@ public struct FoundationOnboardingView: View {
     }
 
     private var primaryForeground: Color {
-        fixedTheme == nil ? environmentTheme.primaryForegroundColor : .primary
+        if visualStyle.background == .systemGrouped {
+            return .primary
+        }
+        return fixedTheme == nil ? environmentTheme.primaryForegroundColor : .primary
     }
 
     private var secondaryForeground: Color {
-        fixedTheme == nil ? environmentTheme.secondaryForegroundColor : .secondary
+        if visualStyle.background == .systemGrouped {
+            return .secondary
+        }
+        return fixedTheme == nil ? environmentTheme.secondaryForegroundColor : .secondary
+    }
+
+    private var actionAccentForeground: Color {
+        guard fixedTheme == nil else { return .white }
+        let accent = environmentTheme.appearance.accent
+        let luminance = 0.2126 * accent.red + 0.7152 * accent.green + 0.0722 * accent.blue
+        return luminance > 0.58 ? .black : .white
     }
 
     private var preferredColorScheme: ColorScheme? {
@@ -231,10 +249,7 @@ public struct FoundationOnboardingView: View {
     }
 
     private var titleFontDesign: Font.Design {
-        switch visualStyle.surface {
-        case .automatic, .material: .rounded
-        case .solid, .plain: .default
-        }
+        visualStyle.resolvedFontDesign(fallback: .rounded)
     }
 
     private var iconBorderOpacity: Double {
@@ -286,8 +301,10 @@ public struct FoundationOnboardingView: View {
 }
 
 private struct FoundationOnboardingButtonStyle: ButtonStyle {
-    @Environment(\.appFoundationTheme) private var theme
     @Environment(\.appFoundationVisualStyle) private var visualStyle
+
+    let theme: FoundationTheme
+    let accentForeground: Color
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -304,15 +321,27 @@ private struct FoundationOnboardingButtonStyle: ButtonStyle {
 
     @ViewBuilder
     private func buttonBackground(isPressed: Bool) -> some View {
-        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        let radius = visualStyle.resolvedCornerRadius(fallback: 18)
 
         switch visualStyle.primaryAction {
-        case .automatic, .monochrome:
-            shape.fill(Color.white.opacity(isPressed ? 0.84 : 1))
+        case .automatic:
+            RoundedRectangle(cornerRadius: radius)
+                .fill(Color.white)
+        case .monochrome:
+            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .fill(Color.white.opacity(isPressed ? 0.84 : 1))
         case .system, .filled:
-            shape.fill(theme.accentColor.opacity(isPressed ? 0.82 : 1))
+            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .fill(theme.primary.opacity(isPressed ? 0.82 : 1))
         case .gradient:
-            shape.fill(theme.gradient)
+            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [theme.primary, theme.secondary],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
                 .opacity(isPressed ? 0.84 : 1)
         }
     }
@@ -324,16 +353,6 @@ private struct FoundationOnboardingButtonStyle: ButtonStyle {
         case .system, .filled, .gradient:
             accentForeground
         }
-    }
-
-    private var accentForeground: Color {
-        let accent = theme.appearance.accent
-        let luminance = 0.2126 * accent.red + 0.7152 * accent.green + 0.0722 * accent.blue
-        return luminance > 0.58 ? .black : .white
-    }
-
-    private var cornerRadius: CGFloat {
-        visualStyle.resolvedCornerRadius(fallback: 18)
     }
 
     private var shadowColor: Color {

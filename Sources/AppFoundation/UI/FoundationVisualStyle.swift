@@ -141,10 +141,18 @@ extension FoundationVisualStyle {
         usesVisibleNavigationChrome ? .visible : .hidden
     }
 
-    var displayFontDesign: Font.Design {
+    var preservesLegacyPresentation: Bool {
+        self == .signature
+    }
+
+    func resolvedFontDesign(fallback: Font.Design) -> Font.Design {
         switch surface {
-        case .automatic, .material: .rounded
-        case .solid, .plain: .default
+        case .automatic:
+            fallback
+        case .material:
+            .rounded
+        case .solid, .plain:
+            .default
         }
     }
 }
@@ -157,6 +165,7 @@ extension View {
         borderColor: Color,
         shadowColor: Color,
         fallbackCornerRadius: CGFloat,
+        borderLineWidth: CGFloat = 1,
         fallbackShadowRadius: CGFloat = 18,
         fallbackShadowOffset: CGFloat = 10
     ) -> some View {
@@ -166,6 +175,7 @@ extension View {
                 borderColor: borderColor,
                 shadowColor: shadowColor,
                 fallbackCornerRadius: fallbackCornerRadius,
+                borderLineWidth: borderLineWidth,
                 fallbackShadowRadius: fallbackShadowRadius,
                 fallbackShadowOffset: fallbackShadowOffset
             )
@@ -180,6 +190,7 @@ private struct FoundationVisualSurfaceModifier: ViewModifier {
     let borderColor: Color
     let shadowColor: Color
     let fallbackCornerRadius: CGFloat
+    let borderLineWidth: CGFloat
     let fallbackShadowRadius: CGFloat
     let fallbackShadowOffset: CGFloat
 
@@ -214,7 +225,7 @@ private struct FoundationVisualSurfaceModifier: ViewModifier {
     private func surfaceBorder(radius: CGFloat) -> some View {
         if visualStyle.surface != .plain {
             RoundedRectangle(cornerRadius: radius, style: .continuous)
-                .strokeBorder(borderColor)
+                .strokeBorder(borderColor, lineWidth: borderLineWidth)
         }
     }
 
@@ -232,17 +243,27 @@ private struct FoundationVisualSurfaceModifier: ViewModifier {
 
     private var resolvedShadowRadius: CGFloat {
         switch visualStyle.elevation {
-        case .none: 0
-        case .subtle: max(4, fallbackShadowRadius * 0.5)
-        case .automatic, .floating: fallbackShadowRadius
+        case .automatic:
+            fallbackShadowRadius
+        case .none:
+            0
+        case .subtle:
+            fallbackShadowRadius > 0 ? max(4, fallbackShadowRadius * 0.5) : 6
+        case .floating:
+            max(14, fallbackShadowRadius)
         }
     }
 
     private var resolvedShadowOffset: CGFloat {
         switch visualStyle.elevation {
-        case .none: 0
-        case .subtle: max(2, fallbackShadowOffset * 0.5)
-        case .automatic, .floating: fallbackShadowOffset
+        case .automatic:
+            fallbackShadowOffset
+        case .none:
+            0
+        case .subtle:
+            fallbackShadowOffset > 0 ? max(2, fallbackShadowOffset * 0.5) : 3
+        case .floating:
+            max(7, fallbackShadowOffset)
         }
     }
 }

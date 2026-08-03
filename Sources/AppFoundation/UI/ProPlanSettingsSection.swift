@@ -2,7 +2,7 @@
 import SwiftUI
 
 /// App-owned copy for the reusable Pro-plan section used inside a SwiftUI `List` or `Form`.
-public struct ProPlanSettingsConfiguration {
+public struct ProPlanSettingsConfiguration: Sendable {
     public var sectionTitle: String
     public var currentPlanLabel: String
     public var freePlanTitle: String
@@ -58,6 +58,23 @@ public struct ProPlanSettingsSection: View {
     }
 
     public var body: some View {
+        Group {
+            if visualStyle.preservesLegacyPresentation {
+                sectionContent
+            } else {
+                sectionContent.listRowBackground(rowBackground)
+            }
+        }
+        .alert("Restore Purchases", isPresented: restoreAlertBinding) {
+            Button("OK", role: .cancel) {
+                restoreMessage = nil
+            }
+        } message: {
+            Text(restoreMessage ?? "")
+        }
+    }
+
+    private var sectionContent: some View {
         Section(configuration.sectionTitle) {
             LabeledContent(configuration.currentPlanLabel) {
                 Text(purchaseManager.hasPro ? configuration.activePlanTitle : configuration.freePlanTitle)
@@ -103,8 +120,7 @@ public struct ProPlanSettingsSection: View {
                 restorePurchases()
             } label: {
                 HStack {
-                    Label(configuration.restorePurchasesTitle, systemImage: "arrow.clockwise")
-                        .foregroundStyle(primaryForeground)
+                    restoreLabel
                     Spacer()
                     if case .restoring = purchaseManager.activity {
                         ProgressView()
@@ -113,13 +129,15 @@ public struct ProPlanSettingsSection: View {
             }
             .disabled(purchaseManager.isBusy)
         }
-        .listRowBackground(rowBackground)
-        .alert("Restore Purchases", isPresented: restoreAlertBinding) {
-            Button("OK", role: .cancel) {
-                restoreMessage = nil
-            }
-        } message: {
-            Text(restoreMessage ?? "")
+    }
+
+    @ViewBuilder
+    private var restoreLabel: some View {
+        if visualStyle.preservesLegacyPresentation {
+            Label(configuration.restorePurchasesTitle, systemImage: "arrow.clockwise")
+        } else {
+            Label(configuration.restorePurchasesTitle, systemImage: "arrow.clockwise")
+                .foregroundStyle(primaryForeground)
         }
     }
 

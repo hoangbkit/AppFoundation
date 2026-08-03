@@ -96,6 +96,7 @@ import SwiftUI
 public struct ProCelebrationView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appFoundationTheme) private var environmentTheme
+    @Environment(\.appFoundationVisualStyle) private var visualStyle
     @Environment(\.requestReview) private var requestReview
     @Environment(PurchaseManager.self) private var purchaseManager
 
@@ -128,7 +129,7 @@ public struct ProCelebrationView: View {
                     Button(configuration.doneButtonTitle) { dismiss() }
                 }
             }
-            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbarBackground(visualStyle.toolbarVisibility, for: .navigationBar)
             .tint(theme.accentColor)
         }
         .presentationDetents([.large])
@@ -142,13 +143,13 @@ public struct ProCelebrationView: View {
 
             VStack(spacing: 6) {
                 Text(resolvedTitle)
-                    .font(.largeTitle.bold())
-                    .foregroundStyle(theme.primaryForegroundColor)
+                    .font(.system(size: 34, weight: .bold, design: visualStyle.displayFontDesign))
+                    .foregroundStyle(primaryForeground)
                     .multilineTextAlignment(.center)
 
                 Text(configuration.message)
                     .font(.subheadline)
-                    .foregroundStyle(theme.secondaryForegroundColor)
+                    .foregroundStyle(secondaryForeground)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -167,13 +168,17 @@ public struct ProCelebrationView: View {
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(theme.accentColor)
                     .frame(width: 46, height: 46)
-                    .background(theme.accentColor.opacity(0.13), in: Circle())
-                    .overlay { Circle().strokeBorder(theme.borderColor) }
+                    .background(statusIconBackground, in: Circle())
+                    .overlay {
+                        if visualStyle.surface != .plain {
+                            Circle().strokeBorder(celebrationCardBorder)
+                        }
+                    }
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Enjoying \(appName)?")
                         .font(.headline.bold())
-                        .foregroundStyle(theme.primaryForegroundColor)
+                        .foregroundStyle(primaryForeground)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
 
@@ -189,7 +194,7 @@ public struct ProCelebrationView: View {
 
                         Text("Leave a review")
                             .font(.caption)
-                            .foregroundStyle(theme.secondaryForegroundColor)
+                            .foregroundStyle(secondaryForeground)
                     }
                 }
                 .layoutPriority(1)
@@ -198,14 +203,14 @@ public struct ProCelebrationView: View {
             }
             .padding(18)
             .frame(maxWidth: .infinity)
-            .background(
-                celebrationCardBackground,
-                in: RoundedRectangle(cornerRadius: celebrationCardCornerRadius, style: .continuous)
+            .foundationVisualSurface(
+                solidColor: celebrationCardBackground,
+                borderColor: celebrationCardBorder,
+                shadowColor: theme.appearance.shadow.color,
+                fallbackCornerRadius: CGFloat(theme.appearance.cardCornerRadius),
+                fallbackShadowRadius: 14,
+                fallbackShadowOffset: 7
             )
-            .overlay {
-                RoundedRectangle(cornerRadius: celebrationCardCornerRadius, style: .continuous)
-                    .strokeBorder(celebrationCardBorder)
-            }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -225,23 +230,23 @@ public struct ProCelebrationView: View {
                     .gridColumnAlignment(.center)
             }
             .font(.caption.weight(.black))
-            .foregroundStyle(theme.secondaryForegroundColor)
+            .foregroundStyle(secondaryForeground)
             .padding(.horizontal, 10)
             .padding(.vertical, 9)
 
             Divider()
-                .overlay(theme.borderColor.opacity(0.45))
+                .overlay(celebrationCardBorder.opacity(0.75))
                 .gridCellColumns(3)
 
             ForEach(Array(resolvedRows.enumerated()), id: \.element.id) { index, row in
                 GridRow {
                     Text(row.feature)
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(theme.primaryForegroundColor)
+                        .foregroundStyle(primaryForeground)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     Text(row.freeValue)
                         .font(.caption2.weight(.semibold))
-                        .foregroundStyle(theme.secondaryForegroundColor)
+                        .foregroundStyle(secondaryForeground)
                         .multilineTextAlignment(.center)
                     Text(row.proValue)
                         .font(.caption2.bold())
@@ -250,23 +255,22 @@ public struct ProCelebrationView: View {
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 9)
-                .background(Color.clear)
 
                 if index < resolvedRows.count - 1 {
                     Divider()
-                        .overlay(theme.borderColor.opacity(0.35))
+                        .overlay(celebrationCardBorder.opacity(0.58))
                         .gridCellColumns(3)
                 }
             }
         }
-        .background(
-            celebrationCardBackground,
-            in: RoundedRectangle(cornerRadius: celebrationCardCornerRadius, style: .continuous)
+        .foundationVisualSurface(
+            solidColor: celebrationCardBackground,
+            borderColor: celebrationCardBorder,
+            shadowColor: theme.appearance.shadow.color,
+            fallbackCornerRadius: CGFloat(theme.appearance.cardCornerRadius),
+            fallbackShadowRadius: 14,
+            fallbackShadowOffset: 7
         )
-        .overlay {
-            RoundedRectangle(cornerRadius: celebrationCardCornerRadius, style: .continuous)
-                .strokeBorder(celebrationCardBorder)
-        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(configuration.comparisonAccessibilityLabel)
     }
@@ -286,16 +290,39 @@ public struct ProCelebrationView: View {
         AppMetadata.current().name
     }
 
-    private var celebrationCardCornerRadius: CGFloat {
-        CGFloat(theme.appearance.cardCornerRadius)
+    private var primaryForeground: Color {
+        visualStyle.background == .systemGrouped ? .primary : theme.primaryForegroundColor
+    }
+
+    private var secondaryForeground: Color {
+        visualStyle.background == .systemGrouped ? .secondary : theme.secondaryForegroundColor
+    }
+
+    private var statusIconBackground: Color {
+        visualStyle.surface == .plain ? .clear : theme.accentColor.opacity(0.13)
     }
 
     private var celebrationCardBackground: Color {
-        theme.elevatedSurfaceColor.opacity(0.62)
+        if visualStyle.background == .systemGrouped {
+            return systemGroupedSurface
+        }
+        return theme.elevatedSurfaceColor.opacity(0.82)
     }
 
     private var celebrationCardBorder: Color {
-        theme.borderColor.opacity(0.45)
+        visualStyle.background == .systemGrouped
+            ? Color.primary.opacity(0.10)
+            : theme.borderColor.opacity(0.65)
+    }
+
+    private var systemGroupedSurface: Color {
+        #if os(iOS) || os(tvOS) || os(visionOS)
+        Color(uiColor: .secondarySystemGroupedBackground)
+        #elseif os(macOS)
+        Color(nsColor: .controlBackgroundColor)
+        #else
+        theme.elevatedSurfaceColor
+        #endif
     }
 
     private var theme: AppTheme {

@@ -143,7 +143,7 @@ public struct ProCelebrationView: View {
 
             VStack(spacing: 6) {
                 Text(resolvedTitle)
-                    .font(.system(size: 34, weight: .bold, design: visualStyle.displayFontDesign))
+                    .font(celebrationTitleFont)
                     .foregroundStyle(primaryForeground)
                     .multilineTextAlignment(.center)
 
@@ -171,7 +171,7 @@ public struct ProCelebrationView: View {
                     .background(statusIconBackground, in: Circle())
                     .overlay {
                         if visualStyle.surface != .plain {
-                            Circle().strokeBorder(celebrationCardBorder)
+                            Circle().strokeBorder(statusIconBorder)
                         }
                     }
 
@@ -208,8 +208,8 @@ public struct ProCelebrationView: View {
                 borderColor: celebrationCardBorder,
                 shadowColor: theme.appearance.shadow.color,
                 fallbackCornerRadius: CGFloat(theme.appearance.cardCornerRadius),
-                fallbackShadowRadius: 14,
-                fallbackShadowOffset: 7
+                fallbackShadowRadius: 0,
+                fallbackShadowOffset: 0
             )
             .contentShape(Rectangle())
         }
@@ -235,7 +235,7 @@ public struct ProCelebrationView: View {
             .padding(.vertical, 9)
 
             Divider()
-                .overlay(celebrationCardBorder.opacity(0.75))
+                .overlay(headerDividerColor)
                 .gridCellColumns(3)
 
             ForEach(Array(resolvedRows.enumerated()), id: \.element.id) { index, row in
@@ -255,10 +255,11 @@ public struct ProCelebrationView: View {
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 9)
+                .background(Color.clear)
 
                 if index < resolvedRows.count - 1 {
                     Divider()
-                        .overlay(celebrationCardBorder.opacity(0.58))
+                        .overlay(rowDividerColor)
                         .gridCellColumns(3)
                 }
             }
@@ -268,8 +269,8 @@ public struct ProCelebrationView: View {
             borderColor: celebrationCardBorder,
             shadowColor: theme.appearance.shadow.color,
             fallbackCornerRadius: CGFloat(theme.appearance.cardCornerRadius),
-            fallbackShadowRadius: 14,
-            fallbackShadowOffset: 7
+            fallbackShadowRadius: 0,
+            fallbackShadowOffset: 0
         )
         .accessibilityElement(children: .contain)
         .accessibilityLabel(configuration.comparisonAccessibilityLabel)
@@ -290,6 +291,17 @@ public struct ProCelebrationView: View {
         AppMetadata.current().name
     }
 
+    private var celebrationTitleFont: Font {
+        if visualStyle.preservesLegacyPresentation {
+            return .largeTitle.bold()
+        }
+        return .system(
+            size: 34,
+            weight: .bold,
+            design: visualStyle.resolvedFontDesign(fallback: .default)
+        )
+    }
+
     private var primaryForeground: Color {
         visualStyle.background == .systemGrouped ? .primary : theme.primaryForegroundColor
     }
@@ -302,17 +314,40 @@ public struct ProCelebrationView: View {
         visualStyle.surface == .plain ? .clear : theme.accentColor.opacity(0.13)
     }
 
+    private var statusIconBorder: Color {
+        visualStyle.preservesLegacyPresentation ? theme.borderColor : celebrationCardBorder
+    }
+
     private var celebrationCardBackground: Color {
         if visualStyle.background == .systemGrouped {
             return systemGroupedSurface
+        }
+        if visualStyle.preservesLegacyPresentation {
+            return theme.elevatedSurfaceColor.opacity(0.62)
         }
         return theme.elevatedSurfaceColor.opacity(0.82)
     }
 
     private var celebrationCardBorder: Color {
-        visualStyle.background == .systemGrouped
-            ? Color.primary.opacity(0.10)
-            : theme.borderColor.opacity(0.65)
+        if visualStyle.background == .systemGrouped {
+            return Color.primary.opacity(0.10)
+        }
+        if visualStyle.preservesLegacyPresentation {
+            return theme.borderColor.opacity(0.45)
+        }
+        return theme.borderColor.opacity(0.65)
+    }
+
+    private var headerDividerColor: Color {
+        visualStyle.preservesLegacyPresentation
+            ? theme.borderColor.opacity(0.45)
+            : celebrationCardBorder.opacity(0.75)
+    }
+
+    private var rowDividerColor: Color {
+        visualStyle.preservesLegacyPresentation
+            ? theme.borderColor.opacity(0.35)
+            : celebrationCardBorder.opacity(0.58)
     }
 
     private var systemGroupedSurface: Color {

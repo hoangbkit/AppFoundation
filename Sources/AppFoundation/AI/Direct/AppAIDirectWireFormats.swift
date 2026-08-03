@@ -25,9 +25,21 @@ extension GeminiRequest.GenerationConfig {
 
     func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encodeIfPresent(temperature, forKey: .temperature)
-        try container.encodeIfPresent(maxOutputTokens, forKey: .maxOutputTokens)
-        try container.encodeIfPresent(responseMimeType, forKey: .responseMimeType)
-        try container.encodeIfPresent(responseSchema, forKey: .responseJsonSchema)
+        try container.encodeIfPresent(
+            temperature,
+            forKey: .temperature
+        )
+        try container.encodeIfPresent(
+            maxOutputTokens,
+            forKey: .maxOutputTokens
+        )
+        try container.encodeIfPresent(
+            responseMimeType,
+            forKey: .responseMimeType
+        )
+        try container.encodeIfPresent(
+            responseJsonSchema,
+            forKey: .responseJsonSchema
+        )
     }
 }

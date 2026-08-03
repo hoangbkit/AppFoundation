@@ -31,7 +31,7 @@ public struct LimitReachedComparisonRow: Identifiable, Hashable, Sendable {
 }
 
 /// App-owned copy for a reusable "limit reached" upsell.
-public struct LimitReachedUpsellConfiguration {
+public struct LimitReachedUpsellConfiguration: Sendable {
     public var navigationTitle: String
     public var title: String
     public var message: String
@@ -121,9 +121,14 @@ public struct ProUpsellView: View {
                 }
                 .scrollIndicators(.hidden)
             }
-            .navigationTitle(configuration.navigationTitle)
-            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                if visualStyle.usesVisibleNavigationChrome {
+                    ToolbarItem(placement: .principal) {
+                        Text(configuration.navigationTitle)
+                            .font(.headline)
+                    }
+                }
+
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close", systemImage: "xmark") { dismiss() }
                         .labelStyle(.iconOnly)
@@ -143,7 +148,7 @@ public struct ProUpsellView: View {
 
             VStack(spacing: 7) {
                 Text(configuration.title)
-                    .font(.system(size: 24, weight: .bold, design: visualStyle.displayFontDesign))
+                    .font(upsellTitleFont)
                     .foregroundStyle(primaryForeground)
                     .multilineTextAlignment(.center)
 
@@ -175,7 +180,7 @@ public struct ProUpsellView: View {
             .padding(.vertical, 9)
 
             Divider()
-                .overlay(comparisonBorder.opacity(0.75))
+                .overlay(headerDividerColor)
                 .gridCellColumns(3)
 
             ForEach(Array(resolvedRows.enumerated()), id: \.element.id) { index, row in
@@ -198,7 +203,7 @@ public struct ProUpsellView: View {
 
                 if index < resolvedRows.count - 1 {
                     Divider()
-                        .overlay(comparisonBorder.opacity(0.58))
+                        .overlay(rowDividerColor)
                         .gridCellColumns(3)
                 }
             }
@@ -208,23 +213,43 @@ public struct ProUpsellView: View {
             borderColor: comparisonBorder,
             shadowColor: theme.appearance.shadow.color,
             fallbackCornerRadius: 16,
-            fallbackShadowRadius: 12,
-            fallbackShadowOffset: 6
+            fallbackShadowRadius: 0,
+            fallbackShadowOffset: 0
         )
         .accessibilityElement(children: .contain)
         .accessibilityLabel(configuration.comparisonAccessibilityLabel)
     }
 
+    @ViewBuilder
     private var unlockAction: some View {
-        Button(action: onUnlockPro) {
-            Label(configuration.unlockButtonTitle, systemImage: "crown.fill")
+        if visualStyle.primaryAction == .automatic {
+            Button(action: onUnlockPro) {
+                Label(configuration.unlockButtonTitle, systemImage: "crown.fill")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(LimitUpsellPrimaryButtonStyle(theme: theme))
+        } else {
+            Button(action: onUnlockPro) {
+                Label(configuration.unlockButtonTitle, systemImage: "crown.fill")
+            }
+            .buttonStyle(FoundationPrimaryButtonStyle(theme: FoundationTheme(theme)))
         }
-        .buttonStyle(FoundationPrimaryButtonStyle(theme: FoundationTheme(theme)))
     }
 
     private var resolvedRows: [LimitReachedComparisonRow] {
         if !configuration.rows.isEmpty { return configuration.rows }
         return purchaseManager.features.map(LimitReachedComparisonRow.init)
+    }
+
+    private var upsellTitleFont: Font {
+        if visualStyle.preservesLegacyPresentation {
+            return .title2.bold()
+        }
+        return .system(
+            size: 24,
+            weight: .bold,
+            design: visualStyle.resolvedFontDesign(fallback: .default)
+        )
     }
 
     private var primaryForeground: Color {
@@ -239,13 +264,32 @@ public struct ProUpsellView: View {
         if visualStyle.background == .systemGrouped {
             return systemGroupedSurface
         }
+        if visualStyle.preservesLegacyPresentation {
+            return theme.elevatedSurfaceColor.opacity(0.62)
+        }
         return theme.elevatedSurfaceColor.opacity(0.82)
     }
 
     private var comparisonBorder: Color {
-        visualStyle.background == .systemGrouped
-            ? Color.primary.opacity(0.10)
-            : theme.borderColor.opacity(0.65)
+        if visualStyle.background == .systemGrouped {
+            return Color.primary.opacity(0.10)
+        }
+        if visualStyle.preservesLegacyPresentation {
+            return theme.borderColor.opacity(0.45)
+        }
+        return theme.borderColor.opacity(0.65)
+    }
+
+    private var headerDividerColor: Color {
+        visualStyle.preservesLegacyPresentation
+            ? theme.borderColor.opacity(0.45)
+            : comparisonBorder.opacity(0.75)
+    }
+
+    private var rowDividerColor: Color {
+        visualStyle.preservesLegacyPresentation
+            ? theme.borderColor.opacity(0.35)
+            : comparisonBorder.opacity(0.58)
     }
 
     private var systemGroupedSurface: Color {
@@ -290,6 +334,29 @@ public struct LimitReachedUpsellFlow<Paywall: View>: View {
                 .transition(.move(edge: .leading).combined(with: .opacity))
             }
         }
+    }
+}
+
+private struct LimitUpsellPrimaryButtonStyle: ButtonStyle {
+    let theme: AppTheme
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.headline.bold())
+            .foregroundStyle(buttonForeground)
+            .padding(.vertical, 15)
+            .background(
+                theme.accentColor.opacity(configuration.isPressed ? 0.78 : 1),
+                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+            )
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
+            .animation(.easeOut(duration: 0.14), value: configuration.isPressed)
+    }
+
+    private var buttonForeground: Color {
+        let accent = theme.appearance.accent
+        let luminance = 0.2126 * accent.red + 0.7152 * accent.green + 0.0722 * accent.blue
+        return luminance > 0.58 ? .black : .white
     }
 }
 

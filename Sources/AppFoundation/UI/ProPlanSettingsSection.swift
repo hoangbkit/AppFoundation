@@ -138,10 +138,7 @@ public struct ProPlanSettingsSection: View {
         case .material:
             theme.surfaceColor.opacity(0.72)
         case .automatic, .solid:
-            if visualStyle.background == .systemGrouped {
-                return systemGroupedSurface
-            }
-            return theme.surfaceColor
+            visualStyle.background == .systemGrouped ? systemGroupedSurface : theme.surfaceColor
         }
     }
 

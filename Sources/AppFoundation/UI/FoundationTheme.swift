@@ -10,7 +10,7 @@ public struct FoundationTheme: Sendable {
     public init(
         primary: Color,
         secondary: Color,
-        background: Color = Color(uiColor: .systemGroupedBackground),
+        background: Color = FoundationTheme.defaultBackground,
         cardCornerRadius: CGFloat = 28
     ) {
         self.primary = primary
@@ -23,6 +23,16 @@ public struct FoundationTheme: Sendable {
         primary: Color(red: 0.30, green: 0.25, blue: 0.95),
         secondary: Color(red: 0.78, green: 0.30, blue: 0.95)
     )
+
+    public static var defaultBackground: Color {
+        #if os(iOS) || os(tvOS) || os(visionOS)
+        Color(uiColor: .systemGroupedBackground)
+        #elseif os(macOS)
+        Color(nsColor: .windowBackgroundColor)
+        #else
+        .clear
+        #endif
+    }
 }
 
 public struct FoundationBackground: View {

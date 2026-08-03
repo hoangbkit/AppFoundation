@@ -25,7 +25,17 @@ final class FoundationVisualStyleTests: XCTestCase {
         XCTAssertEqual(FoundationVisualStyle.flat.surface, .solid)
         XCTAssertEqual(FoundationVisualStyle.flat.elevation, .none)
         XCTAssertEqual(FoundationVisualStyle.flat.primaryAction, .filled)
+        XCTAssertEqual(FoundationVisualStyle.flat.navigationChrome, .system)
         XCTAssertEqual(FoundationVisualStyle.flat.cornerRadius, 10)
+    }
+
+    func testGlassUsesMaterialAndTransparentChrome() {
+        XCTAssertEqual(FoundationVisualStyle.glass.background, .atmospheric)
+        XCTAssertEqual(FoundationVisualStyle.glass.surface, .material)
+        XCTAssertEqual(FoundationVisualStyle.glass.elevation, .subtle)
+        XCTAssertEqual(FoundationVisualStyle.glass.primaryAction, .monochrome)
+        XCTAssertEqual(FoundationVisualStyle.glass.navigationChrome, .transparent)
+        XCTAssertEqual(FoundationVisualStyle.glass.cornerRadius, 26)
     }
 
     func testCustomNegativeCornerRadiusIsClamped() {

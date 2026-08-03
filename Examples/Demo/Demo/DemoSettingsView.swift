@@ -57,6 +57,15 @@ struct DemoSettingsView: View {
                     )
                     .listRowBackground(theme.surfaceColor)
 
+                    Section("AI") {
+                        NavigationLink {
+                            DemoAIProvidersView()
+                        } label: {
+                            Label("AI Providers", systemImage: "sparkles")
+                        }
+                    }
+                    .listRowBackground(theme.surfaceColor)
+
                     Section {
                         ThemePickerView(
                             manager: themes,

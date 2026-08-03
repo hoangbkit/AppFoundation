@@ -29,8 +29,8 @@ struct PaywallThemeTokens {
             background = foundationOverride.background
             primaryForeground = .primary
             secondaryForeground = .secondary
-            surface = Color(uiColor: .secondarySystemGroupedBackground)
-            elevatedSurface = Color(uiColor: .tertiarySystemGroupedBackground)
+            surface = Self.legacySurface
+            elevatedSurface = Self.legacyElevatedSurface
             border = Color.primary.opacity(0.10)
             shadow = Color.black.opacity(0.10)
             cardCornerRadius = foundationOverride.cardCornerRadius
@@ -57,6 +57,26 @@ struct PaywallThemeTokens {
             background: background,
             cardCornerRadius: cardCornerRadius
         )
+    }
+
+    private static var legacySurface: Color {
+        #if os(iOS) || os(tvOS) || os(visionOS)
+        Color(uiColor: .secondarySystemGroupedBackground)
+        #elseif os(macOS)
+        Color(nsColor: .controlBackgroundColor)
+        #else
+        Color.primary.opacity(0.06)
+        #endif
+    }
+
+    private static var legacyElevatedSurface: Color {
+        #if os(iOS) || os(tvOS) || os(visionOS)
+        Color(uiColor: .tertiarySystemGroupedBackground)
+        #elseif os(macOS)
+        Color(nsColor: .underPageBackgroundColor)
+        #else
+        Color.primary.opacity(0.10)
+        #endif
     }
 }
 

@@ -29,6 +29,8 @@ public final class AppAIStatusStore {
     @ObservationIgnored private let client: (any AppAIStatusServing)?
     @ObservationIgnored private let configurationError: AppAIError?
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
+    @ObservationIgnored private var activeRefreshID: UUID?
+    @ObservationIgnored private var stateBeforeRefresh: State?
     @ObservationIgnored private var queuedSyncEntitlements = false
 
     public init(
@@ -85,11 +87,7 @@ public final class AppAIStatusStore {
             queuedSyncEntitlements = queuedSyncEntitlements || syncEntitlements
             return
         }
-        refreshTask = Task { [weak self] in
-            guard let self else { return }
-            await self.performRefresh(syncEntitlements: syncEntitlements)
-            await self.finishRefreshCycle()
-        }
+        _ = startRefresh(syncEntitlements: syncEntitlements)
     }
 
     public func refreshAndWait(syncEntitlements: Bool) async {
@@ -98,35 +96,74 @@ public final class AppAIStatusStore {
             await refreshTask.value
             return
         }
-        let task = Task { [weak self] in
-            guard let self else { return }
-            await self.performRefresh(syncEntitlements: syncEntitlements)
-            await self.finishRefreshCycle()
-        }
-        refreshTask = task
+        let task = startRefresh(syncEntitlements: syncEntitlements)
         await task.value
     }
 
     public func cancelRefresh() {
+        let previousState = stateBeforeRefresh
+        activeRefreshID = nil
         refreshTask?.cancel()
         refreshTask = nil
         queuedSyncEntitlements = false
+        stateBeforeRefresh = nil
+
+        if case .refreshing = state {
+            state = previousState ?? .idle
+        }
     }
 
-    private func finishRefreshCycle() async {
+    @discardableResult
+    private func startRefresh(
+        syncEntitlements: Bool
+    ) -> Task<Void, Never> {
+        let refreshID = UUID()
+        activeRefreshID = refreshID
+        stateBeforeRefresh = state
+
+        let task = Task { [weak self] in
+            guard let self else { return }
+            await self.performRefresh(
+                syncEntitlements: syncEntitlements,
+                refreshID: refreshID
+            )
+            await self.finishRefreshCycle(refreshID: refreshID)
+        }
+        refreshTask = task
+        return task
+    }
+
+    private func finishRefreshCycle(refreshID: UUID) async {
+        guard activeRefreshID == refreshID else { return }
+
+        activeRefreshID = nil
         refreshTask = nil
+        stateBeforeRefresh = nil
+
         guard queuedSyncEntitlements else { return }
         queuedSyncEntitlements = false
         await refreshAndWait(syncEntitlements: true)
     }
 
-    private func performRefresh(syncEntitlements: Bool) async {
+    private func performRefresh(
+        syncEntitlements: Bool,
+        refreshID: UUID
+    ) async {
+        guard activeRefreshID == refreshID else { return }
+
         guard let client else {
-            state = .failed(configurationError ?? .invalidConfiguration("The managed AI client is unavailable."))
+            state = .failed(
+                configurationError
+                    ?? .invalidConfiguration(
+                        "The managed AI client is unavailable."
+                    )
+            )
             return
         }
-        let previous = status.map { ($0, lastUpdatedAt ?? .now) }
+
+        let previous = previousStatus(from: stateBeforeRefresh)
         state = .refreshing
+
         do {
             let result = if syncEntitlements {
                 try await client.syncCurrentEntitlements()
@@ -134,19 +171,48 @@ public final class AppAIStatusStore {
                 try await client.status()
             }
             try Task.checkCancellation()
+            guard activeRefreshID == refreshID else { return }
             state = .current(result, updatedAt: .now)
         } catch is CancellationError {
-            applyFailure(.transport("The managed AI status refresh was cancelled."), previous: previous)
+            guard activeRefreshID == refreshID else { return }
+            applyFailure(
+                .transport("The managed AI status refresh was cancelled."),
+                previous: previous
+            )
         } catch let error as AppAIError {
+            guard activeRefreshID == refreshID else { return }
             applyFailure(error, previous: previous)
         } catch {
-            applyFailure(.transport(error.localizedDescription), previous: previous)
+            guard activeRefreshID == refreshID else { return }
+            applyFailure(
+                .transport(error.localizedDescription),
+                previous: previous
+            )
         }
     }
 
-    private func applyFailure(_ error: AppAIError, previous: (AppAIStatus, Date)?) {
+    private func previousStatus(
+        from state: State?
+    ) -> (AppAIStatus, Date)? {
+        switch state {
+        case .current(let status, let date),
+             .stale(let status, let date, _):
+            return (status, date)
+        case .idle, .refreshing, .failed, nil:
+            return nil
+        }
+    }
+
+    private func applyFailure(
+        _ error: AppAIError,
+        previous: (AppAIStatus, Date)?
+    ) {
         if let previous {
-            state = .stale(previous.0, updatedAt: previous.1, error: error)
+            state = .stale(
+                previous.0,
+                updatedAt: previous.1,
+                error: error
+            )
         } else {
             state = .failed(error)
         }

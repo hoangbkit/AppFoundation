@@ -4,6 +4,11 @@ import Observation
 @MainActor
 @Observable
 public final class AppAIBackendManager {
+    private enum PreferenceWrite: Sendable {
+        case selectedBackend(AppAIBackendID)
+        case model(AppAIProviderID, String?)
+    }
+
     public private(set) var selectedBackendID: AppAIBackendID
     public private(set) var models: [AppAIProviderID: String]
     public let catalog: AppAIBackendCatalog
@@ -11,7 +16,10 @@ public final class AppAIBackendManager {
 
     @ObservationIgnored private let credentialStore: any AppAICredentialStoring
     @ObservationIgnored private let preferences: any AppAIBackendPreferences
-    @ObservationIgnored private let clients: [AppAIProviderID: any AppAIDirectProviderClient]
+    @ObservationIgnored private let clients: [
+        AppAIProviderID: any AppAIDirectProviderClient
+    ]
+    @ObservationIgnored private var preferenceWriteTask: Task<Void, Never>?
 
     public init(
         catalog: AppAIBackendCatalog,
@@ -31,7 +39,9 @@ public final class AppAIBackendManager {
         self.credentialStore = credentialStore
         self.preferences = preferences
 
-        var indexedClients: [AppAIProviderID: any AppAIDirectProviderClient] = [:]
+        var indexedClients: [
+            AppAIProviderID: any AppAIDirectProviderClient
+        ] = [:]
         for client in clients where indexedClients[client.providerID] == nil {
             indexedClients[client.providerID] = client
         }
@@ -67,6 +77,8 @@ public final class AppAIBackendManager {
     }
 
     public func restore() async {
+        await preferenceWriteTask?.value
+
         if let persisted = await preferences.selectedBackend(),
            catalog.contains(persisted) {
             selectedBackendID = persisted
@@ -87,13 +99,14 @@ public final class AppAIBackendManager {
     public func select(_ backend: AppAIBackendID) {
         guard catalog.contains(backend) else { return }
         selectedBackendID = backend
-        Task { await preferences.setSelectedBackend(backend) }
+        enqueuePreferenceWrite(.selectedBackend(backend))
     }
 
     public func selectAndWait(_ backend: AppAIBackendID) async {
         guard catalog.contains(backend) else { return }
         selectedBackendID = backend
-        await preferences.setSelectedBackend(backend)
+        let task = enqueuePreferenceWrite(.selectedBackend(backend))
+        await task.value
     }
 
     public func isConfigured(_ backend: AppAIBackendID) async -> Bool {
@@ -152,12 +165,12 @@ public final class AppAIBackendManager {
         } else {
             models[provider] = normalized
         }
-        Task {
-            await preferences.setModel(
-                normalized.isEmpty ? nil : normalized,
-                for: provider
+        enqueuePreferenceWrite(
+            .model(
+                provider,
+                normalized.isEmpty ? nil : normalized
             )
-        }
+        )
     }
 
     public func setModelAndWait(
@@ -172,10 +185,13 @@ public final class AppAIBackendManager {
         } else {
             models[provider] = normalized
         }
-        await preferences.setModel(
-            normalized.isEmpty ? nil : normalized,
-            for: provider
+        let task = enqueuePreferenceWrite(
+            .model(
+                provider,
+                normalized.isEmpty ? nil : normalized
+            )
         )
+        await task.value
     }
 
     public func test(
@@ -207,6 +223,26 @@ public final class AppAIBackendManager {
             )
         }
         return client
+    }
+
+    @discardableResult
+    private func enqueuePreferenceWrite(
+        _ write: PreferenceWrite
+    ) -> Task<Void, Never> {
+        let previousTask = preferenceWriteTask
+        let preferences = self.preferences
+        let task = Task {
+            await previousTask?.value
+
+            switch write {
+            case .selectedBackend(let backend):
+                await preferences.setSelectedBackend(backend)
+            case .model(let provider, let model):
+                await preferences.setModel(model, for: provider)
+            }
+        }
+        preferenceWriteTask = task
+        return task
     }
 
     private func resolvedModel(

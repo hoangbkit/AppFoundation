@@ -98,14 +98,16 @@ public actor AnthropicMessagesClient: AppAIDirectProviderClient {
             apiVersion,
             forHTTPHeaderField: "anthropic-version"
         )
-        urlRequest.httpBody = try AppAIDirectHTTP.encoder.encode(body)
+        urlRequest.httpBody = try AppAIDirectCodec.encode(body)
 
         let data = try await AppAIDirectHTTP.perform(
             urlRequest,
             transport: transport,
             completionUnknown: true
         )
-        let decoded: AnthropicResponse = try AppAIDirectHTTP.decode(data)
+        let decoded: AnthropicResponse = try AppAIDirectCodec.decode(
+            from: data
+        )
         let text = decoded.content
             .filter { $0.type == "text" }
             .compactMap(\.text)
@@ -176,8 +178,8 @@ public actor AnthropicMessagesClient: AppAIDirectProviderClient {
                 transport: transport,
                 completionUnknown: false
             )
-            let decoded: AnthropicModelsResponse = try AppAIDirectHTTP.decode(
-                data
+            let decoded: AnthropicModelsResponse = try AppAIDirectCodec.decode(
+                from: data
             )
 
             for model in decoded.data {

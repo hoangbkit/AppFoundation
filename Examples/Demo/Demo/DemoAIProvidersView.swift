@@ -1,4 +1,5 @@
 import AppFoundation
+import Foundation
 import SwiftUI
 
 // The Demo intentionally leaves managed AI unconfigured. It still presents the
@@ -64,32 +65,30 @@ enum DemoAIConfiguration {
             namespace: "com.hoangbkit.afdemo"
         )
 
-        let openRouter = AppAIProviderPresets.openRouter(
-            appName: "AppFoundation Demo",
-            siteURL: URL(string: "https://github.com/hoangbkit/AppFoundation"),
-            defaultModel: "openai/gpt-4.1-mini"
-        )
-        let deepSeek = AppAIProviderPresets.deepSeek(
-            defaultModel: "deepseek-chat"
-        )
-        let nvidia = AppAIProviderPresets.nvidia(
-            defaultModel: "meta/llama-3.1-70b-instruct"
-        )
-
         let clients: [any AppAIDirectProviderClient] = [
             OpenAICompatibleClient(
-                configuration: openRouter,
+                configuration: AppAIProviderPresets.openRouter(
+                    appName: "AppFoundation Demo",
+                    siteURL: URL(
+                        string: "https://github.com/hoangbkit/AppFoundation"
+                    ),
+                    defaultModel: "openai/gpt-4.1-mini"
+                ),
                 credentialStore: credentials
             ),
             OpenAIResponsesClient(credentialStore: credentials),
             AnthropicMessagesClient(credentialStore: credentials),
             GeminiGenerateContentClient(credentialStore: credentials),
             OpenAICompatibleClient(
-                configuration: deepSeek,
+                configuration: AppAIProviderPresets.deepSeek(
+                    defaultModel: "deepseek-chat"
+                ),
                 credentialStore: credentials
             ),
             OpenAICompatibleClient(
-                configuration: nvidia,
+                configuration: AppAIProviderPresets.nvidia(
+                    defaultModel: "meta/llama-3.1-70b-instruct"
+                ),
                 credentialStore: credentials
             ),
         ]
@@ -175,9 +174,18 @@ struct DemoAIProvidersView: View {
                 .listRowBackground(theme.surfaceColor)
 
                 Section("Shared Boundary") {
-                    Label("AppFoundation owns secure AI transport", systemImage: "lock.shield.fill")
-                    Label("Each app owns prompts and result meaning", systemImage: "app.badge.checkmark")
-                    Label("Managed and BYOK retry rules remain distinct", systemImage: "arrow.triangle.2.circlepath")
+                    Label(
+                        "AppFoundation owns secure AI transport",
+                        systemImage: "lock.shield.fill"
+                    )
+                    Label(
+                        "Each app owns prompts and result meaning",
+                        systemImage: "app.badge.checkmark"
+                    )
+                    Label(
+                        "Managed and BYOK retry rules remain distinct",
+                        systemImage: "arrow.triangle.2.circlepath"
+                    )
                 }
                 .listRowBackground(theme.surfaceColor)
             }
@@ -227,6 +235,7 @@ struct DemoAIProvidersView: View {
 
     private func refreshStatuses() async {
         var values: [AppAIBackendID: Bool] = [:]
+
         for descriptor in manager.catalog.backends {
             switch descriptor.id {
             case .managed:
@@ -234,9 +243,12 @@ struct DemoAIProvidersView: View {
                 // replace this with an AppAIStatusStore-backed status.
                 values[descriptor.id] = false
             case .direct:
-                values[descriptor.id] = await manager.isConfigured(descriptor.id)
+                values[descriptor.id] = await manager.isConfigured(
+                    descriptor.id
+                )
             }
         }
+
         configuredBackends = values
     }
 }
@@ -276,7 +288,10 @@ private struct DemoManagedAIConfigurationView: View {
                 Section("Demo Status") {
                     LabeledContent("Proxy tenant", value: "Not Configured")
                     LabeledContent("App Attest", value: "Not Connected")
-                    LabeledContent("Entitlement sync", value: "Not Connected")
+                    LabeledContent(
+                        "Entitlement sync",
+                        value: "Not Connected"
+                    )
 
                     Text(
                         "This is intentional. A production app supplies its own app ID, app key, proxy URL, and attestation policy when creating AppAIClient."
@@ -287,10 +302,22 @@ private struct DemoManagedAIConfigurationView: View {
                 .listRowBackground(theme.surfaceColor)
 
                 Section("Production Flow") {
-                    Label("Typed capability requests", systemImage: "curlybraces.square")
-                    Label("Per-request App Attest assertions", systemImage: "checkmark.shield.fill")
-                    Label("Verified StoreKit JWS access", systemImage: "checkmark.seal.fill")
-                    Label("Server idempotency and stored replay", systemImage: "arrow.clockwise.circle.fill")
+                    Label(
+                        "Typed capability requests",
+                        systemImage: "curlybraces.square"
+                    )
+                    Label(
+                        "Per-request App Attest assertions",
+                        systemImage: "checkmark.shield.fill"
+                    )
+                    Label(
+                        "Verified StoreKit JWS access",
+                        systemImage: "checkmark.seal.fill"
+                    )
+                    Label(
+                        "Server idempotency and stored replay",
+                        systemImage: "arrow.clockwise.circle.fill"
+                    )
                 }
                 .listRowBackground(theme.surfaceColor)
             }
@@ -319,7 +346,9 @@ private struct DemoAIDirectProviderView: View {
 
     private var providerID: AppAIProviderID {
         guard case .direct(let providerID) = descriptor.id else {
-            preconditionFailure("Direct provider view requires a direct backend")
+            preconditionFailure(
+                "Direct provider view requires a direct backend"
+            )
         }
         return providerID
     }
@@ -449,7 +478,10 @@ private struct DemoAIModelBrowserView: View {
                     ProgressView("Loading models…")
                 } else if let errorMessage, models.isEmpty {
                     ContentUnavailableView {
-                        Label("Models Unavailable", systemImage: "exclamationmark.triangle")
+                        Label(
+                            "Models Unavailable",
+                            systemImage: "exclamationmark.triangle"
+                        )
                     } description: {
                         Text(errorMessage)
                     } actions: {
@@ -473,18 +505,29 @@ private struct DemoAIModelBrowserView: View {
                             dismiss()
                         } label: {
                             VStack(alignment: .leading, spacing: 3) {
-                                Text(model.displayName ?? model.id)
-                                    .foregroundStyle(theme.primaryForegroundColor)
+                                Text(model.displayName)
+                                    .foregroundStyle(
+                                        theme.primaryForegroundColor
+                                    )
                                 Text(model.id)
                                     .font(.caption.monospaced())
-                                    .foregroundStyle(theme.secondaryForegroundColor)
+                                    .foregroundStyle(
+                                        theme.secondaryForegroundColor
+                                    )
                                 if let contextLength = model.contextLength {
-                                    Text("Context: \(contextLength.formatted()) tokens")
-                                        .font(.caption2)
-                                        .foregroundStyle(theme.secondaryForegroundColor)
+                                    Text(
+                                        "Context: \(contextLength.formatted()) tokens"
+                                    )
+                                    .font(.caption2)
+                                    .foregroundStyle(
+                                        theme.secondaryForegroundColor
+                                    )
                                 }
                             }
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(
+                                maxWidth: .infinity,
+                                alignment: .leading
+                            )
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
@@ -510,8 +553,8 @@ private struct DemoAIModelBrowserView: View {
         do {
             models = try await manager.availableModels(for: providerID)
                 .sorted {
-                    ($0.displayName ?? $0.id).localizedCaseInsensitiveCompare(
-                        $1.displayName ?? $1.id
+                    $0.displayName.localizedCaseInsensitiveCompare(
+                        $1.displayName
                     ) == .orderedAscending
                 }
         } catch {
@@ -588,7 +631,9 @@ private struct DemoAIPlaygroundView: View {
                     .disabled(
                         isGenerating
                             || !isConfigured
-                            || prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            || prompt.trimmingCharacters(
+                                in: .whitespacesAndNewlines
+                            ).isEmpty
                     )
                 }
                 .listRowBackground(theme.surfaceColor)
@@ -619,7 +664,9 @@ private struct DemoAIPlaygroundView: View {
                 if let errorMessage {
                     Section("Error") {
                         Text(errorMessage)
-                            .foregroundStyle(theme.secondaryForegroundColor)
+                            .foregroundStyle(
+                                theme.secondaryForegroundColor
+                            )
                     }
                     .listRowBackground(theme.surfaceColor)
                 }

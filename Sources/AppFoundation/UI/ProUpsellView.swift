@@ -87,6 +87,7 @@ public struct LimitReachedUpsellConfiguration {
 public struct ProUpsellView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appFoundationTheme) private var environmentTheme
+    @Environment(\.appFoundationVisualStyle) private var visualStyle
     @Environment(PurchaseManager.self) private var purchaseManager
 
     private let configuration: LimitReachedUpsellConfiguration
@@ -120,13 +121,15 @@ public struct ProUpsellView: View {
                 }
                 .scrollIndicators(.hidden)
             }
+            .navigationTitle(configuration.navigationTitle)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close", systemImage: "xmark") { dismiss() }
                         .labelStyle(.iconOnly)
                 }
             }
-            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbarBackground(visualStyle.toolbarVisibility, for: .navigationBar)
             .tint(theme.accentColor)
         }
         .presentationDetents([.large])
@@ -140,13 +143,13 @@ public struct ProUpsellView: View {
 
             VStack(spacing: 7) {
                 Text(configuration.title)
-                    .font(.title2.bold())
-                    .foregroundStyle(theme.primaryForegroundColor)
+                    .font(.system(size: 24, weight: .bold, design: visualStyle.displayFontDesign))
+                    .foregroundStyle(primaryForeground)
                     .multilineTextAlignment(.center)
 
                 Text(configuration.message)
                     .font(.subheadline)
-                    .foregroundStyle(theme.secondaryForegroundColor)
+                    .foregroundStyle(secondaryForeground)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -167,23 +170,23 @@ public struct ProUpsellView: View {
                     .gridColumnAlignment(.center)
             }
             .font(.caption.weight(.black))
-            .foregroundStyle(theme.secondaryForegroundColor)
+            .foregroundStyle(secondaryForeground)
             .padding(.horizontal, 10)
             .padding(.vertical, 9)
 
             Divider()
-                .overlay(theme.borderColor.opacity(0.45))
+                .overlay(comparisonBorder.opacity(0.75))
                 .gridCellColumns(3)
 
             ForEach(Array(resolvedRows.enumerated()), id: \.element.id) { index, row in
                 GridRow {
                     Text(row.feature)
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(theme.primaryForegroundColor)
+                        .foregroundStyle(primaryForeground)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     Text(row.freeValue)
                         .font(.caption2.weight(.semibold))
-                        .foregroundStyle(theme.secondaryForegroundColor)
+                        .foregroundStyle(secondaryForeground)
                         .multilineTextAlignment(.center)
                     Text(row.proValue)
                         .font(.caption2.bold())
@@ -195,19 +198,19 @@ public struct ProUpsellView: View {
 
                 if index < resolvedRows.count - 1 {
                     Divider()
-                        .overlay(theme.borderColor.opacity(0.35))
+                        .overlay(comparisonBorder.opacity(0.58))
                         .gridCellColumns(3)
                 }
             }
         }
-        .background(
-            theme.elevatedSurfaceColor.opacity(0.62),
-            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+        .foundationVisualSurface(
+            solidColor: comparisonSurface,
+            borderColor: comparisonBorder,
+            shadowColor: theme.appearance.shadow.color,
+            fallbackCornerRadius: 16,
+            fallbackShadowRadius: 12,
+            fallbackShadowOffset: 6
         )
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(theme.borderColor.opacity(0.45))
-        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(configuration.comparisonAccessibilityLabel)
     }
@@ -215,14 +218,44 @@ public struct ProUpsellView: View {
     private var unlockAction: some View {
         Button(action: onUnlockPro) {
             Label(configuration.unlockButtonTitle, systemImage: "crown.fill")
-                .frame(maxWidth: .infinity)
         }
-        .buttonStyle(LimitUpsellPrimaryButtonStyle(theme: theme))
+        .buttonStyle(FoundationPrimaryButtonStyle(theme: FoundationTheme(theme)))
     }
 
     private var resolvedRows: [LimitReachedComparisonRow] {
         if !configuration.rows.isEmpty { return configuration.rows }
         return purchaseManager.features.map(LimitReachedComparisonRow.init)
+    }
+
+    private var primaryForeground: Color {
+        visualStyle.background == .systemGrouped ? .primary : theme.primaryForegroundColor
+    }
+
+    private var secondaryForeground: Color {
+        visualStyle.background == .systemGrouped ? .secondary : theme.secondaryForegroundColor
+    }
+
+    private var comparisonSurface: Color {
+        if visualStyle.background == .systemGrouped {
+            return systemGroupedSurface
+        }
+        return theme.elevatedSurfaceColor.opacity(0.82)
+    }
+
+    private var comparisonBorder: Color {
+        visualStyle.background == .systemGrouped
+            ? Color.primary.opacity(0.10)
+            : theme.borderColor.opacity(0.65)
+    }
+
+    private var systemGroupedSurface: Color {
+        #if os(iOS) || os(tvOS) || os(visionOS)
+        Color(uiColor: .secondarySystemGroupedBackground)
+        #elseif os(macOS)
+        Color(nsColor: .controlBackgroundColor)
+        #else
+        theme.elevatedSurfaceColor
+        #endif
     }
 
     private var theme: AppTheme {
@@ -257,29 +290,6 @@ public struct LimitReachedUpsellFlow<Paywall: View>: View {
                 .transition(.move(edge: .leading).combined(with: .opacity))
             }
         }
-    }
-}
-
-private struct LimitUpsellPrimaryButtonStyle: ButtonStyle {
-    let theme: AppTheme
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.headline.bold())
-            .foregroundStyle(buttonForeground)
-            .padding(.vertical, 15)
-            .background(
-                theme.accentColor.opacity(configuration.isPressed ? 0.78 : 1),
-                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-            )
-            .scaleEffect(configuration.isPressed ? 0.985 : 1)
-            .animation(.easeOut(duration: 0.14), value: configuration.isPressed)
-    }
-
-    private var buttonForeground: Color {
-        let accent = theme.appearance.accent
-        let luminance = 0.2126 * accent.red + 0.7152 * accent.green + 0.0722 * accent.blue
-        return luminance > 0.58 ? .black : .white
     }
 }
 

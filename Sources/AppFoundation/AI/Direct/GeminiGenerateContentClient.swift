@@ -110,14 +110,16 @@ public actor GeminiGenerateContentClient: AppAIDirectProviderClient {
             credential,
             forHTTPHeaderField: "x-goog-api-key"
         )
-        urlRequest.httpBody = try AppAIDirectHTTP.encoder.encode(body)
+        urlRequest.httpBody = try AppAIDirectCodec.encode(body)
 
         let data = try await AppAIDirectHTTP.perform(
             urlRequest,
             transport: transport,
             completionUnknown: true
         )
-        let decoded: GeminiResponse = try AppAIDirectHTTP.decode(data)
+        let decoded: GeminiResponse = try AppAIDirectCodec.decode(
+            from: data
+        )
         let text = decoded.candidates.first?.content.parts
             .compactMap(\.text)
             .joined() ?? ""
@@ -153,7 +155,9 @@ public actor GeminiGenerateContentClient: AppAIDirectProviderClient {
                 url: AppAIDirectHTTP.endpoint(baseURL, "models"),
                 resolvingAgainstBaseURL: false
             )
-            var queryItems = [URLQueryItem(name: "pageSize", value: "1000")]
+            var queryItems = [
+                URLQueryItem(name: "pageSize", value: "1000"),
+            ]
             if let pageToken {
                 queryItems.append(
                     URLQueryItem(name: "pageToken", value: pageToken)
@@ -181,8 +185,8 @@ public actor GeminiGenerateContentClient: AppAIDirectProviderClient {
                 transport: transport,
                 completionUnknown: false
             )
-            let decoded: GeminiModelsResponse = try AppAIDirectHTTP.decode(
-                data
+            let decoded: GeminiModelsResponse = try AppAIDirectCodec.decode(
+                from: data
             )
 
             for model in decoded.models {

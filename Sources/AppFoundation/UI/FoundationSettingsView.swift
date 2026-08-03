@@ -117,7 +117,7 @@ public struct FoundationSettingsView: View {
                     }
                     .listRowBackground(surface)
                 }
-                .scrollContentBackground(.hidden)
+                .scrollContentBackground(scrollContentBackgroundVisibility)
                 .foregroundStyle(primaryForeground)
             }
             .navigationTitle("Settings")
@@ -259,6 +259,10 @@ public struct FoundationSettingsView: View {
         #else
         activeTheme.surfaceColor
         #endif
+    }
+
+    private var scrollContentBackgroundVisibility: Visibility {
+        visualStyle.background == .systemGrouped ? .visible : .hidden
     }
 
     private var toolbarVisibility: Visibility {

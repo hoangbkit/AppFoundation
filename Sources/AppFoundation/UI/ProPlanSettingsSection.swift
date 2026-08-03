@@ -38,6 +38,7 @@ public struct ProPlanSettingsConfiguration {
 /// The app still owns the paywall presentation. Pass `onUpgrade` to show the upgrade row.
 public struct ProPlanSettingsSection: View {
     @Environment(\.appFoundationTheme) private var theme
+    @Environment(\.appFoundationVisualStyle) private var visualStyle
     @Environment(\.openURL) private var openURL
 
     private let purchaseManager: PurchaseManager
@@ -60,18 +61,18 @@ public struct ProPlanSettingsSection: View {
         Section(configuration.sectionTitle) {
             LabeledContent(configuration.currentPlanLabel) {
                 Text(purchaseManager.hasPro ? configuration.activePlanTitle : configuration.freePlanTitle)
-                    .foregroundStyle(purchaseManager.hasPro ? theme.accentColor : theme.secondaryForegroundColor)
+                    .foregroundStyle(purchaseManager.hasPro ? theme.accentColor : secondaryForeground)
             }
 
             if !purchaseManager.hasPro, let onUpgrade {
                 Button(action: onUpgrade) {
                     HStack {
                         Label(configuration.unlockTitle, systemImage: "crown.fill")
-                            .foregroundStyle(theme.primaryForegroundColor)
+                            .foregroundStyle(primaryForeground)
                         Spacer()
                         Image(systemName: "chevron.right")
                             .font(.caption.bold())
-                            .foregroundStyle(theme.secondaryForegroundColor.opacity(0.72))
+                            .foregroundStyle(secondaryForeground.opacity(0.72))
                     }
                     .contentShape(Rectangle())
                 }
@@ -87,11 +88,11 @@ public struct ProPlanSettingsSection: View {
                             configuration.manageSubscriptionTitle,
                             systemImage: "person.crop.circle.badge.checkmark"
                         )
-                        .foregroundStyle(theme.primaryForegroundColor)
+                        .foregroundStyle(primaryForeground)
                         Spacer()
                         Image(systemName: "arrow.up.right")
                             .font(.caption.bold())
-                            .foregroundStyle(theme.secondaryForegroundColor.opacity(0.72))
+                            .foregroundStyle(secondaryForeground.opacity(0.72))
                     }
                     .contentShape(Rectangle())
                 }
@@ -103,6 +104,7 @@ public struct ProPlanSettingsSection: View {
             } label: {
                 HStack {
                     Label(configuration.restorePurchasesTitle, systemImage: "arrow.clockwise")
+                        .foregroundStyle(primaryForeground)
                     Spacer()
                     if case .restoring = purchaseManager.activity {
                         ProgressView()
@@ -111,6 +113,7 @@ public struct ProPlanSettingsSection: View {
             }
             .disabled(purchaseManager.isBusy)
         }
+        .listRowBackground(rowBackground)
         .alert("Restore Purchases", isPresented: restoreAlertBinding) {
             Button("OK", role: .cancel) {
                 restoreMessage = nil
@@ -118,6 +121,38 @@ public struct ProPlanSettingsSection: View {
         } message: {
             Text(restoreMessage ?? "")
         }
+    }
+
+    private var primaryForeground: Color {
+        visualStyle.background == .systemGrouped ? .primary : theme.primaryForegroundColor
+    }
+
+    private var secondaryForeground: Color {
+        visualStyle.background == .systemGrouped ? .secondary : theme.secondaryForegroundColor
+    }
+
+    private var rowBackground: Color {
+        switch visualStyle.surface {
+        case .plain:
+            .clear
+        case .material:
+            theme.surfaceColor.opacity(0.72)
+        case .automatic, .solid:
+            if visualStyle.background == .systemGrouped {
+                return systemGroupedSurface
+            }
+            return theme.surfaceColor
+        }
+    }
+
+    private var systemGroupedSurface: Color {
+        #if os(iOS) || os(tvOS) || os(visionOS)
+        Color(uiColor: .secondarySystemGroupedBackground)
+        #elseif os(macOS)
+        Color(nsColor: .controlBackgroundColor)
+        #else
+        theme.surfaceColor
+        #endif
     }
 
     private func restorePurchases() {

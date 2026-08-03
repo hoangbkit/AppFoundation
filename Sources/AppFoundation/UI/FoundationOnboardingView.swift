@@ -102,6 +102,7 @@ public struct FoundationOnboardingView: View {
                 .buttonStyle(
                     FoundationOnboardingButtonStyle(
                         theme: resolvedTheme,
+                        actionColor: actionColor,
                         accentForeground: actionAccentForeground
                     )
                 )
@@ -233,6 +234,10 @@ public struct FoundationOnboardingView: View {
         return fixedTheme == nil ? environmentTheme.secondaryForegroundColor : .secondary
     }
 
+    private var actionColor: Color {
+        fixedTheme?.primary ?? environmentTheme.accentColor
+    }
+
     private var actionAccentForeground: Color {
         guard fixedTheme == nil else { return .white }
         let accent = environmentTheme.appearance.accent
@@ -304,6 +309,7 @@ private struct FoundationOnboardingButtonStyle: ButtonStyle {
     @Environment(\.appFoundationVisualStyle) private var visualStyle
 
     let theme: FoundationTheme
+    let actionColor: Color
     let accentForeground: Color
 
     func makeBody(configuration: Configuration) -> some View {
@@ -332,7 +338,7 @@ private struct FoundationOnboardingButtonStyle: ButtonStyle {
                 .fill(Color.white.opacity(isPressed ? 0.84 : 1))
         case .system, .filled:
             RoundedRectangle(cornerRadius: radius, style: .continuous)
-                .fill(theme.primary.opacity(isPressed ? 0.82 : 1))
+                .fill(actionColor.opacity(isPressed ? 0.82 : 1))
         case .gradient:
             RoundedRectangle(cornerRadius: radius, style: .continuous)
                 .fill(

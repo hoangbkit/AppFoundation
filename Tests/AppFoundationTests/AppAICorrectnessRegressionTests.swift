@@ -100,7 +100,7 @@ func directBackendRequiresRegisteredClientToBeReady() async {
 }
 
 @Test
-func GeminiModelDiscoveryPaginatesAndFiltersUnsupportedModels() async throws {
+func geminiModelDiscoveryPaginatesAndFiltersUnsupportedModels() async throws {
     let credentials = AppAIInMemoryCredentialStore(
         credentials: [.gemini: "gemini-key"]
     )
@@ -125,7 +125,8 @@ func GeminiModelDiscoveryPaginatesAndFiltersUnsupportedModels() async throws {
         let body: String
         if call == 1 {
             #expect(query["pageToken"] == nil)
-            body = #"{
+            body = #"""
+            {
                 "models": [
                     {
                         "name": "models/gemini-a",
@@ -140,10 +141,12 @@ func GeminiModelDiscoveryPaginatesAndFiltersUnsupportedModels() async throws {
                     }
                 ],
                 "nextPageToken": "next-page"
-            }"#
+            }
+            """#
         } else {
             #expect(query["pageToken"] == "next-page")
-            body = #"{
+            body = #"""
+            {
                 "models": [
                     {
                         "name": "models/gemini-b",
@@ -152,7 +155,8 @@ func GeminiModelDiscoveryPaginatesAndFiltersUnsupportedModels() async throws {
                         "supportedGenerationMethods": ["generateContent"]
                     }
                 ]
-            }"#
+            }
+            """#
         }
 
         return (
@@ -175,7 +179,7 @@ func GeminiModelDiscoveryPaginatesAndFiltersUnsupportedModels() async throws {
 
     #expect(models.map(\.id) == ["gemini-a", "gemini-b"])
     #expect(models.map(\.displayName) == ["Gemini A", "Gemini B"])
-    #expect(await transport.capturedRequests().count == 2)
+    #expect((await transport.capturedRequests()).count == 2)
 }
 
 @Test @MainActor

@@ -14,7 +14,7 @@ RootView()
     .appFoundationStyle(.native)
 ```
 
-Every built-in view below that point inherits the style.
+Every built-in view below that point inherits the style. Existing app call sites do not need to pass the style into each screen.
 
 ## Adopted built-in views
 

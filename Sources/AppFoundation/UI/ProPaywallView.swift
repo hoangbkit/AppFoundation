@@ -149,7 +149,13 @@ public struct ProPaywallView: View {
             ProCrownIcon()
 
             Text(configuration.title)
-                .font(.system(size: 32, weight: .semibold, design: visualStyle.displayFontDesign))
+                .font(
+                    .system(
+                        size: 32,
+                        weight: .semibold,
+                        design: visualStyle.resolvedFontDesign(fallback: .rounded)
+                    )
+                )
                 .foregroundStyle(primaryForeground)
             Text(configuration.subtitle)
                 .font(.title3)
@@ -163,7 +169,13 @@ public struct ProPaywallView: View {
         VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Pro")
-                    .font(.system(size: 26, weight: .semibold, design: visualStyle.displayFontDesign))
+                    .font(
+                        .system(
+                            size: 26,
+                            weight: .semibold,
+                            design: visualStyle.resolvedFontDesign(fallback: .serif)
+                        )
+                    )
                     .foregroundStyle(primaryForeground)
 
                 Text("Choose the plan that fits you")
@@ -263,8 +275,9 @@ public struct ProPaywallView: View {
                 borderColor: isSelected ? theme.accent : surfaceBorder,
                 shadowColor: theme.shadow.opacity(0.55),
                 fallbackCornerRadius: optionRadius,
-                fallbackShadowRadius: 8,
-                fallbackShadowOffset: 4
+                borderLineWidth: isSelected ? 1.5 : 1,
+                fallbackShadowRadius: 0,
+                fallbackShadowOffset: 0
             )
         }
         .buttonStyle(.plain)
@@ -309,8 +322,9 @@ public struct ProPaywallView: View {
                 borderColor: isSelected ? theme.accent : surfaceBorder,
                 shadowColor: theme.shadow.opacity(0.55),
                 fallbackCornerRadius: optionRadius,
-                fallbackShadowRadius: 8,
-                fallbackShadowOffset: 4
+                borderLineWidth: isSelected ? 1.5 : 1,
+                fallbackShadowRadius: 0,
+                fallbackShadowOffset: 0
             )
             .contentShape(Rectangle())
         }
@@ -333,26 +347,47 @@ public struct ProPaywallView: View {
         .accessibilityHidden(true)
     }
 
+    @ViewBuilder
     private func planBadge(_ badge: String) -> some View {
-        FoundationPill(badge, tint: theme.accent)
-            .lineLimit(1)
+        if visualStyle.preservesLegacyPresentation {
+            Text(badge)
+                .font(.caption2.bold())
+                .padding(.horizontal, 7)
+                .padding(.vertical, 4)
+                .background(theme.accent.opacity(0.15), in: Capsule())
+                .foregroundStyle(theme.accent)
+                .lineLimit(1)
+        } else {
+            FoundationPill(badge, tint: theme.accent)
+                .lineLimit(1)
+        }
     }
 
+    @ViewBuilder
     private var purchaseButton: some View {
-        Button {
-            guard let selectedProduct else { return }
-            Task {
-                await purchases.purchase(selectedProduct)
-                if purchases.isEntitled { dismiss() }
+        if visualStyle.primaryAction == .automatic {
+            Button(action: purchaseSelectedProduct) {
+                HStack {
+                    if purchases.isBusy { ProgressView().tint(.black) }
+                    Text(purchaseButtonTitle).font(.headline)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
             }
-        } label: {
-            HStack {
-                if purchases.isBusy { ProgressView() }
-                Text(purchaseButtonTitle).font(.headline)
+            .background(Color.white, in: Capsule())
+            .foregroundStyle(.black)
+            .shadow(color: .black.opacity(0.16), radius: 12, y: 6)
+            .disabled(selectedProduct == nil || purchases.isBusy)
+        } else {
+            Button(action: purchaseSelectedProduct) {
+                HStack {
+                    if purchases.isBusy { ProgressView() }
+                    Text(purchaseButtonTitle).font(.headline)
+                }
             }
+            .buttonStyle(FoundationPrimaryButtonStyle(theme: theme.foundationTheme))
+            .disabled(selectedProduct == nil || purchases.isBusy)
         }
-        .buttonStyle(FoundationPrimaryButtonStyle(theme: theme.foundationTheme))
-        .disabled(selectedProduct == nil || purchases.isBusy)
     }
 
     private var featureList: some View {
@@ -480,6 +515,14 @@ public struct ProPaywallView: View {
     private var purchaseButtonTitle: String {
         guard let selectedProduct else { return configuration.purchaseButtonTitle }
         return "\(configuration.purchaseButtonTitle) with \(selectedProduct.planLabel)"
+    }
+
+    private func purchaseSelectedProduct() {
+        guard let selectedProduct else { return }
+        Task {
+            await purchases.purchase(selectedProduct)
+            if purchases.isEntitled { dismiss() }
+        }
     }
 
     private func select(_ product: StoreProduct) {

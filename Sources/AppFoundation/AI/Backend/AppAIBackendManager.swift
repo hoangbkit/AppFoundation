@@ -104,10 +104,8 @@ public final class AppAIBackendManager {
             return managedBackend != nil
 
         case .direct(let providerID):
-            if let client = clients[providerID] {
-                return await client.hasCredential()
-            }
-            return await credentialStore.hasCredential(for: providerID)
+            guard let client = clients[providerID] else { return false }
+            return await client.hasCredential()
         }
     }
 
@@ -124,29 +122,15 @@ public final class AppAIBackendManager {
         _ credential: String,
         for provider: AppAIProviderID
     ) async throws {
-        guard catalog.contains(.direct(provider)) else {
-            throw AppAIDirectError.invalidRequest(
-                "The provider is not included in this app's AI catalog."
-            )
-        }
-        if let client = clients[provider] {
-            try await client.saveCredential(credential)
-        } else {
-            try await credentialStore.setCredential(
-                credential,
-                for: provider
-            )
-        }
+        let client = try directClient(for: provider)
+        try await client.saveCredential(credential)
     }
 
     public func removeCredential(
         for provider: AppAIProviderID
     ) async throws {
-        if let client = clients[provider] {
-            try await client.removeCredential()
-        } else {
-            try await credentialStore.removeCredential(for: provider)
-        }
+        let client = try directClient(for: provider)
+        try await client.removeCredential()
     }
 
     public func model(for provider: AppAIProviderID) -> String {

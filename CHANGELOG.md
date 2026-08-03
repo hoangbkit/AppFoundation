@@ -92,6 +92,7 @@ AppFoundation follows semantic versioning while its public API remains in the `0
 - Added responsive widget previews, gallery and detail views, generated Home Screen setup guidance, and app-owned upgrade actions.
 - Added Free and Pro widget presentation without coupling the package to an app's model types or widget extension.
 - Added a Demo catalog containing small, medium, and large widget examples.
+- Added Widget Showcase model and catalog tests.
 - Added `Documentation/WidgetShowcase.md`.
 
 ### Changed
@@ -164,7 +165,7 @@ AppFoundation follows semantic versioning while its public API remains in the `0
 ### Commerce
 
 - Added StoreKit 2 product loading, purchase, restore, verified entitlement evaluation, transaction observation, and foreground refresh.
-- Added `PurchaseManager` as the preferred source-compatible name for the existing `PurchaseController` and added the simple `hasPro` entitlement property.
+- Added `PurchaseManager` as the preferred source-compatible name for `PurchaseController` and added the simple `hasPro` entitlement property.
 - Added Debug-only in-process purchase simulation and runtime switching.
 - Added weekly, monthly, yearly, and non-consumable lifetime plan support.
 - Added `PurchasePlanKind`, plan labels, billing descriptions, recurring/lifetime helpers, and catalog-aware legal disclosure.

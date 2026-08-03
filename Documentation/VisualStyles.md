@@ -1,6 +1,6 @@
 # Built-in View Visual Styles
 
-`AppTheme` controls semantic colors. `FoundationVisualStyle` independently controls the presentation language used by AppFoundation's built-in SwiftUI views: backgrounds, surfaces, elevation, primary actions, corner radius, and navigation chrome.
+`AppTheme` controls semantic colors. `FoundationVisualStyle` independently controls the presentation language used by AppFoundation's built-in SwiftUI views: backgrounds, surfaces, elevation, primary actions, corner radius, typography treatment, and navigation chrome.
 
 Existing apps remain source- and appearance-compatible because `.signature` is the default.
 
@@ -14,7 +14,21 @@ RootView()
     .appFoundationStyle(.native)
 ```
 
-Every built-in view below that point inherits the style, including settings, onboarding, theme previews, shared cards and buttons, and paywall backgrounds.
+Every built-in view below that point inherits the style.
+
+## Adopted built-in views
+
+The portfolio-facing components fully adopt the active visual style:
+
+- `ProPaywallView`
+- `ProUpsellView`
+- `ProCelebrationView`
+- `ProPlanSettingsSection`
+- `ThemePickerView`
+- `FoundationOnboardingView`
+- `FoundationSettingsView`
+
+The shared `ProCrownIcon`, backgrounds, cards, pills, primary buttons, plan options, comparison tables, settings rows, and navigation chrome also inherit the style. Native mode substitutes system foreground and grouped-surface colors where app theme colors would have insufficient contrast.
 
 ## Presets
 
@@ -24,7 +38,7 @@ Every built-in view below that point inherits the style, including settings, onb
 .appFoundationStyle(.signature)
 ```
 
-Preserves the previous AppFoundation appearance. Components use their historical gradients, materials, shadows, corners, and toolbar treatment.
+Preserves the previous AppFoundation appearance. Components use their historical gradients, materials, shadows, corners, typography, and toolbar treatment.
 
 ### Native
 
@@ -32,7 +46,7 @@ Preserves the previous AppFoundation appearance. Components use their historical
 .appFoundationStyle(.native)
 ```
 
-Uses grouped system backgrounds, solid restrained surfaces, 12-point corners, visible system navigation chrome, system-like primary actions, and no floating shadows. This is the recommended default for utility and productivity apps.
+Uses grouped system backgrounds, solid restrained surfaces, 12-point corners, visible system navigation chrome, system-like primary actions, simplified Pro artwork, and no floating shadows. This is the recommended default for utility and productivity apps.
 
 ### Flat
 
@@ -40,7 +54,7 @@ Uses grouped system backgrounds, solid restrained surfaces, 12-point corners, vi
 .appFoundationStyle(.flat)
 ```
 
-Uses the active theme's solid background and surfaces, compact 10-point corners, filled actions, and no elevation. This works well for editors and content-focused apps that should carry stronger app colors without looking glassy.
+Uses the active theme's solid background and surfaces, compact 10-point corners, filled actions, simplified Pro artwork, and no elevation. This works well for editors and content-focused apps that should carry stronger app colors without looking glassy.
 
 ### Glass
 
@@ -48,7 +62,7 @@ Uses the active theme's solid background and surfaces, compact 10-point corners,
 .appFoundationStyle(.glass)
 ```
 
-Uses atmospheric backgrounds, material surfaces, subtle elevation, monochrome actions, and larger corners.
+Uses atmospheric backgrounds, material surfaces, subtle elevation, monochrome actions, ornate Pro artwork, rounded typography, and larger corners.
 
 ## Custom styles
 
@@ -68,6 +82,10 @@ RootView()
 ```
 
 A custom style is a value type and can be stored or encoded if the app allows users to choose a presentation mode.
+
+## Demo
+
+Open the Demo app and go to **Settings → Visual Style → Built-in views**. Switching Signature, Native, Flat, or Glass updates the package screens live and persists across launches.
 
 ## Widget Showcase
 

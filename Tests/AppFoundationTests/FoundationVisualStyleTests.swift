@@ -1,8 +1,16 @@
+import Foundation
 import XCTest
 @testable import AppFoundation
 
+private func requireSendable<T: Sendable>(_: T.Type) {}
+
 final class FoundationVisualStyleTests: XCTestCase {
+    func testStyleIsSendable() {
+        requireSendable(FoundationVisualStyle.self)
+    }
+
     func testSignaturePreservesAutomaticCompatibilityDefaults() {
+        XCTAssertEqual(FoundationVisualStyle(), .signature)
         XCTAssertEqual(FoundationVisualStyle.signature.background, .automatic)
         XCTAssertEqual(FoundationVisualStyle.signature.surface, .automatic)
         XCTAssertEqual(FoundationVisualStyle.signature.elevation, .automatic)

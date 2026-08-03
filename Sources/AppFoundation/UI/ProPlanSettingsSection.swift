@@ -1,4 +1,5 @@
 #if canImport(SwiftUI) && canImport(StoreKit)
+import Foundation
 import SwiftUI
 
 /// App-owned copy for the reusable Pro-plan section used inside a SwiftUI `List` or `Form`.

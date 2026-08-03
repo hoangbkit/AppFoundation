@@ -391,13 +391,20 @@ public struct AppAIDirectProviderConfigurationView: View {
         }
 
         switch providerID {
-        case .openRouter: "sk-or-v1-..."
-        case .openAI: "sk-..."
-        case .anthropic: "sk-ant-..."
-        case .gemini: "AIza..."
-        case .deepSeek: "sk-..."
-        case .nvidia: "nvapi-..."
-        default: "Paste API key"
+        case .openRouter:
+            return "sk-or-v1-..."
+        case .openAI:
+            return "sk-..."
+        case .anthropic:
+            return "sk-ant-..."
+        case .gemini:
+            return "AIza..."
+        case .deepSeek:
+            return "sk-..."
+        case .nvidia:
+            return "nvapi-..."
+        default:
+            return "Paste API key"
         }
     }
 

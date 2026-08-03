@@ -23,7 +23,7 @@ The portfolio-facing components fully adopt the active visual style:
 - `ProPaywallView`
 - `ProUpsellView`
 - `ProCelebrationView`
-- `ProPlanSettingsSection`
+- `ProPlanSettingsSection` (the reusable Pro section)
 - `ThemePickerView`
 - `FoundationOnboardingView`
 - `FoundationSettingsView`

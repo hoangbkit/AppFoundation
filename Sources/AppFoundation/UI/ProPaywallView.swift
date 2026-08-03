@@ -6,6 +6,7 @@ import SwiftUI
 public struct ProPaywallView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appFoundationTheme) private var environmentTheme
+    @Environment(\.appFoundationVisualStyle) private var visualStyle
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(PurchaseManager.self) private var environmentPurchaseManager
 
@@ -86,7 +87,7 @@ public struct ProPaywallView: View {
                         .labelStyle(.iconOnly)
                 }
             }
-            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbarBackground(visualStyle.toolbarVisibility, for: .navigationBar)
             .task {
                 if purchases.products.isEmpty {
                     await purchases.loadProducts(force: true)
@@ -132,7 +133,7 @@ public struct ProPaywallView: View {
             PaywallThemeBackground(tokens: theme)
             content()
         }
-        .foregroundStyle(theme.primaryForeground)
+        .foregroundStyle(primaryForeground)
     }
 
     private var contentStack: some View {
@@ -148,11 +149,11 @@ public struct ProPaywallView: View {
             ProCrownIcon()
 
             Text(configuration.title)
-                .font(.system(size: 32, weight: .semibold, design: .rounded))
-                .foregroundStyle(theme.primaryForeground)
+                .font(.system(size: 32, weight: .semibold, design: visualStyle.displayFontDesign))
+                .foregroundStyle(primaryForeground)
             Text(configuration.subtitle)
                 .font(.title3)
-                .foregroundStyle(theme.secondaryForeground)
+                .foregroundStyle(secondaryForeground)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .multilineTextAlignment(.center)
@@ -162,12 +163,12 @@ public struct ProPaywallView: View {
         VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Pro")
-                    .font(.system(size: 26, weight: .semibold, design: .serif))
-                    .foregroundStyle(theme.primaryForeground)
+                    .font(.system(size: 26, weight: .semibold, design: visualStyle.displayFontDesign))
+                    .foregroundStyle(primaryForeground)
 
                 Text("Choose the plan that fits you")
                     .font(.subheadline)
-                    .foregroundStyle(theme.secondaryForeground)
+                    .foregroundStyle(secondaryForeground)
             }
 
             productContent
@@ -177,20 +178,19 @@ public struct ProPaywallView: View {
             }
 
             if !resolvedFeatures.isEmpty {
-                Divider().overlay(theme.border)
+                Divider().overlay(surfaceBorder)
                 featureList
             }
         }
         .padding(20)
-        .background(
-            theme.surface,
-            in: RoundedRectangle(cornerRadius: theme.cardCornerRadius, style: .continuous)
+        .foundationVisualSurface(
+            solidColor: planSurface,
+            borderColor: surfaceBorder,
+            shadowColor: theme.shadow,
+            fallbackCornerRadius: theme.cardCornerRadius,
+            fallbackShadowRadius: 18,
+            fallbackShadowOffset: 10
         )
-        .overlay {
-            RoundedRectangle(cornerRadius: theme.cardCornerRadius, style: .continuous)
-                .strokeBorder(theme.border)
-        }
-        .shadow(color: theme.shadow, radius: 18, y: 10)
     }
 
     @ViewBuilder
@@ -204,7 +204,7 @@ public struct ProPaywallView: View {
             VStack(spacing: 12) {
                 Text(failure.message)
                     .font(.subheadline)
-                    .foregroundStyle(theme.secondaryForeground)
+                    .foregroundStyle(secondaryForeground)
                     .multilineTextAlignment(.center)
                 Button("Try Again") {
                     Task { await purchases.loadProducts(force: true) }
@@ -247,28 +247,25 @@ public struct ProPaywallView: View {
                     .foregroundStyle(theme.accent)
                 Text(product.displayPrice)
                     .font(.title2.weight(.bold))
-                    .foregroundStyle(theme.primaryForeground)
+                    .foregroundStyle(primaryForeground)
                     .lineLimit(1)
                     .minimumScaleFactor(0.55)
                     .allowsTightening(true)
                 Text(product.isLifetime ? "Pay once" : product.billingDescription)
                     .font(.footnote)
-                    .foregroundStyle(theme.secondaryForeground)
+                    .foregroundStyle(secondaryForeground)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(14)
             .frame(maxWidth: .infinity, minHeight: 132, alignment: .topLeading)
-            .background(
-                isSelected ? theme.accent.opacity(0.12) : theme.elevatedSurface,
-                in: RoundedRectangle(cornerRadius: optionRadius, style: .continuous)
+            .foundationVisualSurface(
+                solidColor: optionSurface(isSelected: isSelected),
+                borderColor: isSelected ? theme.accent : surfaceBorder,
+                shadowColor: theme.shadow.opacity(0.55),
+                fallbackCornerRadius: optionRadius,
+                fallbackShadowRadius: 8,
+                fallbackShadowOffset: 4
             )
-            .overlay {
-                RoundedRectangle(cornerRadius: optionRadius, style: .continuous)
-                    .strokeBorder(
-                        isSelected ? theme.accent : theme.border,
-                        lineWidth: isSelected ? 1.5 : 1
-                    )
-            }
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
@@ -285,10 +282,10 @@ public struct ProPaywallView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(product.planLabel)
                         .font(.headline)
-                        .foregroundStyle(theme.primaryForeground)
+                        .foregroundStyle(primaryForeground)
                     Text(product.billingDescription)
                         .font(.caption)
-                        .foregroundStyle(theme.secondaryForeground)
+                        .foregroundStyle(secondaryForeground)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
@@ -298,7 +295,7 @@ public struct ProPaywallView: View {
                     if let badge { planBadge(badge) }
                     Text(product.displayPrice)
                         .font(.title3.weight(.bold))
-                        .foregroundStyle(theme.primaryForeground)
+                        .foregroundStyle(primaryForeground)
                         .lineLimit(1)
                         .minimumScaleFactor(0.55)
                         .allowsTightening(true)
@@ -307,17 +304,14 @@ public struct ProPaywallView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
             .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
-            .background(
-                isSelected ? theme.accent.opacity(0.12) : theme.elevatedSurface,
-                in: RoundedRectangle(cornerRadius: optionRadius, style: .continuous)
+            .foundationVisualSurface(
+                solidColor: optionSurface(isSelected: isSelected),
+                borderColor: isSelected ? theme.accent : surfaceBorder,
+                shadowColor: theme.shadow.opacity(0.55),
+                fallbackCornerRadius: optionRadius,
+                fallbackShadowRadius: 8,
+                fallbackShadowOffset: 4
             )
-            .overlay {
-                RoundedRectangle(cornerRadius: optionRadius, style: .continuous)
-                    .strokeBorder(
-                        isSelected ? theme.accent : theme.border,
-                        lineWidth: isSelected ? 1.5 : 1
-                    )
-            }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -328,7 +322,7 @@ public struct ProPaywallView: View {
         ZStack {
             Circle()
                 .strokeBorder(
-                    isSelected ? theme.accent : theme.secondaryForeground.opacity(0.45),
+                    isSelected ? theme.accent : secondaryForeground.opacity(0.45),
                     lineWidth: 1.5
                 )
             if isSelected {
@@ -340,12 +334,7 @@ public struct ProPaywallView: View {
     }
 
     private func planBadge(_ badge: String) -> some View {
-        Text(badge)
-            .font(.caption2.bold())
-            .padding(.horizontal, 7)
-            .padding(.vertical, 4)
-            .background(theme.accent.opacity(0.15), in: Capsule())
-            .foregroundStyle(theme.accent)
+        FoundationPill(badge, tint: theme.accent)
             .lineLimit(1)
     }
 
@@ -358,15 +347,11 @@ public struct ProPaywallView: View {
             }
         } label: {
             HStack {
-                if purchases.isBusy { ProgressView().tint(.black) }
+                if purchases.isBusy { ProgressView() }
                 Text(purchaseButtonTitle).font(.headline)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
         }
-        .background(Color.white, in: Capsule())
-        .foregroundStyle(.black)
-        .shadow(color: .black.opacity(0.16), radius: 12, y: 6)
+        .buttonStyle(FoundationPrimaryButtonStyle(theme: theme.foundationTheme))
         .disabled(selectedProduct == nil || purchases.isBusy)
     }
 
@@ -374,7 +359,7 @@ public struct ProPaywallView: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Everything in Free, plus:")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(theme.primaryForeground)
+                .foregroundStyle(primaryForeground)
 
             ForEach(resolvedFeatures) { feature in
                 HStack(alignment: .top, spacing: 10) {
@@ -384,7 +369,7 @@ public struct ProPaywallView: View {
                         .frame(width: 20)
                     Text(feature.message)
                         .font(.subheadline)
-                        .foregroundStyle(theme.primaryForeground)
+                        .foregroundStyle(primaryForeground)
                 }
             }
         }
@@ -394,7 +379,7 @@ public struct ProPaywallView: View {
         VStack(spacing: 10) {
             Text(PurchasePlanDisclosure.text(for: purchases.products))
                 .font(.caption2)
-                .foregroundStyle(theme.secondaryForeground)
+                .foregroundStyle(secondaryForeground)
                 .multilineTextAlignment(.center)
 
             HStack(spacing: 16) {
@@ -434,6 +419,57 @@ public struct ProPaywallView: View {
             appTheme: configuration.themeOverride ?? environmentTheme,
             foundationOverride: configuration.followsActiveTheme ? nil : configuration.theme
         )
+    }
+
+    private var primaryForeground: Color {
+        visualStyle.background == .systemGrouped ? .primary : theme.primaryForeground
+    }
+
+    private var secondaryForeground: Color {
+        visualStyle.background == .systemGrouped ? .secondary : theme.secondaryForeground
+    }
+
+    private var planSurface: Color {
+        if visualStyle.background == .systemGrouped {
+            return systemGroupedSurface
+        }
+        return theme.surface
+    }
+
+    private func optionSurface(isSelected: Bool) -> Color {
+        if isSelected {
+            return theme.accent.opacity(0.12)
+        }
+        if visualStyle.background == .systemGrouped {
+            return systemGroupedElevatedSurface
+        }
+        return theme.elevatedSurface
+    }
+
+    private var surfaceBorder: Color {
+        visualStyle.background == .systemGrouped
+            ? Color.primary.opacity(0.10)
+            : theme.border
+    }
+
+    private var systemGroupedSurface: Color {
+        #if os(iOS) || os(tvOS) || os(visionOS)
+        Color(uiColor: .secondarySystemGroupedBackground)
+        #elseif os(macOS)
+        Color(nsColor: .controlBackgroundColor)
+        #else
+        theme.surface
+        #endif
+    }
+
+    private var systemGroupedElevatedSurface: Color {
+        #if os(iOS) || os(tvOS) || os(visionOS)
+        Color(uiColor: .tertiarySystemGroupedBackground)
+        #elseif os(macOS)
+        Color(nsColor: .underPageBackgroundColor)
+        #else
+        theme.elevatedSurface
+        #endif
     }
 
     private var selectedProduct: StoreProduct? {

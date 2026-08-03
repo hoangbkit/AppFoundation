@@ -130,7 +130,7 @@ public extension View {
 
 extension FoundationVisualStyle {
     func resolvedCornerRadius(fallback: CGFloat) -> CGFloat {
-        cornerRadius.map(CGFloat.init) ?? fallback
+        cornerRadius.map { CGFloat($0) } ?? fallback
     }
 
     var usesVisibleNavigationChrome: Bool {
@@ -230,14 +230,15 @@ private struct FoundationVisualSurfaceModifier: ViewModifier {
     }
 
     private var resolvedShadowColor: Color {
-        guard visualStyle.surface != .plain else { return .clear }
+        guard visualStyle.surface != .plain else { return Color.clear }
+
         switch visualStyle.elevation {
         case .none:
-            .clear
+            return Color.clear
         case .subtle:
-            shadowColor.opacity(0.5)
+            return shadowColor.opacity(0.5)
         case .automatic, .floating:
-            shadowColor
+            return shadowColor
         }
     }
 

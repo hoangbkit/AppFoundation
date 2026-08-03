@@ -136,5 +136,114 @@ extension FoundationVisualStyle {
     var usesVisibleNavigationChrome: Bool {
         navigationChrome == .system
     }
+
+    var toolbarVisibility: Visibility {
+        usesVisibleNavigationChrome ? .visible : .hidden
+    }
+
+    var displayFontDesign: Font.Design {
+        switch surface {
+        case .automatic, .material: .rounded
+        case .solid, .plain: .default
+        }
+    }
+}
+
+extension View {
+    /// Applies the selected AppFoundation surface, border, radius, and elevation
+    /// while allowing each component to supply its semantic theme colors.
+    func foundationVisualSurface(
+        solidColor: Color,
+        borderColor: Color,
+        shadowColor: Color,
+        fallbackCornerRadius: CGFloat,
+        fallbackShadowRadius: CGFloat = 18,
+        fallbackShadowOffset: CGFloat = 10
+    ) -> some View {
+        modifier(
+            FoundationVisualSurfaceModifier(
+                solidColor: solidColor,
+                borderColor: borderColor,
+                shadowColor: shadowColor,
+                fallbackCornerRadius: fallbackCornerRadius,
+                fallbackShadowRadius: fallbackShadowRadius,
+                fallbackShadowOffset: fallbackShadowOffset
+            )
+        )
+    }
+}
+
+private struct FoundationVisualSurfaceModifier: ViewModifier {
+    @Environment(\.appFoundationVisualStyle) private var visualStyle
+
+    let solidColor: Color
+    let borderColor: Color
+    let shadowColor: Color
+    let fallbackCornerRadius: CGFloat
+    let fallbackShadowRadius: CGFloat
+    let fallbackShadowOffset: CGFloat
+
+    func body(content: Content) -> some View {
+        let radius = visualStyle.resolvedCornerRadius(fallback: fallbackCornerRadius)
+
+        content
+            .background { surfaceBackground(radius: radius) }
+            .overlay { surfaceBorder(radius: radius) }
+            .shadow(
+                color: resolvedShadowColor,
+                radius: resolvedShadowRadius,
+                y: resolvedShadowOffset
+            )
+    }
+
+    @ViewBuilder
+    private func surfaceBackground(radius: CGFloat) -> some View {
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+
+        switch visualStyle.surface {
+        case .automatic, .solid:
+            shape.fill(solidColor)
+        case .material:
+            shape.fill(.regularMaterial)
+        case .plain:
+            shape.fill(.clear)
+        }
+    }
+
+    @ViewBuilder
+    private func surfaceBorder(radius: CGFloat) -> some View {
+        if visualStyle.surface != .plain {
+            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .strokeBorder(borderColor)
+        }
+    }
+
+    private var resolvedShadowColor: Color {
+        guard visualStyle.surface != .plain else { return .clear }
+        switch visualStyle.elevation {
+        case .none:
+            .clear
+        case .subtle:
+            shadowColor.opacity(0.5)
+        case .automatic, .floating:
+            shadowColor
+        }
+    }
+
+    private var resolvedShadowRadius: CGFloat {
+        switch visualStyle.elevation {
+        case .none: 0
+        case .subtle: max(4, fallbackShadowRadius * 0.5)
+        case .automatic, .floating: fallbackShadowRadius
+        }
+    }
+
+    private var resolvedShadowOffset: CGFloat {
+        switch visualStyle.elevation {
+        case .none: 0
+        case .subtle: max(2, fallbackShadowOffset * 0.5)
+        case .automatic, .floating: fallbackShadowOffset
+        }
+    }
 }
 #endif

@@ -108,34 +108,36 @@ public struct FoundationCard<Content: View>: View {
 
     @ViewBuilder
     private func cardBackground(radius: CGFloat) -> some View {
-        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
-
         switch visualStyle.surface {
-        case .automatic, .material:
-            shape.fill(.regularMaterial)
+        case .automatic:
+            RoundedRectangle(cornerRadius: radius)
+                .fill(.regularMaterial)
+        case .material:
+            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .fill(.regularMaterial)
         case .solid:
-            shape.fill(theme.background)
+            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .fill(theme.background)
         case .plain:
-            shape.fill(.clear)
+            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .fill(.clear)
         }
     }
 
     @ViewBuilder
     private func cardBorder(radius: CGFloat) -> some View {
-        if visualStyle.surface != .plain {
-            RoundedRectangle(cornerRadius: radius, style: .continuous)
-                .stroke(borderColor, lineWidth: 1)
-        }
-    }
-
-    private var borderColor: Color {
         switch visualStyle.surface {
-        case .automatic, .material:
-            .white.opacity(0.20)
+        case .automatic:
+            RoundedRectangle(cornerRadius: radius)
+                .stroke(.white.opacity(0.20), lineWidth: 1)
+        case .material:
+            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .stroke(.white.opacity(0.20), lineWidth: 1)
         case .solid:
-            .primary.opacity(0.10)
+            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .stroke(.primary.opacity(0.10), lineWidth: 1)
         case .plain:
-            .clear
+            EmptyView()
         }
     }
 
@@ -192,21 +194,21 @@ public struct FoundationPill: View {
         .foregroundStyle(tint)
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
-        .background(
-            tint.opacity(backgroundOpacity),
-            in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        )
+        .background { pillBackground }
     }
 
-    private var cornerRadius: CGFloat {
+    @ViewBuilder
+    private var pillBackground: some View {
         switch visualStyle.surface {
-        case .automatic, .material: 999
-        case .solid, .plain: 7
+        case .automatic, .material:
+            Capsule().fill(tint.opacity(0.12))
+        case .solid:
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(tint.opacity(0.12))
+        case .plain:
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(tint.opacity(0.07))
         }
-    }
-
-    private var backgroundOpacity: Double {
-        visualStyle.surface == .plain ? 0.07 : 0.12
     }
 }
 
@@ -236,21 +238,32 @@ public struct FoundationPrimaryButtonStyle: ButtonStyle {
     @ViewBuilder
     private func buttonBackground(isPressed: Bool) -> some View {
         let radius = buttonCornerRadius
-        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
 
         switch visualStyle.primaryAction {
-        case .automatic, .gradient:
-            shape.fill(
-                LinearGradient(
-                    colors: [theme.primary, theme.secondary],
-                    startPoint: .leading,
-                    endPoint: .trailing
+        case .automatic:
+            RoundedRectangle(cornerRadius: radius)
+                .fill(
+                    LinearGradient(
+                        colors: [theme.primary, theme.secondary],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
                 )
-            )
+        case .gradient:
+            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [theme.primary, theme.secondary],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
         case .system, .filled:
-            shape.fill(theme.primary.opacity(isPressed ? 0.82 : 1))
+            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .fill(theme.primary.opacity(isPressed ? 0.82 : 1))
         case .monochrome:
-            shape.fill(Color.white.opacity(isPressed ? 0.84 : 1))
+            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .fill(Color.white.opacity(isPressed ? 0.84 : 1))
         }
     }
 

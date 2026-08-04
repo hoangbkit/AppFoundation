@@ -41,6 +41,7 @@ private actor AppAttestTestTransport: AppAITransport {
     }
 
     func requestCount() -> Int { requests.count }
+    func capturedRequests() -> [URLRequest] { requests }
 }
 
 private actor AppAttestTestService: AppleAppAttestServicing {
@@ -52,7 +53,7 @@ private actor AppAttestTestService: AppleAppAttestServicing {
 
     init(
         freshKeyID: String = "fresh-app-attest-key",
-        invalidAssertionFailures: Int
+        invalidAssertionFailures: Int = 0
     ) {
         self.freshKeyID = freshKeyID
         self.invalidAssertionFailuresRemaining = invalidAssertionFailures
@@ -105,28 +106,105 @@ private func appAttestRequest() -> AppAIAttestationRequest {
     )
 }
 
-@Test func staleStoredAppAttestKeyIsReplacedAfterReinstall() async throws {
+private func defaultsKey(for configuration: AppAIClientConfiguration) -> String {
+    "\(configuration.keychainService).\(configuration.appID).app-attest-key"
+}
+
+private func makeDefaultsSuite() throws -> (name: String, defaults: UserDefaults) {
+    let name = "com.hoangbkit.AppFoundationTests.AppAttestDefaults.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: name))
+    defaults.removePersistentDomain(forName: name)
+    return (name, defaults)
+}
+
+@Test func reinstallWithoutLocalKeyRegistersAFreshAppAttestKey() async throws {
     let configuration = appAttestTestConfiguration()
     let secureStore = AppAISecureStore(service: configuration.keychainService)
-    let keyAccount = "\(configuration.appID).app-attest-key"
-    try await secureStore.set("stale-app-attest-key", for: keyAccount)
+    let legacyAccount = "\(configuration.appID).app-attest-key"
+    try await secureStore.set("legacy-keychain-key", for: legacyAccount)
+
+    let suite = try makeDefaultsSuite()
+    defer { suite.defaults.removePersistentDomain(forName: suite.name) }
 
     let transport = AppAttestTestTransport()
-    let service = AppAttestTestService(invalidAssertionFailures: 1)
+    let service = AppAttestTestService()
     let provider = AppleAppAttestationProvider(
         configuration: configuration,
         installationID: "installation-kept-in-keychain",
         transport: transport,
         secureStore: secureStore,
-        appAttestService: service
+        appAttestService: service,
+        appAttestDefaultsSuiteName: suite.name
     )
 
     let headers = try await provider.headers(for: appAttestRequest())
-    let storedKey = try await secureStore.string(for: keyAccount)
+    let requests = await transport.capturedRequests()
 
     #expect(headers["X-App-Attest-Key-ID"] == "fresh-app-attest-key")
     #expect(headers["X-App-Attest-Assertion"] == Data([0xB2]).base64EncodedString())
-    #expect(storedKey == "fresh-app-attest-key")
+    #expect(suite.defaults.string(forKey: defaultsKey(for: configuration)) == "fresh-app-attest-key")
+    #expect(try await secureStore.string(for: legacyAccount) == nil)
+    #expect(await service.generatedKeyCount() == 1)
+    #expect(await service.attestedKeys() == ["fresh-app-attest-key"])
+    #expect(await service.assertionKeys() == ["fresh-app-attest-key"])
+    #expect(await transport.requestCount() == 3)
+    #expect(
+        requests.allSatisfy {
+            $0.value(forHTTPHeaderField: "X-Installation-ID")
+                == "installation-kept-in-keychain"
+        }
+    )
+}
+
+@Test func existingLocalKeyIsReusedWithoutRegisteringAnotherKey() async throws {
+    let configuration = appAttestTestConfiguration(appID: "app-attest-existing-key-test")
+    let secureStore = AppAISecureStore(service: configuration.keychainService)
+    let suite = try makeDefaultsSuite()
+    defer { suite.defaults.removePersistentDomain(forName: suite.name) }
+    suite.defaults.set("existing-app-attest-key", forKey: defaultsKey(for: configuration))
+
+    let transport = AppAttestTestTransport()
+    let service = AppAttestTestService()
+    let provider = AppleAppAttestationProvider(
+        configuration: configuration,
+        installationID: "stable-installation",
+        transport: transport,
+        secureStore: secureStore,
+        appAttestService: service,
+        appAttestDefaultsSuiteName: suite.name
+    )
+
+    let headers = try await provider.headers(for: appAttestRequest())
+
+    #expect(headers["X-App-Attest-Key-ID"] == "existing-app-attest-key")
+    #expect(await service.generatedKeyCount() == 0)
+    #expect(await service.attestedKeys().isEmpty)
+    #expect(await service.assertionKeys() == ["existing-app-attest-key"])
+    #expect(await transport.requestCount() == 1)
+}
+
+@Test func invalidLocalAppAttestKeyIsRotatedOnce() async throws {
+    let configuration = appAttestTestConfiguration(appID: "app-attest-key-rotation-test")
+    let secureStore = AppAISecureStore(service: configuration.keychainService)
+    let suite = try makeDefaultsSuite()
+    defer { suite.defaults.removePersistentDomain(forName: suite.name) }
+    suite.defaults.set("stale-app-attest-key", forKey: defaultsKey(for: configuration))
+
+    let transport = AppAttestTestTransport()
+    let service = AppAttestTestService(invalidAssertionFailures: 1)
+    let provider = AppleAppAttestationProvider(
+        configuration: configuration,
+        installationID: "stable-installation",
+        transport: transport,
+        secureStore: secureStore,
+        appAttestService: service,
+        appAttestDefaultsSuiteName: suite.name
+    )
+
+    let headers = try await provider.headers(for: appAttestRequest())
+
+    #expect(headers["X-App-Attest-Key-ID"] == "fresh-app-attest-key")
+    #expect(suite.defaults.string(forKey: defaultsKey(for: configuration)) == "fresh-app-attest-key")
     #expect(await service.generatedKeyCount() == 1)
     #expect(await service.attestedKeys() == ["fresh-app-attest-key"])
     #expect(
@@ -134,24 +212,24 @@ private func appAttestRequest() -> AppAIAttestationRequest {
             == ["stale-app-attest-key", "fresh-app-attest-key"]
     )
     #expect(await transport.requestCount() == 4)
-
-    try await secureStore.remove(keyAccount)
 }
 
 @Test func invalidFreshAppAttestKeyDoesNotCreateARecoveryLoop() async throws {
     let configuration = appAttestTestConfiguration(appID: "app-attest-no-loop-test")
     let secureStore = AppAISecureStore(service: configuration.keychainService)
-    let keyAccount = "\(configuration.appID).app-attest-key"
-    try await secureStore.set("stale-app-attest-key", for: keyAccount)
+    let suite = try makeDefaultsSuite()
+    defer { suite.defaults.removePersistentDomain(forName: suite.name) }
+    suite.defaults.set("stale-app-attest-key", forKey: defaultsKey(for: configuration))
 
     let transport = AppAttestTestTransport()
     let service = AppAttestTestService(invalidAssertionFailures: 2)
     let provider = AppleAppAttestationProvider(
         configuration: configuration,
-        installationID: "installation-kept-in-keychain",
+        installationID: "stable-installation",
         transport: transport,
         secureStore: secureStore,
-        appAttestService: service
+        appAttestService: service,
+        appAttestDefaultsSuiteName: suite.name
     )
 
     var capturedError: AppAIError?
@@ -169,6 +247,7 @@ private func appAttestRequest() -> AppAIAttestationRequest {
         Issue.record("Expected attestationFailed, received \(String(describing: capturedError)).")
     }
 
+    #expect(suite.defaults.string(forKey: defaultsKey(for: configuration)) == nil)
     #expect(await service.generatedKeyCount() == 1)
     #expect(await service.attestedKeys() == ["fresh-app-attest-key"])
     #expect(
@@ -176,6 +255,4 @@ private func appAttestRequest() -> AppAIAttestationRequest {
             == ["stale-app-attest-key", "fresh-app-attest-key"]
     )
     #expect(await transport.requestCount() == 4)
-
-    try await secureStore.remove(keyAccount)
 }

@@ -10,12 +10,58 @@ import DeviceCheck
 #endif
 
 enum AppleAppAttestServiceError: LocalizedError, Equatable, Sendable {
+    case featureUnsupported(String)
+    case invalidInput(String)
     case invalidKey(String)
+    case serverUnavailable(String)
+    case unknownSystemFailure(String)
+    case deviceCheck(code: Int, message: String)
 
     var errorDescription: String? {
         switch self {
-        case .invalidKey(let message):
+        case .featureUnsupported(let message),
+             .invalidInput(let message),
+             .invalidKey(let message),
+             .serverUnavailable(let message),
+             .unknownSystemFailure(let message):
             message
+        case .deviceCheck(_, let message):
+            message
+        }
+    }
+
+    var diagnosticCode: String {
+        switch self {
+        case .featureUnsupported:
+            "featureUnsupported"
+        case .invalidInput:
+            "invalidInput"
+        case .invalidKey:
+            "invalidKey"
+        case .serverUnavailable:
+            "serverUnavailable"
+        case .unknownSystemFailure:
+            "unknownSystemFailure"
+        case .deviceCheck(let code, _):
+            "deviceCheck_\(code)"
+        }
+    }
+
+    var shouldRotateCachedAssertionKey: Bool {
+        switch self {
+        case .invalidKey, .invalidInput:
+            true
+        default:
+            false
+        }
+    }
+
+    var shouldDiscardPendingRegistration: Bool {
+        switch self {
+        case .invalidKey, .invalidInput:
+            true
+        default:
+            false
         }
     }
 }
@@ -81,17 +127,33 @@ struct SystemAppleAppAttestService: AppleAppAttestServicing {
     private static func normalized(_ error: Error) -> Error {
         #if canImport(DeviceCheck) && os(iOS)
         let nsError = error as NSError
-        if nsError.domain == DCError.errorDomain,
-           nsError.code == DCError.Code.invalidKey.rawValue {
+        guard nsError.domain == DCError.errorDomain else { return error }
+
+        switch nsError.code {
+        case DCError.Code.featureUnsupported.rawValue:
+            return AppleAppAttestServiceError.featureUnsupported(error.localizedDescription)
+        case DCError.Code.invalidInput.rawValue:
+            return AppleAppAttestServiceError.invalidInput(error.localizedDescription)
+        case DCError.Code.invalidKey.rawValue:
             return AppleAppAttestServiceError.invalidKey(error.localizedDescription)
+        case DCError.Code.serverUnavailable.rawValue:
+            return AppleAppAttestServiceError.serverUnavailable(error.localizedDescription)
+        case DCError.Code.unknownSystemFailure.rawValue:
+            return AppleAppAttestServiceError.unknownSystemFailure(error.localizedDescription)
+        default:
+            return AppleAppAttestServiceError.deviceCheck(
+                code: nsError.code,
+                message: error.localizedDescription
+            )
         }
-        #endif
+        #else
         return error
+        #endif
     }
 }
 
 actor AppleAppAttestationProvider: AppAIAttestationProviding {
-    private struct ChallengeResponse: Decodable {
+    private struct ChallengeResponse: Codable, Sendable {
         let challengeId: String
         let challenge: String
         let expiresAt: Date
@@ -112,9 +174,14 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
         let attestationObject: String
     }
 
-    private struct RegisteredKey {
+    private struct RegisteredKey: Sendable {
         let id: String
         let cameFromLocalStore: Bool
+    }
+
+    private struct PendingRegistration: Codable, Sendable {
+        let keyID: String
+        let challenge: ChallengeResponse
     }
 
     private let configuration: AppAIClientConfiguration
@@ -144,6 +211,23 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
         self.decoder = Self.makeDecoder()
     }
 
+    func prepare() async throws {
+        guard configuration.attestationPolicy != .disabled else { return }
+        guard await appAttestService.isSupported() else {
+            if configuration.attestationPolicy == .required {
+                throw AppAIError.attestationUnavailable
+            }
+            return
+        }
+
+        do {
+            _ = try await registeredKey()
+        } catch {
+            if configuration.attestationPolicy == .preferred { return }
+            throw publicError(from: error)
+        }
+    }
+
     func headers(for request: AppAIAttestationRequest) async throws -> [String: String] {
         guard configuration.attestationPolicy != .disabled else { return [:] }
         guard await appAttestService.isSupported() else {
@@ -160,18 +244,22 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
             )
         } catch {
             if configuration.attestationPolicy == .preferred { return [:] }
-            if let error = error as? AppAIError { throw error }
-            throw AppAIError.attestationFailed(error.localizedDescription)
+            throw publicError(from: error)
         }
     }
 
     func resetKey() async throws {
-        appAttestDefaults.removeObject(forKey: keyDefaultsKey)
+        clearRegisteredKey()
+        clearPendingRegistration()
         try await secureStore.remove(legacyKeyAccount)
     }
 
     private var keyDefaultsKey: String {
         "\(configuration.keychainService).\(configuration.appID).app-attest-key"
+    }
+
+    private var pendingRegistrationDefaultsKey: String {
+        "\(configuration.keychainService).\(configuration.appID).app-attest-pending-registration.v1"
     }
 
     private var legacyKeyAccount: String {
@@ -217,26 +305,27 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
                 clientDataHash: Self.sha256(clientData)
             )
         } catch let error as AppleAppAttestServiceError {
-            guard case .invalidKey = error else {
-                throw errorAsAttestationFailure(error)
+            guard error.shouldRotateCachedAssertionKey else {
+                throw errorAsAttestationFailure(error, stage: "generateAssertion")
             }
 
-            appAttestDefaults.removeObject(forKey: keyDefaultsKey)
+            clearRegisteredKey()
+            clearPendingRegistration()
 
             guard allowsLocalKeyRecovery,
                   registeredKey.cameFromLocalStore else {
-                throw errorAsAttestationFailure(error)
+                throw errorAsAttestationFailure(error, stage: "generateAssertion")
             }
 
-            // The locally cached identifier can become unusable after restore or
-            // unusual device state. Register a fresh key and retry this logical
-            // request once with a fresh one-time challenge.
+            // A restored or otherwise stale local identifier can surface as either
+            // invalidKey or invalidInput on real devices. Rotate once only, then
+            // retry this logical request with a fresh key and challenge.
             return try await assertionHeaders(
                 for: request,
                 allowsLocalKeyRecovery: false
             )
         } catch {
-            throw errorAsAttestationFailure(error)
+            throw errorAsAttestationFailure(error, stage: "generateAssertion")
         }
 
         return [
@@ -259,7 +348,78 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
         // the underlying App Attest key does not.
         try? await secureStore.remove(legacyKeyAccount)
 
-        let keyID = try await appAttestService.generateKey()
+        return try await registerNewKey()
+    }
+
+    private func registerNewKey() async throws -> RegisteredKey {
+        let pending = try await resolvedPendingRegistration()
+        guard let challengeData = Data(base64URL: pending.challenge.challenge) else {
+            clearPendingRegistration()
+            throw AppAIError.invalidResponse
+        }
+
+        let attestation: Data
+        do {
+            attestation = try await appAttestService.attestKey(
+                pending.keyID,
+                clientDataHash: Self.sha256(challengeData)
+            )
+        } catch let error as AppleAppAttestServiceError {
+            if error.shouldDiscardPendingRegistration {
+                clearPendingRegistration()
+            }
+            throw errorAsAttestationFailure(error, stage: "attestKey")
+        } catch {
+            throw errorAsAttestationFailure(error, stage: "attestKey")
+        }
+
+        let body = RegisterRequest(
+            challengeId: pending.challenge.challengeId,
+            challenge: pending.challenge.challenge,
+            keyId: pending.keyID,
+            attestationObject: attestation.base64EncodedString()
+        )
+
+        // Once Apple has attested the key, remember it before contacting the app
+        // server. If the response is lost after the server commits registration,
+        // the next assertion can still prove whether registration succeeded. The
+        // client's unknown-key recovery handles the opposite outcome.
+        appAttestDefaults.set(pending.keyID, forKey: keyDefaultsKey)
+        clearPendingRegistration()
+
+        _ = try await send(
+            path: "/v1/attest/register",
+            body: body,
+            response: EmptyResponse.self
+        )
+        return RegisteredKey(id: pending.keyID, cameFromLocalStore: false)
+    }
+
+    private func resolvedPendingRegistration() async throws -> PendingRegistration {
+        if let pending = loadPendingRegistration() {
+            if pending.challenge.expiresAt.timeIntervalSinceNow > 1 {
+                return pending
+            }
+
+            let challenge = try await fetchChallenge(
+                ChallengeRequest(
+                    purpose: "register",
+                    requestId: nil,
+                    method: nil,
+                    path: nil,
+                    bodyHash: nil
+                )
+            )
+            let refreshed = PendingRegistration(
+                keyID: pending.keyID,
+                challenge: challenge
+            )
+            try savePendingRegistration(refreshed)
+            return refreshed
+        }
+
+        // Ask the app server to initiate registration before allocating a key.
+        // This gives the server control over rollout and attestation request rate.
         let challenge = try await fetchChallenge(
             ChallengeRequest(
                 purpose: "register",
@@ -269,33 +429,44 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
                 bodyHash: nil
             )
         )
-        guard let challengeData = Data(base64URL: challenge.challenge) else {
-            throw AppAIError.invalidResponse
-        }
 
-        let attestation: Data
+        let keyID: String
         do {
-            attestation = try await appAttestService.attestKey(
-                keyID,
-                clientDataHash: Self.sha256(challengeData)
-            )
+            keyID = try await appAttestService.generateKey()
         } catch {
-            throw errorAsAttestationFailure(error)
+            throw errorAsAttestationFailure(error, stage: "generateKey")
         }
 
-        let body = RegisterRequest(
-            challengeId: challenge.challengeId,
-            challenge: challenge.challenge,
-            keyId: keyID,
-            attestationObject: attestation.base64EncodedString()
-        )
-        _ = try await send(
-            path: "/v1/attest/register",
-            body: body,
-            response: EmptyResponse.self
-        )
-        appAttestDefaults.set(keyID, forKey: keyDefaultsKey)
-        return RegisteredKey(id: keyID, cameFromLocalStore: false)
+        let pending = PendingRegistration(keyID: keyID, challenge: challenge)
+        try savePendingRegistration(pending)
+        return pending
+    }
+
+    private func loadPendingRegistration() -> PendingRegistration? {
+        guard let data = appAttestDefaults.data(forKey: pendingRegistrationDefaultsKey) else {
+            return nil
+        }
+        guard let pending = try? decoder.decode(PendingRegistration.self, from: data),
+              !pending.keyID.isEmpty,
+              !pending.challenge.challengeId.isEmpty,
+              !pending.challenge.challenge.isEmpty else {
+            clearPendingRegistration()
+            return nil
+        }
+        return pending
+    }
+
+    private func savePendingRegistration(_ pending: PendingRegistration) throws {
+        let data = try encoder.encode(pending)
+        appAttestDefaults.set(data, forKey: pendingRegistrationDefaultsKey)
+    }
+
+    private func clearRegisteredKey() {
+        appAttestDefaults.removeObject(forKey: keyDefaultsKey)
+    }
+
+    private func clearPendingRegistration() {
+        appAttestDefaults.removeObject(forKey: pendingRegistrationDefaultsKey)
     }
 
     private func fetchChallenge(_ body: ChallengeRequest) async throws -> ChallengeResponse {
@@ -345,9 +516,23 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
         return decoded
     }
 
-    private func errorAsAttestationFailure(_ error: Error) -> Error {
+    private func publicError(from error: Error) -> Error {
         if let error = error as? AppAIError { return error }
-        return AppAIError.attestationFailed(error.localizedDescription)
+        return errorAsAttestationFailure(error, stage: "unknown")
+    }
+
+    private func errorAsAttestationFailure(_ error: Error, stage: String) -> Error {
+        if let error = error as? AppAIError { return error }
+        if let error = error as? AppleAppAttestServiceError {
+            return AppAIError.attestationFailed(
+                "App Attest \(stage) failed (\(error.diagnosticCode)): \(error.localizedDescription)"
+            )
+        }
+
+        let nsError = error as NSError
+        return AppAIError.attestationFailed(
+            "App Attest \(stage) failed [\(nsError.domain):\(nsError.code)]: \(error.localizedDescription)"
+        )
     }
 
     private static func makeEncoder() -> JSONEncoder {

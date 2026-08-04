@@ -136,8 +136,13 @@ public struct AppAIAttestationRequest: Sendable {
 }
 
 public protocol AppAIAttestationProviding: Sendable {
+    func prepare() async throws
     func headers(for request: AppAIAttestationRequest) async throws -> [String: String]
     func resetKey() async throws
+}
+
+public extension AppAIAttestationProviding {
+    func prepare() async throws {}
 }
 
 public struct AppAIAccess: Decodable, Sendable, Equatable {

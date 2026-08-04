@@ -59,8 +59,6 @@ public actor AppAIClient {
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
     private let injectedAttestationProvider: (any AppAIAttestationProviding)?
-    private var installationIDCache: String?
-    private var defaultAttestationProvider: (any AppAIAttestationProviding)?
 
     public init(
         configuration: AppAIClientConfiguration,
@@ -73,7 +71,6 @@ public actor AppAIClient {
         self.encoder = Self.makeEncoder()
         self.decoder = Self.makeDecoder()
         self.injectedAttestationProvider = attestationProvider
-        self.defaultAttestationProvider = nil
     }
 
     public func status() async throws -> AppAIStatus {
@@ -94,7 +91,7 @@ public actor AppAIClient {
         await AppAIProcessGate.shared.acquire(gateKey)
         do {
             try Task.checkCancellation()
-            let provider = try await resolvedAttestationProvider(
+            let provider = resolvedAttestationProvider(
                 installationID: installationID
             )
             try await provider?.prepare()
@@ -179,27 +176,22 @@ public actor AppAIClient {
                 if let injectedAttestationProvider {
                     try await injectedAttestationProvider.resetKey()
                 } else {
-                    let provider = defaultAttestationProvider
-                        ?? AppleAppAttestationProvider(
-                            configuration: configuration,
-                            installationID: installationIDCache ?? "",
-                            transport: transport,
-                            secureStore: secureStore
-                        )
+                    let provider = AppleAppAttestationProvider(
+                        configuration: configuration,
+                        installationID: "",
+                        transport: transport,
+                        secureStore: secureStore
+                    )
                     try await provider.resetKey()
                 }
 
                 try await secureStore.remove(installationAccount)
-                installationIDCache = nil
-                defaultAttestationProvider = nil
-
                 await AppAIProcessGate.shared.release(attestationKey)
-                await AppAIProcessGate.shared.release(identityKey)
             } catch {
                 await AppAIProcessGate.shared.release(attestationKey)
-                await AppAIProcessGate.shared.release(identityKey)
                 throw error
             }
+            await AppAIProcessGate.shared.release(identityKey)
         } catch {
             await AppAIProcessGate.shared.release(identityKey)
             throw error
@@ -219,22 +211,16 @@ public actor AppAIClient {
     }
 
     private func installationID() async throws -> String {
-        if let installationIDCache { return installationIDCache }
-
         let gateKey = installationGateKey
         await AppAIProcessGate.shared.acquire(gateKey)
         do {
             try Task.checkCancellation()
             let value: String
-            if let installationIDCache {
-                value = installationIDCache
-            } else if let stored = try await secureStore.string(for: installationAccount) {
-                installationIDCache = stored
+            if let stored = try await secureStore.string(for: installationAccount) {
                 value = stored
             } else {
                 let generated = UUID().uuidString.lowercased()
                 try await secureStore.set(generated, for: installationAccount)
-                installationIDCache = generated
                 value = generated
             }
 
@@ -248,19 +234,16 @@ public actor AppAIClient {
 
     private func resolvedAttestationProvider(
         installationID: String
-    ) async throws -> (any AppAIAttestationProviding)? {
+    ) -> (any AppAIAttestationProviding)? {
         guard configuration.attestationPolicy != .disabled else { return nil }
         if let injectedAttestationProvider { return injectedAttestationProvider }
-        if let defaultAttestationProvider { return defaultAttestationProvider }
 
-        let provider = AppleAppAttestationProvider(
+        return AppleAppAttestationProvider(
             configuration: configuration,
             installationID: installationID,
             transport: transport,
             secureStore: secureStore
         )
-        defaultAttestationProvider = provider
-        return provider
     }
 
     private func baseRequest(
@@ -296,7 +279,7 @@ public actor AppAIClient {
         as type: Response.Type
     ) async throws -> Response {
         let installationID = try await installationID()
-        let provider = try await resolvedAttestationProvider(
+        let provider = resolvedAttestationProvider(
             installationID: installationID
         )
 

@@ -86,6 +86,8 @@ struct SystemAppleAppAttestService: AppleAppAttestServicing {
         #if canImport(DeviceCheck) && os(iOS)
         do {
             return try await DCAppAttestService.shared.generateKey()
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
             throw Self.normalized(error)
         }
@@ -101,6 +103,8 @@ struct SystemAppleAppAttestService: AppleAppAttestServicing {
                 keyID,
                 clientDataHash: clientDataHash
             )
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
             throw Self.normalized(error)
         }
@@ -116,6 +120,8 @@ struct SystemAppleAppAttestService: AppleAppAttestServicing {
                 keyID,
                 clientDataHash: clientDataHash
             )
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
             throw Self.normalized(error)
         }
@@ -222,6 +228,8 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
 
         do {
             _ = try await registeredKey()
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
             if configuration.attestationPolicy == .preferred { return }
             throw publicError(from: error)
@@ -242,6 +250,8 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
                 for: request,
                 allowsLocalKeyRecovery: true
             )
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
             if configuration.attestationPolicy == .preferred { return [:] }
             throw publicError(from: error)
@@ -304,6 +314,8 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
                 registeredKey.id,
                 clientDataHash: Self.sha256(clientData)
             )
+        } catch is CancellationError {
+            throw CancellationError()
         } catch let error as AppleAppAttestServiceError {
             guard error.shouldRotateCachedAssertionKey else {
                 throw errorAsAttestationFailure(error, stage: "generateAssertion")
@@ -343,11 +355,17 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
             return RegisteredKey(id: stored, cameFromLocalStore: true)
         }
 
-        // Older AppFoundation builds cached this identifier in Keychain. Ignore
-        // and clean that legacy value: it can outlive an uninstall even though
-        // the underlying App Attest key does not.
-        try? await secureStore.remove(legacyKeyAccount)
+        // Preserve a valid key during the one-time migration from older
+        // AppFoundation versions. After a reinstall the migrated identifier is
+        // stale, and the bounded invalidKey/invalidInput recovery above rotates it.
+        if let legacy = try await secureStore.string(for: legacyKeyAccount),
+           !legacy.isEmpty {
+            appAttestDefaults.set(legacy, forKey: keyDefaultsKey)
+            try await secureStore.remove(legacyKeyAccount)
+            return RegisteredKey(id: legacy, cameFromLocalStore: true)
+        }
 
+        try? await secureStore.remove(legacyKeyAccount)
         return try await registerNewKey()
     }
 
@@ -364,6 +382,8 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
                 pending.keyID,
                 clientDataHash: Self.sha256(challengeData)
             )
+        } catch is CancellationError {
+            throw CancellationError()
         } catch let error as AppleAppAttestServiceError {
             if error.shouldDiscardPendingRegistration {
                 clearPendingRegistration()
@@ -433,6 +453,8 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
         let keyID: String
         do {
             keyID = try await appAttestService.generateKey()
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
             throw errorAsAttestationFailure(error, stage: "generateKey")
         }
@@ -477,7 +499,7 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
         )
     }
 
-    private func send<Body: Encodable, Response: Decodable>(
+    private func send<Body: Encodable, Response: Decodable & Sendable>(
         path: String,
         body: Body,
         response: Response.Type
@@ -497,6 +519,10 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
         let httpResponse: HTTPURLResponse
         do {
             (responseData, httpResponse) = try await transport.data(for: request)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as URLError where error.code == .cancelled {
+            throw CancellationError()
         } catch let error as AppAIError {
             throw error
         } catch {
@@ -517,11 +543,13 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
     }
 
     private func publicError(from error: Error) -> Error {
+        if error is CancellationError { return CancellationError() }
         if let error = error as? AppAIError { return error }
         return errorAsAttestationFailure(error, stage: "unknown")
     }
 
     private func errorAsAttestationFailure(_ error: Error, stage: String) -> Error {
+        if error is CancellationError { return CancellationError() }
         if let error = error as? AppAIError { return error }
         if let error = error as? AppleAppAttestServiceError {
             return AppAIError.attestationFailed(
@@ -591,7 +619,7 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
     }
 }
 
-private struct EmptyResponse: Decodable {}
+private struct EmptyResponse: Decodable, Sendable {}
 
 private extension Data {
     init?(base64URL value: String) {

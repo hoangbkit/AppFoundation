@@ -7,6 +7,11 @@ import Testing
 
 private actor AppAttestTestTransport: AppAITransport {
     private var requests: [URLRequest] = []
+    private var registerTransportFailuresRemaining: Int
+
+    init(registerTransportFailures: Int = 0) {
+        self.registerTransportFailuresRemaining = registerTransportFailures
+    }
 
     func data(for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         requests.append(request)
@@ -32,6 +37,10 @@ private actor AppAttestTestTransport: AppAITransport {
             return (try JSONSerialization.data(withJSONObject: payload), response)
 
         case "/v1/attest/register":
+            if registerTransportFailuresRemaining > 0 {
+                registerTransportFailuresRemaining -= 1
+                throw URLError(.networkConnectionLost)
+            }
             return (Data("{}".utf8), response)
 
         default:
@@ -46,17 +55,21 @@ private actor AppAttestTestTransport: AppAITransport {
 
 private actor AppAttestTestService: AppleAppAttestServicing {
     private let freshKeyID: String
-    private var invalidAssertionFailuresRemaining: Int
+    private var attestationFailures: [AppleAppAttestServiceError]
+    private var assertionFailures: [AppleAppAttestServiceError]
     private var generateKeyCalls = 0
     private var attestedKeyIDs: [String] = []
+    private var attestationHashes: [Data] = []
     private var assertionKeyIDs: [String] = []
 
     init(
         freshKeyID: String = "fresh-app-attest-key",
-        invalidAssertionFailures: Int = 0
+        attestationFailures: [AppleAppAttestServiceError] = [],
+        assertionFailures: [AppleAppAttestServiceError] = []
     ) {
         self.freshKeyID = freshKeyID
-        self.invalidAssertionFailuresRemaining = invalidAssertionFailures
+        self.attestationFailures = attestationFailures
+        self.assertionFailures = assertionFailures
     }
 
     func isSupported() async -> Bool { true }
@@ -68,20 +81,24 @@ private actor AppAttestTestService: AppleAppAttestServicing {
 
     func attestKey(_ keyID: String, clientDataHash: Data) async throws -> Data {
         attestedKeyIDs.append(keyID)
+        attestationHashes.append(clientDataHash)
+        if !attestationFailures.isEmpty {
+            throw attestationFailures.removeFirst()
+        }
         return Data([0xA1])
     }
 
     func generateAssertion(_ keyID: String, clientDataHash: Data) async throws -> Data {
         assertionKeyIDs.append(keyID)
-        if invalidAssertionFailuresRemaining > 0 {
-            invalidAssertionFailuresRemaining -= 1
-            throw AppleAppAttestServiceError.invalidKey("The App Attest key is invalid.")
+        if !assertionFailures.isEmpty {
+            throw assertionFailures.removeFirst()
         }
         return Data([0xB2])
     }
 
     func generatedKeyCount() -> Int { generateKeyCalls }
     func attestedKeys() -> [String] { attestedKeyIDs }
+    func capturedAttestationHashes() -> [Data] { attestationHashes }
     func assertionKeys() -> [String] { assertionKeyIDs }
 }
 
@@ -108,6 +125,10 @@ private func appAttestRequest() -> AppAIAttestationRequest {
 
 private func defaultsKey(for configuration: AppAIClientConfiguration) -> String {
     "\(configuration.keychainService).\(configuration.appID).app-attest-key"
+}
+
+private func pendingDefaultsKey(for configuration: AppAIClientConfiguration) -> String {
+    "\(configuration.keychainService).\(configuration.appID).app-attest-pending-registration.v1"
 }
 
 private func makeDefaultsSuite() throws -> (name: String, defaults: UserDefaults) {
@@ -143,6 +164,7 @@ private func makeDefaultsSuite() throws -> (name: String, defaults: UserDefaults
     #expect(headers["X-App-Attest-Key-ID"] == "fresh-app-attest-key")
     #expect(headers["X-App-Attest-Assertion"] == Data([0xB2]).base64EncodedString())
     #expect(suite.defaults.string(forKey: defaultsKey(for: configuration)) == "fresh-app-attest-key")
+    #expect(suite.defaults.data(forKey: pendingDefaultsKey(for: configuration)) == nil)
     #expect(try await secureStore.string(for: legacyAccount) == nil)
     #expect(await service.generatedKeyCount() == 1)
     #expect(await service.attestedKeys() == ["fresh-app-attest-key"])
@@ -154,6 +176,32 @@ private func makeDefaultsSuite() throws -> (name: String, defaults: UserDefaults
                 == "installation-kept-in-keychain"
         }
     )
+}
+
+@Test func prepareRegistersAKeyWithoutGeneratingAnAssertion() async throws {
+    let configuration = appAttestTestConfiguration(appID: "app-attest-prepare-test")
+    let secureStore = AppAISecureStore(service: configuration.keychainService)
+    let suite = try makeDefaultsSuite()
+    defer { suite.defaults.removePersistentDomain(forName: suite.name) }
+
+    let transport = AppAttestTestTransport()
+    let service = AppAttestTestService()
+    let provider = AppleAppAttestationProvider(
+        configuration: configuration,
+        installationID: "stable-installation",
+        transport: transport,
+        secureStore: secureStore,
+        appAttestService: service,
+        appAttestDefaultsSuiteName: suite.name
+    )
+
+    try await provider.prepare()
+
+    #expect(suite.defaults.string(forKey: defaultsKey(for: configuration)) == "fresh-app-attest-key")
+    #expect(await service.generatedKeyCount() == 1)
+    #expect(await service.attestedKeys() == ["fresh-app-attest-key"])
+    #expect(await service.assertionKeys().isEmpty)
+    #expect(await transport.requestCount() == 2)
 }
 
 @Test func existingLocalKeyIsReusedWithoutRegisteringAnotherKey() async throws {
@@ -183,6 +231,91 @@ private func makeDefaultsSuite() throws -> (name: String, defaults: UserDefaults
     #expect(await transport.requestCount() == 1)
 }
 
+@Test func transientAttestationFailureReusesTheSameKeyAndClientDataHash() async throws {
+    let configuration = appAttestTestConfiguration(appID: "app-attest-transient-test")
+    let secureStore = AppAISecureStore(service: configuration.keychainService)
+    let suite = try makeDefaultsSuite()
+    defer { suite.defaults.removePersistentDomain(forName: suite.name) }
+
+    let transport = AppAttestTestTransport()
+    let service = AppAttestTestService(
+        attestationFailures: [
+            .serverUnavailable("Apple App Attest is temporarily unavailable.")
+        ]
+    )
+    let provider = AppleAppAttestationProvider(
+        configuration: configuration,
+        installationID: "stable-installation",
+        transport: transport,
+        secureStore: secureStore,
+        appAttestService: service,
+        appAttestDefaultsSuiteName: suite.name
+    )
+
+    do {
+        try await provider.prepare()
+        Issue.record("Expected the first attestation attempt to fail.")
+    } catch let error as AppAIError {
+        guard case .attestationFailed(let message) = error else {
+            Issue.record("Expected attestationFailed, received \(error).")
+            return
+        }
+        #expect(message.contains("attestKey"))
+        #expect(message.contains("serverUnavailable"))
+    }
+
+    #expect(suite.defaults.data(forKey: pendingDefaultsKey(for: configuration)) != nil)
+
+    try await provider.prepare()
+
+    let hashes = await service.capturedAttestationHashes()
+    #expect(await service.generatedKeyCount() == 1)
+    #expect(await service.attestedKeys() == ["fresh-app-attest-key", "fresh-app-attest-key"])
+    #expect(hashes.count == 2)
+    #expect(hashes[0] == hashes[1])
+    #expect(suite.defaults.string(forKey: defaultsKey(for: configuration)) == "fresh-app-attest-key")
+    #expect(suite.defaults.data(forKey: pendingDefaultsKey(for: configuration)) == nil)
+    #expect(await transport.requestCount() == 2)
+}
+
+@Test func uncertainRegistrationResponseDoesNotReattestTheSameKey() async throws {
+    let configuration = appAttestTestConfiguration(appID: "app-attest-register-uncertain-test")
+    let secureStore = AppAISecureStore(service: configuration.keychainService)
+    let suite = try makeDefaultsSuite()
+    defer { suite.defaults.removePersistentDomain(forName: suite.name) }
+
+    let transport = AppAttestTestTransport(registerTransportFailures: 1)
+    let service = AppAttestTestService()
+    let provider = AppleAppAttestationProvider(
+        configuration: configuration,
+        installationID: "stable-installation",
+        transport: transport,
+        secureStore: secureStore,
+        appAttestService: service,
+        appAttestDefaultsSuiteName: suite.name
+    )
+
+    do {
+        try await provider.prepare()
+        Issue.record("Expected the registration response to be lost.")
+    } catch let error as AppAIError {
+        guard case .transport = error else {
+            Issue.record("Expected transport error, received \(error).")
+            return
+        }
+    }
+
+    #expect(suite.defaults.string(forKey: defaultsKey(for: configuration)) == "fresh-app-attest-key")
+    #expect(suite.defaults.data(forKey: pendingDefaultsKey(for: configuration)) == nil)
+
+    let headers = try await provider.headers(for: appAttestRequest())
+
+    #expect(headers["X-App-Attest-Key-ID"] == "fresh-app-attest-key")
+    #expect(await service.generatedKeyCount() == 1)
+    #expect(await service.attestedKeys() == ["fresh-app-attest-key"])
+    #expect(await service.assertionKeys() == ["fresh-app-attest-key"])
+}
+
 @Test func invalidLocalAppAttestKeyIsRotatedOnce() async throws {
     let configuration = appAttestTestConfiguration(appID: "app-attest-key-rotation-test")
     let secureStore = AppAISecureStore(service: configuration.keychainService)
@@ -191,7 +324,11 @@ private func makeDefaultsSuite() throws -> (name: String, defaults: UserDefaults
     suite.defaults.set("stale-app-attest-key", forKey: defaultsKey(for: configuration))
 
     let transport = AppAttestTestTransport()
-    let service = AppAttestTestService(invalidAssertionFailures: 1)
+    let service = AppAttestTestService(
+        assertionFailures: [
+            .invalidKey("The App Attest key is invalid.")
+        ]
+    )
     let provider = AppleAppAttestationProvider(
         configuration: configuration,
         installationID: "stable-installation",
@@ -214,6 +351,39 @@ private func makeDefaultsSuite() throws -> (name: String, defaults: UserDefaults
     #expect(await transport.requestCount() == 4)
 }
 
+@Test func invalidInputFromCachedAssertionKeyIsAlsoRotatedOnce() async throws {
+    let configuration = appAttestTestConfiguration(appID: "app-attest-invalid-input-test")
+    let secureStore = AppAISecureStore(service: configuration.keychainService)
+    let suite = try makeDefaultsSuite()
+    defer { suite.defaults.removePersistentDomain(forName: suite.name) }
+    suite.defaults.set("restored-app-attest-key", forKey: defaultsKey(for: configuration))
+
+    let transport = AppAttestTestTransport()
+    let service = AppAttestTestService(
+        assertionFailures: [
+            .invalidInput("The App Attest input is invalid.")
+        ]
+    )
+    let provider = AppleAppAttestationProvider(
+        configuration: configuration,
+        installationID: "stable-installation",
+        transport: transport,
+        secureStore: secureStore,
+        appAttestService: service,
+        appAttestDefaultsSuiteName: suite.name
+    )
+
+    let headers = try await provider.headers(for: appAttestRequest())
+
+    #expect(headers["X-App-Attest-Key-ID"] == "fresh-app-attest-key")
+    #expect(await service.generatedKeyCount() == 1)
+    #expect(
+        await service.assertionKeys()
+            == ["restored-app-attest-key", "fresh-app-attest-key"]
+    )
+    #expect(await transport.requestCount() == 4)
+}
+
 @Test func invalidFreshAppAttestKeyDoesNotCreateARecoveryLoop() async throws {
     let configuration = appAttestTestConfiguration(appID: "app-attest-no-loop-test")
     let secureStore = AppAISecureStore(service: configuration.keychainService)
@@ -222,7 +392,12 @@ private func makeDefaultsSuite() throws -> (name: String, defaults: UserDefaults
     suite.defaults.set("stale-app-attest-key", forKey: defaultsKey(for: configuration))
 
     let transport = AppAttestTestTransport()
-    let service = AppAttestTestService(invalidAssertionFailures: 2)
+    let service = AppAttestTestService(
+        assertionFailures: [
+            .invalidKey("The cached App Attest key is invalid."),
+            .invalidKey("The fresh App Attest key is invalid."),
+        ]
+    )
     let provider = AppleAppAttestationProvider(
         configuration: configuration,
         installationID: "stable-installation",
@@ -241,8 +416,9 @@ private func makeDefaultsSuite() throws -> (name: String, defaults: UserDefaults
     }
 
     switch capturedError {
-    case .attestationFailed:
-        break
+    case .attestationFailed(let message):
+        #expect(message.contains("generateAssertion"))
+        #expect(message.contains("invalidKey"))
     default:
         Issue.record("Expected attestationFailed, received \(String(describing: capturedError)).")
     }

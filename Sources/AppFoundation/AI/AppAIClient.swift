@@ -86,11 +86,11 @@ public actor AppAIClient {
 
     public func prepareAttestation() async throws {
         guard configuration.attestationPolicy != .disabled else { return }
-        let installationID = try await installationID()
         let gateKey = attestationGateKey
         await AppAIProcessGate.shared.acquire(gateKey)
         do {
             try Task.checkCancellation()
+            let installationID = try await installationID()
             let provider = resolvedAttestationProvider(
                 installationID: installationID
             )
@@ -165,12 +165,12 @@ public actor AppAIClient {
     }
 
     public func resetInstallationIdentity() async throws {
-        let identityKey = installationGateKey
         let attestationKey = attestationGateKey
-        await AppAIProcessGate.shared.acquire(identityKey)
+        let identityKey = installationGateKey
+        await AppAIProcessGate.shared.acquire(attestationKey)
         do {
             try Task.checkCancellation()
-            await AppAIProcessGate.shared.acquire(attestationKey)
+            await AppAIProcessGate.shared.acquire(identityKey)
             do {
                 try Task.checkCancellation()
                 if let injectedAttestationProvider {
@@ -186,14 +186,14 @@ public actor AppAIClient {
                 }
 
                 try await secureStore.remove(installationAccount)
-                await AppAIProcessGate.shared.release(attestationKey)
+                await AppAIProcessGate.shared.release(identityKey)
             } catch {
-                await AppAIProcessGate.shared.release(attestationKey)
+                await AppAIProcessGate.shared.release(identityKey)
                 throw error
             }
-            await AppAIProcessGate.shared.release(identityKey)
+            await AppAIProcessGate.shared.release(attestationKey)
         } catch {
-            await AppAIProcessGate.shared.release(identityKey)
+            await AppAIProcessGate.shared.release(attestationKey)
             throw error
         }
     }
@@ -278,12 +278,8 @@ public actor AppAIClient {
         body: Data,
         as type: Response.Type
     ) async throws -> Response {
-        let installationID = try await installationID()
-        let provider = resolvedAttestationProvider(
-            installationID: installationID
-        )
-
-        guard let provider else {
+        guard configuration.attestationPolicy != .disabled else {
+            let installationID = try await installationID()
             return try await protectedPostLoop(
                 path: path,
                 requestID: requestID,
@@ -294,13 +290,18 @@ public actor AppAIClient {
             )
         }
 
-        // App Attest assertions contain a strictly increasing counter. Keep the
-        // assertion, server verification, and counter commit in one process-wide
-        // critical section so concurrent clients cannot invalidate each other.
+        // App Attest assertions contain a strictly increasing counter. Acquire
+        // this gate before reading the installation identity so a concurrent reset
+        // cannot clear the identity and then allow a queued request to use its old
+        // value. Reset follows the same attestation-then-identity lock order.
         let gateKey = attestationGateKey
         await AppAIProcessGate.shared.acquire(gateKey)
         do {
             try Task.checkCancellation()
+            let installationID = try await installationID()
+            let provider = resolvedAttestationProvider(
+                installationID: installationID
+            )
             let result = try await protectedPostLoop(
                 path: path,
                 requestID: requestID,

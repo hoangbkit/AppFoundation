@@ -9,6 +9,87 @@ import CryptoKit
 import DeviceCheck
 #endif
 
+enum AppleAppAttestServiceError: LocalizedError, Equatable, Sendable {
+    case invalidKey(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidKey(let message):
+            message
+        }
+    }
+}
+
+protocol AppleAppAttestServicing: Sendable {
+    func isSupported() async -> Bool
+    func generateKey() async throws -> String
+    func attestKey(_ keyID: String, clientDataHash: Data) async throws -> Data
+    func generateAssertion(_ keyID: String, clientDataHash: Data) async throws -> Data
+}
+
+private struct SystemAppleAppAttestService: AppleAppAttestServicing {
+    func isSupported() async -> Bool {
+        #if canImport(DeviceCheck) && os(iOS)
+        DCAppAttestService.shared.isSupported
+        #else
+        false
+        #endif
+    }
+
+    func generateKey() async throws -> String {
+        #if canImport(DeviceCheck) && os(iOS)
+        do {
+            return try await DCAppAttestService.shared.generateKey()
+        } catch {
+            throw Self.normalized(error)
+        }
+        #else
+        throw AppAIError.attestationUnavailable
+        #endif
+    }
+
+    func attestKey(_ keyID: String, clientDataHash: Data) async throws -> Data {
+        #if canImport(DeviceCheck) && os(iOS)
+        do {
+            return try await DCAppAttestService.shared.attestKey(
+                keyID,
+                clientDataHash: clientDataHash
+            )
+        } catch {
+            throw Self.normalized(error)
+        }
+        #else
+        throw AppAIError.attestationUnavailable
+        #endif
+    }
+
+    func generateAssertion(_ keyID: String, clientDataHash: Data) async throws -> Data {
+        #if canImport(DeviceCheck) && os(iOS)
+        do {
+            return try await DCAppAttestService.shared.generateAssertion(
+                keyID,
+                clientDataHash: clientDataHash
+            )
+        } catch {
+            throw Self.normalized(error)
+        }
+        #else
+        throw AppAIError.attestationUnavailable
+        #endif
+    }
+
+    private static func normalized(_ error: Error) -> Error {
+        #if canImport(DeviceCheck) && os(iOS)
+        let nsError = error as NSError
+        if nsError.domain == DCError.errorDomain,
+           nsError.code == DCError.invalidKey.rawValue {
+            return AppleAppAttestServiceError.invalidKey(error.localizedDescription)
+        }
+        #endif
+        return error
+    }
+}
+
 actor AppleAppAttestationProvider: AppAIAttestationProviding {
     private struct ChallengeResponse: Decodable {
         let challengeId: String
@@ -31,10 +112,16 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
         let attestationObject: String
     }
 
+    private struct RegisteredKey {
+        let id: String
+        let cameFromSecureStore: Bool
+    }
+
     private let configuration: AppAIClientConfiguration
     private let installationID: String
     private let transport: any AppAITransport
     private let secureStore: AppAISecureStore
+    private let appAttestService: any AppleAppAttestServicing
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
 
@@ -42,52 +129,32 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
         configuration: AppAIClientConfiguration,
         installationID: String,
         transport: any AppAITransport,
-        secureStore: AppAISecureStore
+        secureStore: AppAISecureStore,
+        appAttestService: any AppleAppAttestServicing = SystemAppleAppAttestService()
     ) {
         self.configuration = configuration
         self.installationID = installationID
         self.transport = transport
         self.secureStore = secureStore
+        self.appAttestService = appAttestService
         self.encoder = Self.makeEncoder()
         self.decoder = Self.makeDecoder()
     }
 
     func headers(for request: AppAIAttestationRequest) async throws -> [String: String] {
         guard configuration.attestationPolicy != .disabled else { return [:] }
-        guard isSupported else {
-            if configuration.attestationPolicy == .required { throw AppAIError.attestationUnavailable }
+        guard await appAttestService.isSupported() else {
+            if configuration.attestationPolicy == .required {
+                throw AppAIError.attestationUnavailable
+            }
             return [:]
         }
 
         do {
-            let keyID = try await registeredKeyID()
-            let bodyHash = Self.base64URL(Self.sha256(request.body))
-            let challenge = try await fetchChallenge(ChallengeRequest(
-                purpose: "assert",
-                requestId: request.requestID,
-                method: request.method,
-                path: request.path,
-                bodyHash: bodyHash
-            ))
-            let timestamp = Int64(Date().timeIntervalSince1970 * 1_000)
-            let clientData = try Self.canonicalClientData(
-                appID: configuration.appID,
-                bodyHash: bodyHash,
-                challenge: challenge.challenge,
-                challengeID: challenge.challengeId,
-                method: request.method,
-                path: request.path,
-                requestID: request.requestID,
-                timestamp: timestamp
+            return try await assertionHeaders(
+                for: request,
+                allowsStoredKeyRecovery: true
             )
-            let assertion = try await generateAssertion(keyID: keyID, clientDataHash: Self.sha256(clientData))
-            return [
-                "X-App-Attest-Key-ID": keyID,
-                "X-App-Attest-Challenge-ID": challenge.challengeId,
-                "X-App-Attest-Challenge": challenge.challenge,
-                "X-App-Attest-Assertion": assertion.base64EncodedString(),
-                "X-App-Attest-Timestamp": String(timestamp),
-            ]
         } catch {
             if configuration.attestationPolicy == .preferred { return [:] }
             if let error = error as? AppAIError { throw error }
@@ -101,37 +168,114 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
 
     private var keyAccount: String { "\(configuration.appID).app-attest-key" }
 
-    private var isSupported: Bool {
-        #if canImport(DeviceCheck) && os(iOS)
-        DCAppAttestService.shared.isSupported
-        #else
-        false
-        #endif
+    private func assertionHeaders(
+        for request: AppAIAttestationRequest,
+        allowsStoredKeyRecovery: Bool
+    ) async throws -> [String: String] {
+        let registeredKey = try await registeredKey()
+        let bodyHash = Self.base64URL(Self.sha256(request.body))
+        let challenge = try await fetchChallenge(
+            ChallengeRequest(
+                purpose: "assert",
+                requestId: request.requestID,
+                method: request.method,
+                path: request.path,
+                bodyHash: bodyHash
+            )
+        )
+        let timestamp = Int64(Date().timeIntervalSince1970 * 1_000)
+        let clientData = try Self.canonicalClientData(
+            appID: configuration.appID,
+            bodyHash: bodyHash,
+            challenge: challenge.challenge,
+            challengeID: challenge.challengeId,
+            method: request.method,
+            path: request.path,
+            requestID: request.requestID,
+            timestamp: timestamp
+        )
+
+        let assertion: Data
+        do {
+            assertion = try await appAttestService.generateAssertion(
+                registeredKey.id,
+                clientDataHash: Self.sha256(clientData)
+            )
+        } catch AppleAppAttestServiceError.invalidKey {
+            guard allowsStoredKeyRecovery,
+                  registeredKey.cameFromSecureStore else {
+                throw errorAsAttestationFailure(error)
+            }
+
+            // App Attest keys do not survive an app reinstall, while their Keychain
+            // references can. Remove the stale reference, register a fresh key, and
+            // retry the original logical request exactly once with a new challenge.
+            try await secureStore.remove(keyAccount)
+            return try await assertionHeaders(
+                for: request,
+                allowsStoredKeyRecovery: false
+            )
+        } catch {
+            throw errorAsAttestationFailure(error)
+        }
+
+        return [
+            "X-App-Attest-Key-ID": registeredKey.id,
+            "X-App-Attest-Challenge-ID": challenge.challengeId,
+            "X-App-Attest-Challenge": challenge.challenge,
+            "X-App-Attest-Assertion": assertion.base64EncodedString(),
+            "X-App-Attest-Timestamp": String(timestamp),
+        ]
     }
 
-    private func registeredKeyID() async throws -> String {
-        if let stored = try await secureStore.string(for: keyAccount) { return stored }
-        let keyID = try await generateKey()
-        let challenge = try await fetchChallenge(ChallengeRequest(
-            purpose: "register", requestId: nil, method: nil, path: nil, bodyHash: nil
-        ))
+    private func registeredKey() async throws -> RegisteredKey {
+        if let stored = try await secureStore.string(for: keyAccount) {
+            return RegisteredKey(id: stored, cameFromSecureStore: true)
+        }
+
+        let keyID = try await appAttestService.generateKey()
+        let challenge = try await fetchChallenge(
+            ChallengeRequest(
+                purpose: "register",
+                requestId: nil,
+                method: nil,
+                path: nil,
+                bodyHash: nil
+            )
+        )
         guard let challengeData = Data(base64URL: challenge.challenge) else {
             throw AppAIError.invalidResponse
         }
-        let attestation = try await attestKey(keyID: keyID, clientDataHash: Self.sha256(challengeData))
+        let attestation: Data
+        do {
+            attestation = try await appAttestService.attestKey(
+                keyID,
+                clientDataHash: Self.sha256(challengeData)
+            )
+        } catch {
+            throw errorAsAttestationFailure(error)
+        }
         let body = RegisterRequest(
             challengeId: challenge.challengeId,
             challenge: challenge.challenge,
             keyId: keyID,
             attestationObject: attestation.base64EncodedString()
         )
-        _ = try await send(path: "/v1/attest/register", body: body, response: EmptyResponse.self)
+        _ = try await send(
+            path: "/v1/attest/register",
+            body: body,
+            response: EmptyResponse.self
+        )
         try await secureStore.set(keyID, for: keyAccount)
-        return keyID
+        return RegisteredKey(id: keyID, cameFromSecureStore: false)
     }
 
     private func fetchChallenge(_ body: ChallengeRequest) async throws -> ChallengeResponse {
-        try await send(path: "/v1/attest/challenge", body: body, response: ChallengeResponse.self)
+        try await send(
+            path: "/v1/attest/challenge",
+            body: body,
+            response: ChallengeResponse.self
+        )
     }
 
     private func send<Body: Encodable, Response: Decodable>(
@@ -140,7 +284,9 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
         response: Response.Type
     ) async throws -> Response {
         let data = try encoder.encode(body)
-        var request = URLRequest(url: AppAIClient.endpointURL(baseURL: configuration.baseURL, path: path))
+        var request = URLRequest(
+            url: AppAIClient.endpointURL(baseURL: configuration.baseURL, path: path)
+        )
         request.httpMethod = "POST"
         request.httpBody = data
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -149,11 +295,19 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
         request.setValue(installationID, forHTTPHeaderField: "X-Installation-ID")
         let responseData: Data
         let httpResponse: HTTPURLResponse
-        do { (responseData, httpResponse) = try await transport.data(for: request) }
-        catch let error as AppAIError { throw error }
-        catch { throw AppAIError.transport(error.localizedDescription) }
+        do {
+            (responseData, httpResponse) = try await transport.data(for: request)
+        } catch let error as AppAIError {
+            throw error
+        } catch {
+            throw AppAIError.transport(error.localizedDescription)
+        }
         guard (200..<300).contains(httpResponse.statusCode) else {
-            throw AppAIClient.decodeServerError(data: responseData, response: httpResponse, decoder: decoder)
+            throw AppAIClient.decodeServerError(
+                data: responseData,
+                response: httpResponse,
+                decoder: decoder
+            )
         }
         guard let decoded = try? decoder.decode(Response.self, from: responseData) else {
             throw AppAIError.invalidResponse
@@ -161,31 +315,9 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
         return decoded
     }
 
-    private func generateKey() async throws -> String {
-        #if canImport(DeviceCheck) && os(iOS)
-        do { return try await DCAppAttestService.shared.generateKey() }
-        catch { throw AppAIError.attestationFailed(error.localizedDescription) }
-        #else
-        throw AppAIError.attestationUnavailable
-        #endif
-    }
-
-    private func attestKey(keyID: String, clientDataHash: Data) async throws -> Data {
-        #if canImport(DeviceCheck) && os(iOS)
-        do { return try await DCAppAttestService.shared.attestKey(keyID, clientDataHash: clientDataHash) }
-        catch { throw AppAIError.attestationFailed(error.localizedDescription) }
-        #else
-        throw AppAIError.attestationUnavailable
-        #endif
-    }
-
-    private func generateAssertion(keyID: String, clientDataHash: Data) async throws -> Data {
-        #if canImport(DeviceCheck) && os(iOS)
-        do { return try await DCAppAttestService.shared.generateAssertion(keyID, clientDataHash: clientDataHash) }
-        catch { throw AppAIError.attestationFailed(error.localizedDescription) }
-        #else
-        throw AppAIError.attestationUnavailable
-        #endif
+    private func errorAsAttestationFailure(_ error: Error) -> Error {
+        if let error = error as? AppAIError { return error }
+        return AppAIError.attestationFailed(error.localizedDescription)
     }
 
     private static func makeEncoder() -> JSONEncoder {
@@ -237,7 +369,10 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
             "timestamp": timestamp,
             "version": 1,
         ]
-        return try JSONSerialization.data(withJSONObject: values, options: [.sortedKeys, .withoutEscapingSlashes])
+        return try JSONSerialization.data(
+            withJSONObject: values,
+            options: [.sortedKeys, .withoutEscapingSlashes]
+        )
     }
 }
 
@@ -245,9 +380,13 @@ private struct EmptyResponse: Decodable {}
 
 private extension Data {
     init?(base64URL value: String) {
-        var normalized = value.replacingOccurrences(of: "-", with: "+")
+        var normalized = value
+            .replacingOccurrences(of: "-", with: "+")
             .replacingOccurrences(of: "_", with: "/")
-        normalized += String(repeating: "=", count: (4 - normalized.count % 4) % 4)
+        normalized += String(
+            repeating: "=",
+            count: (4 - normalized.count % 4) % 4
+        )
         self.init(base64Encoded: normalized)
     }
 }

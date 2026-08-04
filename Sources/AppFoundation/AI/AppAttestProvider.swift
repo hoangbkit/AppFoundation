@@ -114,7 +114,7 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
 
     private struct RegisteredKey {
         let id: String
-        let cameFromSecureStore: Bool
+        let cameFromLocalStore: Bool
     }
 
     private let configuration: AppAIClientConfiguration
@@ -122,6 +122,7 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
     private let transport: any AppAITransport
     private let secureStore: AppAISecureStore
     private let appAttestService: any AppleAppAttestServicing
+    private let appAttestDefaultsSuiteName: String?
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
 
@@ -130,13 +131,15 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
         installationID: String,
         transport: any AppAITransport,
         secureStore: AppAISecureStore,
-        appAttestService: any AppleAppAttestServicing = SystemAppleAppAttestService()
+        appAttestService: any AppleAppAttestServicing = SystemAppleAppAttestService(),
+        appAttestDefaultsSuiteName: String? = nil
     ) {
         self.configuration = configuration
         self.installationID = installationID
         self.transport = transport
         self.secureStore = secureStore
         self.appAttestService = appAttestService
+        self.appAttestDefaultsSuiteName = appAttestDefaultsSuiteName
         self.encoder = Self.makeEncoder()
         self.decoder = Self.makeDecoder()
     }
@@ -153,7 +156,7 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
         do {
             return try await assertionHeaders(
                 for: request,
-                allowsStoredKeyRecovery: true
+                allowsLocalKeyRecovery: true
             )
         } catch {
             if configuration.attestationPolicy == .preferred { return [:] }
@@ -163,14 +166,26 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
     }
 
     func resetKey() async throws {
-        try await secureStore.remove(keyAccount)
+        appAttestDefaults.removeObject(forKey: keyDefaultsKey)
+        try await secureStore.remove(legacyKeyAccount)
     }
 
-    private var keyAccount: String { "\(configuration.appID).app-attest-key" }
+    private var keyDefaultsKey: String {
+        "\(configuration.keychainService).\(configuration.appID).app-attest-key"
+    }
+
+    private var legacyKeyAccount: String {
+        "\(configuration.appID).app-attest-key"
+    }
+
+    private var appAttestDefaults: UserDefaults {
+        guard let appAttestDefaultsSuiteName else { return .standard }
+        return UserDefaults(suiteName: appAttestDefaultsSuiteName) ?? .standard
+    }
 
     private func assertionHeaders(
         for request: AppAIAttestationRequest,
-        allowsStoredKeyRecovery: Bool
+        allowsLocalKeyRecovery: Bool
     ) async throws -> [String: String] {
         let registeredKey = try await registeredKey()
         let bodyHash = Self.base64URL(Self.sha256(request.body))
@@ -202,19 +217,23 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
                 clientDataHash: Self.sha256(clientData)
             )
         } catch let error as AppleAppAttestServiceError {
-            guard case .invalidKey(_) = error,
-                  allowsStoredKeyRecovery,
-                  registeredKey.cameFromSecureStore else {
+            guard case .invalidKey = error else {
                 throw errorAsAttestationFailure(error)
             }
 
-            // App Attest keys do not survive an app reinstall, while their Keychain
-            // references can. Remove the stale reference, register a fresh key, and
-            // retry the original logical request exactly once with a new challenge.
-            try await secureStore.remove(keyAccount)
+            appAttestDefaults.removeObject(forKey: keyDefaultsKey)
+
+            guard allowsLocalKeyRecovery,
+                  registeredKey.cameFromLocalStore else {
+                throw errorAsAttestationFailure(error)
+            }
+
+            // The locally cached identifier can become unusable after restore or
+            // unusual device state. Register a fresh key and retry this logical
+            // request once with a fresh one-time challenge.
             return try await assertionHeaders(
                 for: request,
-                allowsStoredKeyRecovery: false
+                allowsLocalKeyRecovery: false
             )
         } catch {
             throw errorAsAttestationFailure(error)
@@ -230,9 +249,15 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
     }
 
     private func registeredKey() async throws -> RegisteredKey {
-        if let stored = try await secureStore.string(for: keyAccount) {
-            return RegisteredKey(id: stored, cameFromSecureStore: true)
+        if let stored = appAttestDefaults.string(forKey: keyDefaultsKey),
+           !stored.isEmpty {
+            return RegisteredKey(id: stored, cameFromLocalStore: true)
         }
+
+        // Older AppFoundation builds cached this identifier in Keychain. Ignore
+        // and clean that legacy value: it can outlive an uninstall even though
+        // the underlying App Attest key does not.
+        try? await secureStore.remove(legacyKeyAccount)
 
         let keyID = try await appAttestService.generateKey()
         let challenge = try await fetchChallenge(
@@ -247,6 +272,7 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
         guard let challengeData = Data(base64URL: challenge.challenge) else {
             throw AppAIError.invalidResponse
         }
+
         let attestation: Data
         do {
             attestation = try await appAttestService.attestKey(
@@ -256,6 +282,7 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
         } catch {
             throw errorAsAttestationFailure(error)
         }
+
         let body = RegisterRequest(
             challengeId: challenge.challengeId,
             challenge: challenge.challenge,
@@ -267,8 +294,8 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
             body: body,
             response: EmptyResponse.self
         )
-        try await secureStore.set(keyID, for: keyAccount)
-        return RegisteredKey(id: keyID, cameFromSecureStore: false)
+        appAttestDefaults.set(keyID, forKey: keyDefaultsKey)
+        return RegisteredKey(id: keyID, cameFromLocalStore: false)
     }
 
     private func fetchChallenge(_ body: ChallengeRequest) async throws -> ChallengeResponse {
@@ -294,6 +321,7 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
         request.setValue(configuration.appID, forHTTPHeaderField: "X-App-ID")
         request.setValue(configuration.appKey, forHTTPHeaderField: "X-App-Key")
         request.setValue(installationID, forHTTPHeaderField: "X-Installation-ID")
+
         let responseData: Data
         let httpResponse: HTTPURLResponse
         do {
@@ -303,6 +331,7 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
         } catch {
             throw AppAIError.transport(error.localizedDescription)
         }
+
         guard (200..<300).contains(httpResponse.statusCode) else {
             throw AppAIClient.decodeServerError(
                 data: responseData,

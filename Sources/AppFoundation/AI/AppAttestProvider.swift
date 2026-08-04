@@ -58,10 +58,10 @@ enum AppleAppAttestServiceError: LocalizedError, Equatable, Sendable {
 
     var shouldDiscardPendingRegistration: Bool {
         switch self {
-        case .invalidKey, .invalidInput:
-            true
-        default:
+        case .serverUnavailable:
             false
+        default:
+            true
         }
     }
 }
@@ -227,6 +227,7 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
         }
 
         do {
+            try Task.checkCancellation()
             _ = try await registeredKey()
         } catch is CancellationError {
             throw CancellationError()
@@ -246,6 +247,7 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
         }
 
         do {
+            try Task.checkCancellation()
             return try await assertionHeaders(
                 for: request,
                 allowsLocalKeyRecovery: true
@@ -285,6 +287,7 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
         for request: AppAIAttestationRequest,
         allowsLocalKeyRecovery: Bool
     ) async throws -> [String: String] {
+        try Task.checkCancellation()
         let registeredKey = try await registeredKey()
         let bodyHash = Self.base64URL(Self.sha256(request.body))
         let challenge = try await fetchChallenge(
@@ -390,6 +393,7 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
             }
             throw errorAsAttestationFailure(error, stage: "attestKey")
         } catch {
+            clearPendingRegistration()
             throw errorAsAttestationFailure(error, stage: "attestKey")
         }
 
@@ -407,11 +411,24 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
         appAttestDefaults.set(pending.keyID, forKey: keyDefaultsKey)
         clearPendingRegistration()
 
-        _ = try await send(
-            path: "/v1/attest/register",
-            body: body,
-            response: EmptyResponse.self
-        )
+        do {
+            _ = try await send(
+                path: "/v1/attest/register",
+                body: body,
+                response: EmptyResponse.self
+            )
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as AppAIError {
+            // A transport loss or malformed success response leaves registration
+            // outcome uncertain, so retain the key and let the next assertion
+            // resolve it. A definite server rejection means discard the key.
+            if case .server = error {
+                clearRegisteredKey()
+            }
+            throw error
+        }
+
         return RegisteredKey(id: pending.keyID, cameFromLocalStore: false)
     }
 
@@ -421,21 +438,10 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
                 return pending
             }
 
-            let challenge = try await fetchChallenge(
-                ChallengeRequest(
-                    purpose: "register",
-                    requestId: nil,
-                    method: nil,
-                    path: nil,
-                    bodyHash: nil
-                )
-            )
-            let refreshed = PendingRegistration(
-                keyID: pending.keyID,
-                challenge: challenge
-            )
-            try savePendingRegistration(refreshed)
-            return refreshed
+            // Apple requires serverUnavailable retries to use the same key and
+            // clientDataHash. Once our one-time challenge expires, that exact retry
+            // is no longer verifiable, so discard it and begin a fresh registration.
+            clearPendingRegistration()
         }
 
         // Ask the app server to initiate registration before allocating a key.

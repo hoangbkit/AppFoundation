@@ -52,8 +52,13 @@ private struct CancellationOutput: Decodable, Sendable {
     let value: String
 }
 
-private func cancellationConfiguration(_ suffix: String) -> AppAIClientConfiguration {
-    AppAIClientConfiguration(
+private func runCancellationTest(
+    failure: CancellingAITransport.Failure,
+    suffix: String
+) async throws {
+    let transport = CancellingAITransport(failure: failure)
+    let attestation = CancellationTestAttestation()
+    let configuration = AppAIClientConfiguration(
         appID: "cancellation-\(suffix)",
         appKey: "test-key-123456789",
         baseURL: URL(string: "https://example.com")!,
@@ -61,19 +66,8 @@ private func cancellationConfiguration(_ suffix: String) -> AppAIClientConfigura
         keychainService: "com.hoangbkit.AppFoundationTests.Cancellation.\(UUID().uuidString)",
         transportRetryCount: 3
     )
-}
-
-@Test(arguments: [
-    CancellingAITransport.Failure.taskCancellation,
-    CancellingAITransport.Failure.cancelledURL,
-])
-func cancellationIsPropagatedWithoutTransportRetry(
-    failure: CancellingAITransport.Failure
-) async throws {
-    let transport = CancellingAITransport(failure: failure)
-    let attestation = CancellationTestAttestation()
     let client = AppAIClient(
-        configuration: cancellationConfiguration(String(describing: failure)),
+        configuration: configuration,
         transport: transport,
         attestationProvider: attestation
     )
@@ -92,4 +86,19 @@ func cancellationIsPropagatedWithoutTransportRetry(
 
     #expect(await transport.requestCount() == 1)
     #expect(await attestation.headerCount() == 1)
+    try await client.resetInstallationIdentity()
+}
+
+@Test func taskCancellationIsPropagatedWithoutTransportRetry() async throws {
+    try await runCancellationTest(
+        failure: .taskCancellation,
+        suffix: "task"
+    )
+}
+
+@Test func cancelledURLErrorIsPropagatedWithoutTransportRetry() async throws {
+    try await runCancellationTest(
+        failure: .cancelledURL,
+        suffix: "url"
+    )
 }

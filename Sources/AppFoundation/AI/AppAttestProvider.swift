@@ -27,7 +27,7 @@ protocol AppleAppAttestServicing: Sendable {
     func generateAssertion(_ keyID: String, clientDataHash: Data) async throws -> Data
 }
 
-private struct SystemAppleAppAttestService: AppleAppAttestServicing {
+struct SystemAppleAppAttestService: AppleAppAttestServicing {
     func isSupported() async -> Bool {
         #if canImport(DeviceCheck) && os(iOS)
         DCAppAttestService.shared.isSupported
@@ -82,7 +82,7 @@ private struct SystemAppleAppAttestService: AppleAppAttestServicing {
         #if canImport(DeviceCheck) && os(iOS)
         let nsError = error as NSError
         if nsError.domain == DCError.errorDomain,
-           nsError.code == DCError.invalidKey.rawValue {
+           nsError.code == DCError.Code.invalidKey.rawValue {
             return AppleAppAttestServiceError.invalidKey(error.localizedDescription)
         }
         #endif
@@ -201,8 +201,9 @@ actor AppleAppAttestationProvider: AppAIAttestationProviding {
                 registeredKey.id,
                 clientDataHash: Self.sha256(clientData)
             )
-        } catch AppleAppAttestServiceError.invalidKey {
-            guard allowsStoredKeyRecovery,
+        } catch let error as AppleAppAttestServiceError {
+            guard case .invalidKey(_) = error,
+                  allowsStoredKeyRecovery,
                   registeredKey.cameFromSecureStore else {
                 throw errorAsAttestationFailure(error)
             }

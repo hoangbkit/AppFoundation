@@ -93,6 +93,7 @@ public actor AppAIClient {
         let gateKey = attestationGateKey
         await AppAIProcessGate.shared.acquire(gateKey)
         do {
+            try Task.checkCancellation()
             let provider = try await resolvedAttestationProvider(
                 installationID: installationID
             )
@@ -170,30 +171,36 @@ public actor AppAIClient {
         let identityKey = installationGateKey
         let attestationKey = attestationGateKey
         await AppAIProcessGate.shared.acquire(identityKey)
-        await AppAIProcessGate.shared.acquire(attestationKey)
-
         do {
-            if let injectedAttestationProvider {
-                try await injectedAttestationProvider.resetKey()
-            } else {
-                let provider = defaultAttestationProvider
-                    ?? AppleAppAttestationProvider(
-                        configuration: configuration,
-                        installationID: installationIDCache ?? "",
-                        transport: transport,
-                        secureStore: secureStore
-                    )
-                try await provider.resetKey()
+            try Task.checkCancellation()
+            await AppAIProcessGate.shared.acquire(attestationKey)
+            do {
+                try Task.checkCancellation()
+                if let injectedAttestationProvider {
+                    try await injectedAttestationProvider.resetKey()
+                } else {
+                    let provider = defaultAttestationProvider
+                        ?? AppleAppAttestationProvider(
+                            configuration: configuration,
+                            installationID: installationIDCache ?? "",
+                            transport: transport,
+                            secureStore: secureStore
+                        )
+                    try await provider.resetKey()
+                }
+
+                try await secureStore.remove(installationAccount)
+                installationIDCache = nil
+                defaultAttestationProvider = nil
+
+                await AppAIProcessGate.shared.release(attestationKey)
+                await AppAIProcessGate.shared.release(identityKey)
+            } catch {
+                await AppAIProcessGate.shared.release(attestationKey)
+                await AppAIProcessGate.shared.release(identityKey)
+                throw error
             }
-
-            try await secureStore.remove(installationAccount)
-            installationIDCache = nil
-            defaultAttestationProvider = nil
-
-            await AppAIProcessGate.shared.release(attestationKey)
-            await AppAIProcessGate.shared.release(identityKey)
         } catch {
-            await AppAIProcessGate.shared.release(attestationKey)
             await AppAIProcessGate.shared.release(identityKey)
             throw error
         }
@@ -217,6 +224,7 @@ public actor AppAIClient {
         let gateKey = installationGateKey
         await AppAIProcessGate.shared.acquire(gateKey)
         do {
+            try Task.checkCancellation()
             let value: String
             if let installationIDCache {
                 value = installationIDCache
@@ -281,7 +289,7 @@ public actor AppAIClient {
         return request
     }
 
-    private func protectedPost<Response: Decodable>(
+    private func protectedPost<Response: Decodable & Sendable>(
         path: String,
         requestID: String,
         body: Data,
@@ -309,6 +317,7 @@ public actor AppAIClient {
         let gateKey = attestationGateKey
         await AppAIProcessGate.shared.acquire(gateKey)
         do {
+            try Task.checkCancellation()
             let result = try await protectedPostLoop(
                 path: path,
                 requestID: requestID,
@@ -325,7 +334,7 @@ public actor AppAIClient {
         }
     }
 
-    private func protectedPostLoop<Response: Decodable>(
+    private func protectedPostLoop<Response: Decodable & Sendable>(
         path: String,
         requestID: String,
         body: Data,
@@ -338,6 +347,7 @@ public actor AppAIClient {
         var transportAttempts = 0
 
         while true {
+            try Task.checkCancellation()
             var request = try baseRequest(
                 path: path,
                 method: "POST",
@@ -381,7 +391,7 @@ public actor AppAIClient {
         }
     }
 
-    private func perform<Response: Decodable>(
+    private func perform<Response: Decodable & Sendable>(
         _ request: URLRequest,
         as type: Response.Type
     ) async throws -> Response {
@@ -389,6 +399,10 @@ public actor AppAIClient {
         let response: HTTPURLResponse
         do {
             (data, response) = try await transport.data(for: request)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as URLError where error.code == .cancelled {
+            throw CancellationError()
         } catch let error as AppAIError {
             throw error
         } catch {

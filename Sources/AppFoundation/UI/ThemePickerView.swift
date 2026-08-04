@@ -56,6 +56,7 @@ public struct ThemePickerView<Preview: View>: View {
                 .padding(.vertical, 4)
             }
             .scrollIndicators(.hidden)
+            .contentMargins(.leading, 1, for: .scrollContent)
 
             if showsCountdown, manager.isPreviewActive {
                 previewCountdown

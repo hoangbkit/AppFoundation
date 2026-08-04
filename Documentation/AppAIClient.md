@@ -19,6 +19,8 @@ let aiClient = AppAIClient(
 
 Each app uses a different app ID and app key. The client creates an installation ID once and stores it in the Keychain with `AfterFirstUnlockThisDeviceOnly` accessibility.
 
+The App Attest key identifier is intentionally stored in app-local preferences rather than Keychain. App Attest proves that requests come from a valid app instance on supported Apple hardware; it is not used as a permanent installation identity. When the app is uninstalled, the local identifier disappears. A reinstall therefore generates, attests, and registers a fresh App Attest key while retaining the existing Keychain installation ID when iOS preserves it.
+
 ## Generate
 
 ```swift
@@ -48,6 +50,8 @@ The client owns:
 - Retry with the same logical request ID and body
 - App Attest registration and assertion headers on supported iOS devices
 - Fresh one-time assertions for every transport retry
+- A fresh App Attest key after reinstall
+- One-time key rotation when Apple reports a locally cached key as invalid
 - Re-registration when the server no longer recognizes a locally stored key
 
 ## Attestation policies
@@ -75,6 +79,17 @@ attestationPolicy: .required
 ```
 
 The client fails locally when App Attest is unsupported or assertion creation fails. The server also rejects requests without a valid assertion.
+
+## Reinstall and key rotation
+
+The installation ID and App Attest key have separate lifecycles:
+
+1. The installation ID remains in Keychain and continues to identify the server-side quota record when iOS preserves Keychain data.
+2. The App Attest key identifier lives in app-local preferences and disappears with the app.
+3. A reinstall has no local key identifier, so the client generates and registers a new App Attest key automatically.
+4. If Apple later reports a cached key as invalid, the client removes that identifier, registers a fresh key, and retries the logical request once.
+
+The server may associate more than one valid App Attest key with the same installation. Key rotation is not treated as a new device identity.
 
 ## Retry behavior
 

@@ -36,43 +36,30 @@ public struct AppAIBackendStatusRow: View {
     private let descriptor: AppAIBackendDescriptor
     private let isConfigured: Bool
     private let isSelected: Bool
+    private let statusText: String?
 
     public init(
         descriptor: AppAIBackendDescriptor,
         isConfigured: Bool,
-        isSelected: Bool = false
+        isSelected: Bool = false,
+        statusText: String? = nil
     ) {
         self.descriptor = descriptor
         self.isConfigured = isConfigured
         self.isSelected = isSelected
+        self.statusText = statusText
     }
 
     public var body: some View {
         HStack(spacing: 12) {
-            if let symbolName = descriptor.symbolName {
-                Image(systemName: symbolName)
-                    .frame(width: 24)
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(descriptor.title)
-                if let subtitle = descriptor.subtitle {
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            Spacer()
-            if isSelected {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.tint)
-            } else {
-                Text(isConfigured ? "Ready" : "Setup Required")
-                    .font(.caption)
-                    .foregroundStyle(
-                        isConfigured ? Color.secondary : Color.orange
-                    )
-            }
+            Text(descriptor.title)
+            Spacer(minLength: 12)
+            Text(statusText ?? (isConfigured ? "Configured" : "Not Configured"))
+                .foregroundStyle(isConfigured ? Color.green : Color.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
         }
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 

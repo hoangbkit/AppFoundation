@@ -36,6 +36,7 @@ AppFoundation follows semantic versioning.
 
 - Updated `ProPaywallView` to show the yearly savings percentage whenever monthly and yearly plans are both available.
 - Preserved explicitly configured savings-percentage badges and replaced `BEST VALUE` when the same plan already shows savings.
+- Standardized `ProPaywallView` plan options on the vertical stacked layout and shortened the lifetime subtitle to `Pay once`.
 
 ### Fixed
 
@@ -105,6 +106,7 @@ AppFoundation follows semantic versioning.
 - Added responsive widget previews, gallery and detail views, generated Home Screen setup guidance, and app-owned upgrade actions.
 - Added Free and Pro widget presentation without coupling the package to an app's model types or widget extension.
 - Added a Demo catalog containing small, medium, and large widget examples.
+- Added Widget Showcase model and catalog tests.
 - Added `Documentation/WidgetShowcase.md`.
 
 ### Changed

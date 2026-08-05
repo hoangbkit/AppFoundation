@@ -6,7 +6,6 @@ import SwiftUI
 public struct ProPaywallView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appFoundationTheme) private var environmentTheme
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(PurchaseManager.self) private var environmentPurchaseManager
 
     private let purchaseManagerOverride: PurchaseController?
@@ -214,64 +213,12 @@ public struct ProPaywallView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 24)
         case .loaded:
-            if usesStackedPlanLayout {
-                VStack(spacing: 10) {
-                    ForEach(purchases.products) { product in
-                        stackedPlanOption(for: product, badge: badge(for: product))
-                    }
-                }
-            } else {
-                LazyVGrid(columns: planColumns, spacing: 12) {
-                    ForEach(purchases.products) { product in
-                        cardPlanOption(for: product, badge: badge(for: product))
-                    }
+            VStack(spacing: 10) {
+                ForEach(purchases.products) { product in
+                    stackedPlanOption(for: product, badge: badge(for: product))
                 }
             }
         }
-    }
-
-    private func cardPlanOption(for product: StoreProduct, badge: String?) -> some View {
-        let isSelected = selectedProductID == product.id
-        let optionRadius = min(theme.cardCornerRadius, 16)
-
-        return Button { select(product) } label: {
-            VStack(alignment: .leading, spacing: 9) {
-                HStack(alignment: .top) {
-                    selectionIndicator(isSelected: isSelected)
-                    Spacer(minLength: 6)
-                    if let badge { planBadge(badge) }
-                }
-
-                Text(product.planLabel)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(theme.accent)
-                Text(product.displayPrice)
-                    .font(.title2.weight(.bold))
-                    .foregroundStyle(theme.primaryForeground)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.55)
-                    .allowsTightening(true)
-                Text(product.isLifetime ? "Pay once" : product.billingDescription)
-                    .font(.footnote)
-                    .foregroundStyle(theme.secondaryForeground)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(14)
-            .frame(maxWidth: .infinity, minHeight: 132, alignment: .topLeading)
-            .background(
-                isSelected ? theme.accent.opacity(0.12) : theme.elevatedSurface,
-                in: RoundedRectangle(cornerRadius: optionRadius, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: optionRadius, style: .continuous)
-                    .strokeBorder(
-                        isSelected ? theme.accent : theme.border,
-                        lineWidth: isSelected ? 1.5 : 1
-                    )
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private func stackedPlanOption(for product: StoreProduct, badge: String?) -> some View {
@@ -286,7 +233,7 @@ public struct ProPaywallView: View {
                     Text(product.planLabel)
                         .font(.headline)
                         .foregroundStyle(theme.primaryForeground)
-                    Text(product.billingDescription)
+                    Text(product.isLifetime ? "Pay once" : product.billingDescription)
                         .font(.caption)
                         .foregroundStyle(theme.secondaryForeground)
                         .fixedSize(horizontal: false, vertical: true)
@@ -416,17 +363,6 @@ public struct ProPaywallView: View {
     private var resolvedFeatures: [FoundationPaywallFeature] {
         if !configuration.features.isEmpty { return configuration.features }
         return purchases.features.map(FoundationPaywallFeature.init)
-    }
-
-    private var usesStackedPlanLayout: Bool {
-        purchases.products.count != 2 || dynamicTypeSize.isAccessibilitySize
-    }
-
-    private var planColumns: [GridItem] {
-        if purchases.products.count <= 1 || dynamicTypeSize.isAccessibilitySize {
-            return [GridItem(.flexible())]
-        }
-        return [GridItem(.flexible()), GridItem(.flexible())]
     }
 
     private var theme: PaywallThemeTokens {

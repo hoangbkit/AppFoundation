@@ -52,14 +52,116 @@ public struct AppAIBackendStatusRow: View {
 
     public var body: some View {
         HStack(spacing: 12) {
-            Text(descriptor.title)
+            if let symbolName = descriptor.symbolName {
+                Image(systemName: symbolName)
+                    .foregroundStyle(.tint)
+                    .frame(width: 24)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(descriptor.title)
+
+                if let subtitle = descriptor.subtitle {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
             Spacer(minLength: 12)
-            Text(statusText ?? (isConfigured ? "Configured" : "Not Configured"))
+
+            VStack(alignment: .trailing, spacing: 3) {
+                Text(
+                    statusText
+                        ?? (isConfigured ? "Connected" : "Not Configured")
+                )
+                .font(.caption)
                 .foregroundStyle(isConfigured ? Color.green : Color.secondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
+
+                if isSelected {
+                    Label("Default", systemImage: "checkmark.circle.fill")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.tint)
+                        .labelStyle(.titleAndIcon)
+                }
+            }
         }
+        .accessibilityElement(children: .combine)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
+/// Reusable editable state for a direct-provider configuration screen.
+///
+/// The draft keeps the last saved values so apps can consistently expose
+/// unsaved changes, discard edits, and normalize values before persistence.
+public struct AppAIProviderConfigurationDraft: Equatable, Sendable {
+    public var apiKey: String
+    public var model: String
+
+    private var savedAPIKey: String
+    private var savedModel: String
+
+    public init(apiKey: String = "", model: String = "") {
+        let normalizedAPIKey = Self.normalize(apiKey)
+        let normalizedModel = Self.normalize(model)
+        self.apiKey = normalizedAPIKey
+        self.model = normalizedModel
+        self.savedAPIKey = normalizedAPIKey
+        self.savedModel = normalizedModel
+    }
+
+    public var normalizedAPIKey: String {
+        Self.normalize(apiKey)
+    }
+
+    public var normalizedModel: String {
+        Self.normalize(model)
+    }
+
+    public var hasSavedCredential: Bool {
+        !savedAPIKey.isEmpty
+    }
+
+    public var hasUnsavedChanges: Bool {
+        normalizedAPIKey != savedAPIKey
+            || normalizedModel != savedModel
+    }
+
+    public var canSave: Bool {
+        !normalizedModel.isEmpty && hasUnsavedChanges
+    }
+
+    public var canTest: Bool {
+        !normalizedAPIKey.isEmpty && !normalizedModel.isEmpty
+    }
+
+    public mutating func load(apiKey: String, model: String) {
+        let normalizedAPIKey = Self.normalize(apiKey)
+        let normalizedModel = Self.normalize(model)
+        self.apiKey = normalizedAPIKey
+        self.model = normalizedModel
+        self.savedAPIKey = normalizedAPIKey
+        self.savedModel = normalizedModel
+    }
+
+    public mutating func markSaved() {
+        apiKey = normalizedAPIKey
+        model = normalizedModel
+        savedAPIKey = apiKey
+        savedModel = model
+    }
+
+    public mutating func discardChanges() {
+        apiKey = savedAPIKey
+        model = savedModel
+    }
+
+    private static func normalize(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 
@@ -82,6 +184,7 @@ public struct AppAIModelField: View {
     public var body: some View {
         LabeledContent(title) {
             TextField(placeholder, text: $model)
+                .font(.body.monospaced())
                 .multilineTextAlignment(.trailing)
         }
     }
@@ -218,7 +321,7 @@ public struct AppAIConnectionTestButton: View {
 /// A compact form for configuring one direct AI provider.
 ///
 /// The API key and model ID remain directly editable. Apps can optionally
-/// provide model browsing while preserving manual entry and paste support.
+/// provide model browsing and clipboard access while preserving manual entry.
 @MainActor
 public struct AppAIDirectProviderConfigurationView: View {
     private enum Activity {
@@ -230,51 +333,113 @@ public struct AppAIDirectProviderConfigurationView: View {
     @Binding private var apiKey: String
     @Binding private var model: String
     private let canSave: Bool
+    private let hasSavedCredential: Bool
     private let save: () async throws -> Void
     private let testConnection: () async throws -> Void
     private let browseModels: (() -> Void)?
+    private let pasteAPIKey: (() -> String?)?
+    private let credentialFooter: String?
 
     @State private var activity: Activity?
     @State private var message: String?
     @State private var messageIsError = false
+    @State private var isAPIKeyVisible = false
+    @State private var isShowingRemoveConfirmation = false
 
     public init(
         descriptor: AppAIBackendDescriptor,
         apiKey: Binding<String>,
         model: Binding<String>,
         canSave: Bool,
+        hasSavedCredential: Bool = false,
         save: @escaping () async throws -> Void,
         testConnection: @escaping () async throws -> Void,
-        browseModels: (() -> Void)? = nil
+        browseModels: (() -> Void)? = nil,
+        pasteAPIKey: (() -> String?)? = nil,
+        credentialFooter: String? = nil
     ) {
         self.descriptor = descriptor
         self._apiKey = apiKey
         self._model = model
         self.canSave = canSave
+        self.hasSavedCredential = hasSavedCredential
         self.save = save
         self.testConnection = testConnection
         self.browseModels = browseModels
+        self.pasteAPIKey = pasteAPIKey
+        self.credentialFooter = credentialFooter
     }
 
     public var body: some View {
         Form {
-            Section("API Key") {
+            Section {
+                AppAIBackendStatusRow(
+                    descriptor: descriptor,
+                    isConfigured: hasSavedCredential,
+                    statusText: providerStatusText
+                )
+            }
+
+            Section {
                 HStack(spacing: 10) {
-                    SecureField(keyPlaceholder, text: $apiKey)
-                        .textContentType(.password)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
+                    Group {
+                        if isAPIKeyVisible {
+                            TextField(keyPlaceholder, text: $apiKey)
+                        } else {
+                            SecureField(keyPlaceholder, text: $apiKey)
+                                .textContentType(.password)
+                        }
+                    }
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+
+                    Button {
+                        isAPIKeyVisible.toggle()
+                    } label: {
+                        Image(
+                            systemName: isAPIKeyVisible
+                                ? "eye.slash.fill"
+                                : "eye.fill"
+                        )
+                        .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(
+                        isAPIKeyVisible ? "Hide API key" : "Show API key"
+                    )
+
+                    if let pasteAPIKey {
+                        Button {
+                            if let value = pasteAPIKey() {
+                                apiKey = value
+                            }
+                        } label: {
+                            Image(systemName: "doc.on.clipboard")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Paste API key")
+                        .disabled(isWorking)
+                    }
 
                     clearButton(
                         value: $apiKey,
                         accessibilityLabel: "Clear API key"
                     )
                 }
+            } header: {
+                Text("API Key")
+            } footer: {
+                Text(
+                    credentialFooter
+                        ?? "Stored securely in Keychain. Requests go directly to \(descriptor.title)."
+                )
             }
 
-            Section("Model ID") {
+            Section {
                 HStack(spacing: 10) {
                     TextField("Model ID", text: $model)
+                        .font(.body.monospaced())
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
 
@@ -289,24 +454,39 @@ public struct AppAIDirectProviderConfigurationView: View {
                             .disabled(trimmedAPIKey.isEmpty || isWorking)
                     }
                 }
+            } header: {
+                Text("Model ID")
+            } footer: {
+                if let preferredModel = descriptor.preferredModel {
+                    Text("Recommended: \(preferredModel)")
+                        .font(.caption.monospaced())
+                }
             }
 
             Section {
                 Button {
-                    Task { await test() }
+                    requestSave()
                 } label: {
-                    HStack {
-                        Spacer()
-                        if activity == .testing {
-                            ProgressView()
-                            Text("Testing…")
-                        } else {
-                            Text("Test Connection")
-                        }
-                        Spacer()
-                    }
+                    actionLabel(
+                        title: "Save Configuration",
+                        isActive: activity == .saving,
+                        activeTitle: "Saving…"
+                    )
                 }
                 .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .disabled(!canSave || isWorking || trimmedModel.isEmpty)
+
+                Button {
+                    Task { await test() }
+                } label: {
+                    actionLabel(
+                        title: "Test Connection",
+                        isActive: activity == .testing,
+                        activeTitle: "Testing…"
+                    )
+                }
+                .buttonStyle(.bordered)
                 .controlSize(.large)
                 .disabled(
                     isWorking
@@ -314,20 +494,50 @@ public struct AppAIDirectProviderConfigurationView: View {
                         || trimmedModel.isEmpty
                 )
 
-                if let message {
-                    Text(message)
+                if canSave {
+                    Label("Unsaved changes", systemImage: "circle.fill")
                         .font(.footnote)
-                        .foregroundStyle(
-                            messageIsError ? Color.red : Color.green
-                        )
-                        .fixedSize(horizontal: false, vertical: true)
+                        .foregroundStyle(.orange)
+                }
+
+                if let message {
+                    Label(
+                        message,
+                        systemImage: messageIsError
+                            ? "exclamationmark.circle.fill"
+                            : "checkmark.circle.fill"
+                    )
+                    .font(.footnote)
+                    .foregroundStyle(messageIsError ? Color.red : Color.green)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
+        .onChange(of: apiKey) { _, _ in
+            clearResultForEditing()
+        }
+        .onChange(of: model) { _, _ in
+            clearResultForEditing()
+        }
+        .confirmationDialog(
+            "Remove saved API key?",
+            isPresented: $isShowingRemoveConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Remove API Key", role: .destructive) {
+                Task { await saveConfiguration() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(
+                "Saving an empty API key removes the credential for \(descriptor.title)."
+            )
+        }
+        #if os(macOS)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button {
-                    Task { await saveConfiguration() }
+                    requestSave()
                 } label: {
                     if activity == .saving {
                         ProgressView()
@@ -337,6 +547,32 @@ public struct AppAIDirectProviderConfigurationView: View {
                 }
                 .disabled(!canSave || isWorking || trimmedModel.isEmpty)
             }
+        }
+        #endif
+    }
+
+    private var providerStatusText: String {
+        if canSave {
+            return "Unsaved Changes"
+        }
+        return hasSavedCredential ? "Connected" : "Not Configured"
+    }
+
+    @ViewBuilder
+    private func actionLabel(
+        title: String,
+        isActive: Bool,
+        activeTitle: String
+    ) -> some View {
+        HStack {
+            Spacer()
+            if isActive {
+                ProgressView()
+                Text(activeTitle)
+            } else {
+                Text(title)
+            }
+            Spacer()
         }
     }
 
@@ -348,13 +584,13 @@ public struct AppAIDirectProviderConfigurationView: View {
         if !value.wrappedValue.isEmpty {
             Button {
                 value.wrappedValue = ""
-                message = nil
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(accessibilityLabel)
+            .disabled(isWorking)
         }
     }
 
@@ -393,6 +629,19 @@ public struct AppAIDirectProviderConfigurationView: View {
         }
     }
 
+    private func requestSave() {
+        if hasSavedCredential && trimmedAPIKey.isEmpty {
+            isShowingRemoveConfirmation = true
+        } else {
+            Task { await saveConfiguration() }
+        }
+    }
+
+    private func clearResultForEditing() {
+        guard activity == nil else { return }
+        message = nil
+    }
+
     private func saveConfiguration() async {
         activity = .saving
         message = nil
@@ -400,7 +649,9 @@ public struct AppAIDirectProviderConfigurationView: View {
 
         do {
             try await save()
-            message = "Saved"
+            message = trimmedAPIKey.isEmpty
+                ? "API key removed"
+                : "Configuration saved"
             messageIsError = false
         } catch {
             message = error.localizedDescription

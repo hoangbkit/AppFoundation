@@ -2,6 +2,12 @@ import AppFoundation
 import Foundation
 import SwiftUI
 
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+
 // The Demo intentionally leaves managed AI unconfigured. It still presents the
 // managed backend so apps can see how it fits beside direct BYOK providers.
 enum DemoAIConfiguration {
@@ -145,7 +151,8 @@ struct DemoAIProvidersView: View {
                             AppAIBackendStatusRow(
                                 descriptor: descriptor,
                                 isConfigured: configuredBackends[descriptor.id] == true,
-                                isSelected: manager.selectedBackendID == descriptor.id
+                                isSelected: manager.selectedBackendID == descriptor.id,
+                                statusText: statusText(for: descriptor)
                             )
                         }
                     }
@@ -188,6 +195,19 @@ struct DemoAIProvidersView: View {
             ) {
                 Task { await refreshStatuses() }
             }
+        }
+    }
+
+    private func statusText(
+        for descriptor: AppAIBackendDescriptor
+    ) -> String {
+        switch descriptor.id {
+        case .managed:
+            return "Unavailable"
+        case .direct:
+            return configuredBackends[descriptor.id] == true
+                ? "Connected"
+                : "Not Configured"
         }
     }
 
@@ -327,17 +347,17 @@ private struct DemoManagedAIConfigurationView: View {
 @MainActor
 private struct DemoAIDirectProviderView: View {
     @Environment(ThemeManager.self) private var themes
+    @Environment(\.dismiss) private var dismiss
 
     let manager: AppAIBackendManager
     let descriptor: AppAIBackendDescriptor
     let onConfigurationChanged: @MainActor () -> Void
 
-    @State private var apiKey = ""
-    @State private var model = ""
-    @State private var savedAPIKey = ""
-    @State private var savedModel = ""
+    @State private var draft = AppAIProviderConfigurationDraft()
     @State private var didLoad = false
     @State private var isShowingModelBrowser = false
+    @State private var isShowingUnsavedChanges = false
+    @State private var saveErrorMessage: String?
 
     private var theme: AppTheme { themes.effectiveTheme }
 
@@ -356,14 +376,16 @@ private struct DemoAIDirectProviderView: View {
 
             AppAIDirectProviderConfigurationView(
                 descriptor: descriptor,
-                apiKey: $apiKey,
-                model: $model,
-                canSave: canSave,
+                apiKey: $draft.apiKey,
+                model: $draft.model,
+                canSave: draft.canSave,
+                hasSavedCredential: draft.hasSavedCredential,
                 save: saveConfiguration,
                 testConnection: testConnection,
                 browseModels: descriptor.capabilities.supportsModelDiscovery
                     ? { isShowingModelBrowser = true }
-                    : nil
+                    : nil,
+                pasteAPIKey: DemoClipboard.string
             )
             .scrollContentBackground(.hidden)
         }
@@ -371,16 +393,56 @@ private struct DemoAIDirectProviderView: View {
         .navigationTitle(descriptor.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.visible, for: .navigationBar)
+        .navigationBarBackButtonHidden(draft.hasUnsavedChanges)
+        .toolbar {
+            if draft.hasUnsavedChanges {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button {
+                        isShowingUnsavedChanges = true
+                    } label: {
+                        Label("Back", systemImage: "chevron.left")
+                    }
+                }
+            }
+        }
         .sheet(isPresented: $isShowingModelBrowser) {
             NavigationStack {
                 DemoAIModelBrowserView(
                     manager: manager,
                     descriptor: descriptor,
-                    credential: apiKey
+                    credential: draft.apiKey,
+                    selectedModelID: draft.normalizedModel
                 ) { selectedModel in
-                    model = selectedModel
+                    draft.model = selectedModel
                 }
             }
+        }
+        .confirmationDialog(
+            "Unsaved Changes",
+            isPresented: $isShowingUnsavedChanges,
+            titleVisibility: .visible
+        ) {
+            Button("Save and Go Back") {
+                Task { await saveAndDismiss() }
+            }
+            Button("Discard Changes", role: .destructive) {
+                draft.discardChanges()
+                dismiss()
+            }
+            Button("Keep Editing", role: .cancel) {}
+        } message: {
+            Text("Save or discard the provider changes before leaving.")
+        }
+        .alert(
+            "Couldn’t Save",
+            isPresented: Binding(
+                get: { saveErrorMessage != nil },
+                set: { if !$0 { saveErrorMessage = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(saveErrorMessage ?? "Unknown error")
         }
         .task {
             guard !didLoad else { return }
@@ -389,53 +451,44 @@ private struct DemoAIDirectProviderView: View {
         }
     }
 
-    private var normalizedAPIKey: String {
-        apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private var normalizedModel: String {
-        model.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private var canSave: Bool {
-        didLoad
-            && !normalizedModel.isEmpty
-            && (
-                normalizedAPIKey != savedAPIKey
-                    || normalizedModel != savedModel
-            )
-    }
-
     private func loadConfiguration() async {
-        apiKey = (try? await manager.credential(for: providerID)) ?? ""
-        model = manager.model(for: providerID)
-        savedAPIKey = normalizedAPIKey
-        savedModel = normalizedModel
+        let apiKey = (try? await manager.credential(for: providerID)) ?? ""
+        let model = manager.model(for: providerID)
+        draft.load(apiKey: apiKey, model: model)
     }
 
     private func saveConfiguration() async throws {
-        if normalizedAPIKey.isEmpty {
+        if draft.normalizedAPIKey.isEmpty {
             try await manager.removeCredential(for: providerID)
         } else {
             try await manager.saveCredential(
-                normalizedAPIKey,
+                draft.normalizedAPIKey,
                 for: providerID
             )
         }
 
-        await manager.setModelAndWait(normalizedModel, for: providerID)
-        apiKey = normalizedAPIKey
-        model = normalizedModel
-        savedAPIKey = normalizedAPIKey
-        savedModel = normalizedModel
+        await manager.setModelAndWait(
+            draft.normalizedModel,
+            for: providerID
+        )
+        draft.markSaved()
         onConfigurationChanged()
+    }
+
+    private func saveAndDismiss() async {
+        do {
+            try await saveConfiguration()
+            dismiss()
+        } catch {
+            saveErrorMessage = error.localizedDescription
+        }
     }
 
     private func testConnection() async throws {
         try await manager.test(
             provider: providerID,
-            credential: normalizedAPIKey,
-            model: normalizedModel
+            credential: draft.normalizedAPIKey,
+            model: draft.normalizedModel
         )
     }
 }
@@ -448,11 +501,13 @@ private struct DemoAIModelBrowserView: View {
     let manager: AppAIBackendManager
     let descriptor: AppAIBackendDescriptor
     let credential: String
+    let selectedModelID: String
     let onSelect: @MainActor (String) -> Void
 
     @State private var models: [AppAIModel] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var searchText = ""
 
     private var theme: AppTheme { themes.effectiveTheme }
 
@@ -461,6 +516,18 @@ private struct DemoAIModelBrowserView: View {
             preconditionFailure("Model browser requires a direct backend")
         }
         return providerID
+    }
+
+    private var filteredModels: [AppAIModel] {
+        let query = searchText.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        guard !query.isEmpty else { return models }
+
+        return models.filter {
+            $0.id.localizedCaseInsensitiveContains(query)
+                || $0.displayName.localizedCaseInsensitiveContains(query)
+        }
     }
 
     var body: some View {
@@ -491,30 +558,48 @@ private struct DemoAIModelBrowserView: View {
                             "Enter a model ID manually on the previous screen."
                         )
                     )
+                } else if filteredModels.isEmpty {
+                    ContentUnavailableView(
+                        "No Matching Models",
+                        systemImage: "magnifyingglass",
+                        description: Text(
+                            "Try another model name or ID."
+                        )
+                    )
                 } else {
-                    List(models) { model in
+                    List(filteredModels) { model in
                         Button {
                             onSelect(model.id)
                             dismiss()
                         } label: {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(model.displayName)
-                                    .foregroundStyle(
-                                        theme.primaryForegroundColor
-                                    )
-                                Text(model.id)
-                                    .font(.caption.monospaced())
-                                    .foregroundStyle(
-                                        theme.secondaryForegroundColor
-                                    )
-                                if let contextLength = model.contextLength {
-                                    Text(
-                                        "Context: \(contextLength.formatted()) tokens"
-                                    )
-                                    .font(.caption2)
-                                    .foregroundStyle(
-                                        theme.secondaryForegroundColor
-                                    )
+                            HStack(spacing: 12) {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(model.displayName)
+                                        .foregroundStyle(
+                                            theme.primaryForegroundColor
+                                        )
+                                    Text(model.id)
+                                        .font(.caption.monospaced())
+                                        .foregroundStyle(
+                                            theme.secondaryForegroundColor
+                                        )
+                                    if let contextLength = model.contextLength {
+                                        Text(
+                                            "Context: \(contextLength.formatted()) tokens"
+                                        )
+                                        .font(.caption2)
+                                        .foregroundStyle(
+                                            theme.secondaryForegroundColor
+                                        )
+                                    }
+                                }
+
+                                Spacer(minLength: 12)
+
+                                if model.id == selectedModelID {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(theme.accentColor)
+                                        .accessibilityLabel("Selected model")
                                 }
                             }
                             .frame(
@@ -524,6 +609,9 @@ private struct DemoAIModelBrowserView: View {
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        .accessibilityAddTraits(
+                            model.id == selectedModelID ? .isSelected : []
+                        )
                         .listRowBackground(theme.surfaceColor)
                     }
                     .scrollContentBackground(.hidden)
@@ -534,6 +622,7 @@ private struct DemoAIModelBrowserView: View {
         .navigationTitle("\(descriptor.title) Models")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.visible, for: .navigationBar)
+        .searchable(text: $searchText, prompt: "Search models")
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { dismiss() }
@@ -562,5 +651,17 @@ private struct DemoAIModelBrowserView: View {
             models = []
             errorMessage = error.localizedDescription
         }
+    }
+}
+
+private enum DemoClipboard {
+    static func string() -> String? {
+        #if canImport(UIKit)
+        UIPasteboard.general.string
+        #elseif canImport(AppKit)
+        NSPasteboard.general.string(forType: .string)
+        #else
+        nil
+        #endif
     }
 }

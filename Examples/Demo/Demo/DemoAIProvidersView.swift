@@ -2,12 +2,6 @@ import AppFoundation
 import Foundation
 import SwiftUI
 
-#if canImport(UIKit)
-import UIKit
-#elseif canImport(AppKit)
-import AppKit
-#endif
-
 // The Demo intentionally leaves managed AI unconfigured. It still presents the
 // managed backend so apps can see how it fits beside direct BYOK providers.
 enum DemoAIConfiguration {
@@ -58,7 +52,7 @@ enum DemoAIConfiguration {
                 subtitle: "Use an NVIDIA-hosted OpenAI-compatible model",
                 symbolName: "cpu.fill",
                 preferredModel: "meta/llama-3.1-70b-instruct"
-            ),
+            )
         ]
     )
 
@@ -96,7 +90,7 @@ enum DemoAIConfiguration {
                     defaultModel: "meta/llama-3.1-70b-instruct"
                 ),
                 credentialStore: credentials
-            ),
+            )
         ]
 
         return AppAIBackendManager(
@@ -203,10 +197,10 @@ struct DemoAIProvidersView: View {
     ) -> String {
         switch descriptor.id {
         case .managed:
-            return "Unavailable"
+            "Unavailable"
         case .direct:
-            return configuredBackends[descriptor.id] == true
-                ? "Connected"
+            configuredBackends[descriptor.id] == true
+                ? "Configured"
                 : "Not Configured"
         }
     }
@@ -243,39 +237,25 @@ private struct DemoManagedAIConfigurationView: View {
 
             Form {
                 Section {
-                    managedSummary
-                }
-                .listRowBackground(theme.surfaceColor)
+                    Label("Built into the app", systemImage: "sparkles")
+                        .foregroundStyle(theme.accentColor)
 
-                Section("Included") {
-                    benefitRow(
-                        "No API key required",
-                        message: "The app handles provider access for you.",
-                        systemImage: "key.slash.fill"
-                    )
-                    benefitRow(
-                        "Monthly allowance",
-                        message: "Usage and limits are shown by the app.",
-                        systemImage: "chart.bar.fill"
-                    )
-                    benefitRow(
-                        "Works automatically",
-                        message: "No model or provider setup is needed.",
-                        systemImage: "sparkles"
-                    )
-                }
-                .listRowBackground(theme.surfaceColor)
-
-                Section {
-                    Label(
-                        "Managed AI is unavailable in this Demo build.",
-                        systemImage: "info.circle.fill"
+                    Text(
+                        "Managed AI requires no personal API key. The app handles provider access, models, and usage limits."
                     )
                     .foregroundStyle(theme.secondaryForegroundColor)
-                } footer: {
+                } header: {
+                    Text("Managed Provider")
+                }
+                .listRowBackground(theme.surfaceColor)
+
+                Section("Availability") {
+                    LabeledContent("Status", value: "Unavailable")
+
                     Text(
-                        "Production apps connect this option to their own managed AI service and display the user's remaining allowance here."
+                        "This Demo build does not connect to a managed AI service."
                     )
+                    .foregroundStyle(theme.secondaryForegroundColor)
                 }
                 .listRowBackground(theme.surfaceColor)
             }
@@ -284,80 +264,22 @@ private struct DemoManagedAIConfigurationView: View {
         .foregroundStyle(theme.primaryForegroundColor)
         .navigationTitle(descriptor.title)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.visible, for: .navigationBar)
-    }
-
-    private var managedSummary: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(theme.accentColor.opacity(0.14))
-                Image(systemName: "sparkles")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(theme.accentColor)
-            }
-            .frame(width: 48, height: 48)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(descriptor.title)
-                    .font(.headline)
-                Text("Built into the app")
-                    .font(.subheadline)
-                    .foregroundStyle(theme.secondaryForegroundColor)
-            }
-
-            Spacer(minLength: 12)
-
-            Text("Unavailable")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(theme.secondaryForegroundColor)
-                .padding(.horizontal, 9)
-                .padding(.vertical, 5)
-                .background(
-                    theme.secondaryForegroundColor.opacity(0.12),
-                    in: Capsule()
-                )
-        }
-        .padding(.vertical, 4)
-    }
-
-    private func benefitRow(
-        _ title: String,
-        message: String,
-        systemImage: String
-    ) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: systemImage)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(theme.accentColor)
-                .frame(width: 22)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                Text(message)
-                    .font(.caption)
-                    .foregroundStyle(theme.secondaryForegroundColor)
-            }
-        }
-        .padding(.vertical, 3)
+        .toolbarBackground(.hidden, for: .navigationBar)
     }
 }
 
 @MainActor
 private struct DemoAIDirectProviderView: View {
     @Environment(ThemeManager.self) private var themes
-    @Environment(\.dismiss) private var dismiss
 
     let manager: AppAIBackendManager
     let descriptor: AppAIBackendDescriptor
     let onConfigurationChanged: @MainActor () -> Void
 
-    @State private var draft = AppAIProviderConfigurationDraft()
+    @State private var model = ""
+    @State private var hasCredential = false
     @State private var didLoad = false
     @State private var isShowingModelBrowser = false
-    @State private var isShowingUnsavedChanges = false
-    @State private var saveErrorMessage: String?
 
     private var theme: AppTheme { themes.effectiveTheme }
 
@@ -376,120 +298,65 @@ private struct DemoAIDirectProviderView: View {
 
             AppAIDirectProviderConfigurationView(
                 descriptor: descriptor,
-                apiKey: $draft.apiKey,
-                model: $draft.model,
-                canSave: draft.canSave,
-                hasSavedCredential: draft.hasSavedCredential,
-                save: saveConfiguration,
+                model: $model,
+                hasCredential: hasCredential,
+                saveCredential: saveCredential,
+                removeCredential: removeCredential,
+                saveModel: saveModel,
                 testConnection: testConnection,
                 browseModels: descriptor.capabilities.supportsModelDiscovery
                     ? { isShowingModelBrowser = true }
                     : nil,
-                pasteAPIKey: DemoClipboard.string
+                credentialFooter: "The key is stored in Keychain and is never synced through iCloud. The Demo sends request content directly to \(descriptor.title) only when this provider is used."
             )
             .scrollContentBackground(.hidden)
         }
         .foregroundStyle(theme.primaryForegroundColor)
         .navigationTitle(descriptor.title)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.visible, for: .navigationBar)
-        .navigationBarBackButtonHidden(draft.hasUnsavedChanges)
-        .toolbar {
-            if draft.hasUnsavedChanges {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button {
-                        isShowingUnsavedChanges = true
-                    } label: {
-                        Label("Back", systemImage: "chevron.left")
-                    }
-                }
-            }
-        }
+        .toolbarBackground(.hidden, for: .navigationBar)
         .sheet(isPresented: $isShowingModelBrowser) {
             NavigationStack {
                 DemoAIModelBrowserView(
                     manager: manager,
                     descriptor: descriptor,
-                    credential: draft.apiKey,
-                    selectedModelID: draft.normalizedModel
+                    selectedModelID: model
                 ) { selectedModel in
-                    draft.model = selectedModel
+                    model = selectedModel
                 }
             }
         }
-        .confirmationDialog(
-            "Unsaved Changes",
-            isPresented: $isShowingUnsavedChanges,
-            titleVisibility: .visible
-        ) {
-            Button("Save and Go Back") {
-                Task { await saveAndDismiss() }
-            }
-            Button("Discard Changes", role: .destructive) {
-                draft.discardChanges()
-                dismiss()
-            }
-            Button("Keep Editing", role: .cancel) {}
-        } message: {
-            Text("Save or discard the provider changes before leaving.")
-        }
-        .alert(
-            "Couldn’t Save",
-            isPresented: Binding(
-                get: { saveErrorMessage != nil },
-                set: { if !$0 { saveErrorMessage = nil } }
-            )
-        ) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(saveErrorMessage ?? "Unknown error")
-        }
         .task {
             guard !didLoad else { return }
-            await loadConfiguration()
+            model = manager.model(for: providerID)
+            hasCredential = await manager.isConfigured(descriptor.id)
             didLoad = true
         }
     }
 
-    private func loadConfiguration() async {
-        let apiKey = (try? await manager.credential(for: providerID)) ?? ""
-        let model = manager.model(for: providerID)
-        draft.load(apiKey: apiKey, model: model)
-    }
-
-    private func saveConfiguration() async throws {
-        if draft.normalizedAPIKey.isEmpty {
-            try await manager.removeCredential(for: providerID)
-        } else {
-            try await manager.saveCredential(
-                draft.normalizedAPIKey,
-                for: providerID
-            )
-        }
-
-        await manager.setModelAndWait(
-            draft.normalizedModel,
-            for: providerID
-        )
-        draft.markSaved()
+    private func saveCredential(_ value: String) async throws {
+        try await manager.saveCredential(value, for: providerID)
+        hasCredential = true
         onConfigurationChanged()
     }
 
-    private func saveAndDismiss() async {
-        do {
-            try await saveConfiguration()
-            dismiss()
-        } catch {
-            saveErrorMessage = error.localizedDescription
-        }
+    private func removeCredential() async throws {
+        try await manager.removeCredential(for: providerID)
+        hasCredential = false
+        onConfigurationChanged()
     }
 
-    private func testConnection() async throws {
-        try await manager.test(
-            provider: providerID,
-            credential: draft.normalizedAPIKey,
-            model: draft.normalizedModel
-        )
+    private func saveModel(_ candidateModel: String) async throws {
+        await manager.setModelAndWait(candidateModel, for: providerID)
+        model = manager.model(for: providerID)
+        onConfigurationChanged()
+    }
+
+    private func testConnection(_ candidateModel: String) async throws {
+        await manager.setModelAndWait(candidateModel, for: providerID)
+        model = manager.model(for: providerID)
+        try await manager.test(provider: providerID, model: model)
+        onConfigurationChanged()
     }
 }
 
@@ -500,7 +367,6 @@ private struct DemoAIModelBrowserView: View {
 
     let manager: AppAIBackendManager
     let descriptor: AppAIBackendDescriptor
-    let credential: String
     let selectedModelID: String
     let onSelect: @MainActor (String) -> Void
 
@@ -561,25 +427,23 @@ private struct DemoAIModelBrowserView: View {
                 } else if filteredModels.isEmpty {
                     ContentUnavailableView(
                         "No Matching Models",
-                        systemImage: "magnifyingglass",
-                        description: Text(
-                            "Try another model name or ID."
-                        )
+                        systemImage: "magnifyingglass"
                     )
                 } else {
                     List(filteredModels) { model in
                         Button {
+                            manager.setModel(model.id, for: providerID)
                             onSelect(model.id)
                             dismiss()
                         } label: {
-                            HStack(spacing: 12) {
-                                VStack(alignment: .leading, spacing: 3) {
+                            HStack(alignment: .top, spacing: 12) {
+                                VStack(alignment: .leading, spacing: 4) {
                                     Text(model.displayName)
                                         .foregroundStyle(
                                             theme.primaryForegroundColor
                                         )
                                     Text(model.id)
-                                        .font(.caption.monospaced())
+                                        .font(.caption)
                                         .foregroundStyle(
                                             theme.secondaryForegroundColor
                                         )
@@ -594,24 +458,17 @@ private struct DemoAIModelBrowserView: View {
                                     }
                                 }
 
-                                Spacer(minLength: 12)
+                                Spacer()
 
-                                if model.id == selectedModelID {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(theme.accentColor)
-                                        .accessibilityLabel("Selected model")
+                                if selectedModelID == model.id {
+                                    Image(systemName: "checkmark")
+                                        .fontWeight(.semibold)
                                 }
                             }
-                            .frame(
-                                maxWidth: .infinity,
-                                alignment: .leading
-                            )
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .accessibilityAddTraits(
-                            model.id == selectedModelID ? .isSelected : []
-                        )
                         .listRowBackground(theme.surfaceColor)
                     }
                     .scrollContentBackground(.hidden)
@@ -619,10 +476,10 @@ private struct DemoAIModelBrowserView: View {
             }
         }
         .foregroundStyle(theme.primaryForegroundColor)
-        .navigationTitle("\(descriptor.title) Models")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.visible, for: .navigationBar)
         .searchable(text: $searchText, prompt: "Search models")
+        .navigationTitle("Choose Model")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { dismiss() }
@@ -638,31 +495,15 @@ private struct DemoAIModelBrowserView: View {
         defer { isLoading = false }
 
         do {
-            models = try await manager.availableModels(
-                for: providerID,
-                credential: credential
-            )
-            .sorted {
-                $0.displayName.localizedCaseInsensitiveCompare(
-                    $1.displayName
-                ) == .orderedAscending
-            }
+            models = try await manager.availableModels(for: providerID)
+                .sorted {
+                    $0.displayName.localizedCaseInsensitiveCompare(
+                        $1.displayName
+                    ) == .orderedAscending
+                }
         } catch {
             models = []
             errorMessage = error.localizedDescription
         }
-    }
-}
-
-@MainActor
-private enum DemoClipboard {
-    static func string() -> String? {
-        #if canImport(UIKit)
-        UIPasteboard.general.string
-        #elseif canImport(AppKit)
-        NSPasteboard.general.string(forType: .string)
-        #else
-        nil
-        #endif
     }
 }

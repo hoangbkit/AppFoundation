@@ -458,9 +458,55 @@ public struct ProPaywallView: View {
     }
 
     private func badge(for product: StoreProduct) -> String? {
-        configuration.highlightedProductID == product.id
+        let configuredBadge = configuration.highlightedProductID == product.id
             ? configuration.highlightedProductBadge
             : nil
+
+        if let configuredBadge, isSavingsPercentageBadge(configuredBadge) {
+            return configuredBadge
+        }
+
+        if isYearlyPlan(product),
+           let monthlyProduct = purchases.products.first(where: isMonthlyPlan),
+           let savingsPercentage = yearlySavingsPercentage(
+               monthlyPrice: monthlyProduct.price,
+               yearlyPrice: product.price
+           ) {
+            return "SAVE \(savingsPercentage)%"
+        }
+
+        return configuredBadge
+    }
+
+    private func isMonthlyPlan(_ product: StoreProduct) -> Bool {
+        guard let period = product.subscriptionPeriod else { return false }
+        return period.value == 1 && period.unit == .month
+    }
+
+    private func isYearlyPlan(_ product: StoreProduct) -> Bool {
+        guard let period = product.subscriptionPeriod else { return false }
+        return (period.value == 1 && period.unit == .year)
+            || (period.value == 12 && period.unit == .month)
+    }
+
+    private func yearlySavingsPercentage(
+        monthlyPrice: Double,
+        yearlyPrice: Double
+    ) -> Int? {
+        let annualizedMonthlyPrice = monthlyPrice * 12
+        guard annualizedMonthlyPrice > 0,
+              yearlyPrice >= 0,
+              yearlyPrice < annualizedMonthlyPrice
+        else { return nil }
+
+        let percentage = ((annualizedMonthlyPrice - yearlyPrice) / annualizedMonthlyPrice) * 100
+        return min(100, max(1, Int(percentage.rounded())))
+    }
+
+    private func isSavingsPercentageBadge(_ badge: String) -> Bool {
+        let normalizedBadge = badge.lowercased()
+        return badge.contains("%")
+            && (normalizedBadge.contains("save") || normalizedBadge.contains("off"))
     }
 
     private func restore() {

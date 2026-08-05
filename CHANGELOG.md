@@ -32,6 +32,11 @@ AppFoundation follows semantic versioning.
 - Exposed the original onboarding layout as `FoundationOnboardingStandardPage` so apps can mix standard and custom pages.
 - Added flexible onboarding documentation, compatibility tests, and Demo previews.
 
+### Changed
+
+- Updated `ProPaywallView` to show the yearly savings percentage whenever monthly and yearly plans are both available.
+- Preserved explicitly configured savings-percentage badges and replaced `BEST VALUE` when the same plan already shows savings.
+
 ### Fixed
 
 - Preserved the onboarding header height when Skip becomes unavailable on the final page, preventing custom page content from jumping vertically.
@@ -100,7 +105,6 @@ AppFoundation follows semantic versioning.
 - Added responsive widget previews, gallery and detail views, generated Home Screen setup guidance, and app-owned upgrade actions.
 - Added Free and Pro widget presentation without coupling the package to an app's model types or widget extension.
 - Added a Demo catalog containing small, medium, and large widget examples.
-- Added Widget Showcase model and catalog tests.
 - Added `Documentation/WidgetShowcase.md`.
 
 ### Changed

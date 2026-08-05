@@ -9,8 +9,15 @@ struct AppRootView: View {
             HomeView()
         } else {
             FoundationOnboardingView(
-                pages: DemoConfiguration.onboardingPages
-            ) {
+                pages: DemoConfiguration.onboardingPages,
+                configuration: FoundationOnboardingConfiguration(
+                    headerTitle: "APPFOUNDATION",
+                    completionTitle: "Explore Demo",
+                    buttonAppearance: .themed
+                )
+            ) { page, context in
+                DemoOnboardingPageView(page: page, context: context)
+            } onCompletion: {
                 hasCompletedOnboarding = true
             }
         }

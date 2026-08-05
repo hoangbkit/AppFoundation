@@ -197,7 +197,6 @@ struct DemoAIProvidersView: View {
         for descriptor in manager.catalog.backends {
             switch descriptor.id {
             case .managed:
-                // The Demo has no live managed backend registration.
                 values[descriptor.id] = false
             case .direct:
                 values[descriptor.id] = await manager.isConfigured(
@@ -265,7 +264,7 @@ private struct DemoManagedAIConfigurationView: View {
         .foregroundStyle(theme.primaryForegroundColor)
         .navigationTitle(descriptor.title)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
     }
 
     private var managedSummary: some View {
@@ -333,9 +332,12 @@ private struct DemoAIDirectProviderView: View {
     let descriptor: AppAIBackendDescriptor
     let onConfigurationChanged: @MainActor () -> Void
 
+    @State private var apiKey = ""
     @State private var model = ""
-    @State private var hasCredential = false
+    @State private var savedAPIKey = ""
+    @State private var savedModel = ""
     @State private var didLoad = false
+    @State private var isShowingModelBrowser = false
 
     private var theme: AppTheme { themes.effectiveTheme }
 
@@ -352,85 +354,89 @@ private struct DemoAIDirectProviderView: View {
         ZStack {
             AppThemeBackground(theme: theme)
 
-            Form {
-                Section {
-                    AppAIDirectProviderConfigurationView(
-                        descriptor: descriptor,
-                        model: modelBinding,
-                        hasCredential: hasCredential,
-                        saveCredential: saveCredential,
-                        removeCredential: removeCredential,
-                        testConnection: testConnection
-                    )
-                }
-                .listRowBackground(theme.surfaceColor)
-
-                if descriptor.capabilities.supportsModelDiscovery {
-                    Section("Models") {
-                        NavigationLink {
-                            DemoAIModelBrowserView(
-                                manager: manager,
-                                descriptor: descriptor
-                            ) { selectedModel in
-                                model = selectedModel
-                            }
-                        } label: {
-                            LabeledContent("Browse Models") {
-                                Text(hasCredential ? model : "API Key Required")
-                                    .foregroundStyle(
-                                        hasCredential
-                                            ? theme.secondaryForegroundColor
-                                            : Color.secondary
-                                    )
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.75)
-                            }
-                        }
-                        .disabled(!hasCredential)
-                    }
-                    .listRowBackground(theme.surfaceColor)
-                }
-            }
+            AppAIDirectProviderConfigurationView(
+                descriptor: descriptor,
+                apiKey: $apiKey,
+                model: $model,
+                canSave: canSave,
+                save: saveConfiguration,
+                testConnection: testConnection,
+                browseModels: descriptor.capabilities.supportsModelDiscovery
+                    ? { isShowingModelBrowser = true }
+                    : nil
+            )
             .scrollContentBackground(.hidden)
         }
         .foregroundStyle(theme.primaryForegroundColor)
         .navigationTitle(descriptor.title)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .sheet(isPresented: $isShowingModelBrowser) {
+            NavigationStack {
+                DemoAIModelBrowserView(
+                    manager: manager,
+                    descriptor: descriptor,
+                    credential: apiKey
+                ) { selectedModel in
+                    model = selectedModel
+                }
+            }
+        }
         .task {
             guard !didLoad else { return }
-            model = manager.model(for: providerID)
-            hasCredential = await manager.isConfigured(descriptor.id)
+            await loadConfiguration()
             didLoad = true
         }
     }
 
-    private var modelBinding: Binding<String> {
-        Binding(
-            get: { model },
-            set: { value in
-                model = value
-                manager.setModel(value, for: providerID)
-            }
-        )
+    private var normalizedAPIKey: String {
+        apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func saveCredential(_ value: String) async throws {
-        try await manager.saveCredential(value, for: providerID)
-        hasCredential = true
-        onConfigurationChanged()
+    private var normalizedModel: String {
+        model.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func removeCredential() async throws {
-        try await manager.removeCredential(for: providerID)
-        hasCredential = false
-        onConfigurationChanged()
+    private var canSave: Bool {
+        didLoad
+            && !normalizedModel.isEmpty
+            && (
+                normalizedAPIKey != savedAPIKey
+                    || normalizedModel != savedModel
+            )
     }
 
-    private func testConnection(_ candidateModel: String) async throws {
-        await manager.setModelAndWait(candidateModel, for: providerID)
+    private func loadConfiguration() async {
+        apiKey = (try? await manager.credential(for: providerID)) ?? ""
         model = manager.model(for: providerID)
-        try await manager.test(provider: providerID, model: model)
+        savedAPIKey = normalizedAPIKey
+        savedModel = normalizedModel
+    }
+
+    private func saveConfiguration() async throws {
+        if normalizedAPIKey.isEmpty {
+            try await manager.removeCredential(for: providerID)
+        } else {
+            try await manager.saveCredential(
+                normalizedAPIKey,
+                for: providerID
+            )
+        }
+
+        await manager.setModelAndWait(normalizedModel, for: providerID)
+        apiKey = normalizedAPIKey
+        model = normalizedModel
+        savedAPIKey = normalizedAPIKey
+        savedModel = normalizedModel
+        onConfigurationChanged()
+    }
+
+    private func testConnection() async throws {
+        try await manager.test(
+            provider: providerID,
+            credential: normalizedAPIKey,
+            model: normalizedModel
+        )
     }
 }
 
@@ -441,6 +447,7 @@ private struct DemoAIModelBrowserView: View {
 
     let manager: AppAIBackendManager
     let descriptor: AppAIBackendDescriptor
+    let credential: String
     let onSelect: @MainActor (String) -> Void
 
     @State private var models: [AppAIModel] = []
@@ -487,7 +494,6 @@ private struct DemoAIModelBrowserView: View {
                 } else {
                     List(models) { model in
                         Button {
-                            manager.setModel(model.id, for: providerID)
                             onSelect(model.id)
                             dismiss()
                         } label: {
@@ -527,7 +533,12 @@ private struct DemoAIModelBrowserView: View {
         .foregroundStyle(theme.primaryForegroundColor)
         .navigationTitle("\(descriptor.title) Models")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel") { dismiss() }
+            }
+        }
         .task { await load() }
     }
 
@@ -538,12 +549,15 @@ private struct DemoAIModelBrowserView: View {
         defer { isLoading = false }
 
         do {
-            models = try await manager.availableModels(for: providerID)
-                .sorted {
-                    $0.displayName.localizedCaseInsensitiveCompare(
-                        $1.displayName
-                    ) == .orderedAscending
-                }
+            models = try await manager.availableModels(
+                for: providerID,
+                credential: credential
+            )
+            .sorted {
+                $0.displayName.localizedCaseInsensitiveCompare(
+                    $1.displayName
+                ) == .orderedAscending
+            }
         } catch {
             models = []
             errorMessage = error.localizedDescription

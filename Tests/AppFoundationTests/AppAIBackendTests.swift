@@ -5,6 +5,7 @@ import Testing
 private actor MockDirectClient: AppAIDirectProviderClient {
     nonisolated let providerID: AppAIProviderID
     private let store: any AppAICredentialStoring
+    private var lastTestCredential: String?
 
     init(
         providerID: AppAIProviderID,
@@ -30,6 +31,7 @@ private actor MockDirectClient: AppAIDirectProviderClient {
         if model.isEmpty {
             throw AppAIDirectError.invalidModel
         }
+        lastTestCredential = try await store.credential(for: providerID)
     }
 
     func generate(
@@ -44,6 +46,10 @@ private actor MockDirectClient: AppAIDirectProviderClient {
 
     func availableModels() async throws -> [AppAIModel] {
         [.init(id: "model-a")]
+    }
+
+    func testedCredential() -> String? {
+        lastTestCredential
     }
 }
 
@@ -76,6 +82,31 @@ func backendManagerRestoresSelectionAndModels() async throws {
     #expect(await manager.isConfigured(.direct(.openAI)))
     #expect(!(await manager.isConfigured(.managed)))
     #expect(manager.managedClient == nil)
+}
+
+@Test @MainActor
+func backendManagerTestsDraftCredentialWithoutSavingIt() async throws {
+    let store = AppAIInMemoryCredentialStore(
+        credentials: [.openAI: "saved-key"]
+    )
+    let client = MockDirectClient(providerID: .openAI, store: store)
+    let manager = AppAIBackendManager(
+        catalog: AppAIBackendCatalog(backends: [
+            .openAI(preferredModel: "model-a"),
+        ]),
+        clients: [client],
+        credentialStore: store,
+        preferences: AppAIInMemoryBackendPreferences()
+    )
+
+    try await manager.test(
+        provider: .openAI,
+        credential: "draft-key",
+        model: "model-a"
+    )
+
+    #expect(await client.testedCredential() == "draft-key")
+    #expect(try await store.credential(for: .openAI) == "saved-key")
 }
 
 @Test @MainActor

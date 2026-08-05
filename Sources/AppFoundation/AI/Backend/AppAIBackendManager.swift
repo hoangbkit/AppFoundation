@@ -131,6 +131,13 @@ public final class AppAIBackendManager {
         return managedClient
     }
 
+    public func credential(
+        for provider: AppAIProviderID
+    ) async throws -> String? {
+        _ = try directClient(for: provider)
+        return try await credentialStore.credential(for: provider)
+    }
+
     public func saveCredential(
         _ credential: String,
         for provider: AppAIProviderID
@@ -203,10 +210,38 @@ public final class AppAIBackendManager {
         try await client.testConnection(model: resolved)
     }
 
+    public func test(
+        provider: AppAIProviderID,
+        credential: String,
+        model: String
+    ) async throws {
+        let client = try directClient(for: provider)
+        let resolved = try resolvedModel(model, provider: provider)
+        try await withTemporaryCredential(
+            credential,
+            for: provider
+        ) {
+            try await client.testConnection(model: resolved)
+        }
+    }
+
     public func availableModels(
         for provider: AppAIProviderID
     ) async throws -> [AppAIModel] {
         try await directClient(for: provider).availableModels()
+    }
+
+    public func availableModels(
+        for provider: AppAIProviderID,
+        credential: String
+    ) async throws -> [AppAIModel] {
+        let client = try directClient(for: provider)
+        return try await withTemporaryCredential(
+            credential,
+            for: provider
+        ) {
+            try await client.availableModels()
+        }
     }
 
     public func directClient(
@@ -256,6 +291,49 @@ public final class AppAIBackendManager {
             throw AppAIDirectError.invalidModel
         }
         return value
+    }
+
+    private func withTemporaryCredential<Value>(
+        _ credential: String,
+        for provider: AppAIProviderID,
+        operation: () async throws -> Value
+    ) async throws -> Value {
+        let normalized = credential.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        guard !normalized.isEmpty else {
+            throw AppAIDirectError.missingCredential(provider)
+        }
+
+        let original = try await credentialStore.credential(for: provider)
+        if original == normalized {
+            return try await operation()
+        }
+
+        try await credentialStore.setCredential(normalized, for: provider)
+        do {
+            let value = try await operation()
+            try await restoreCredential(original, for: provider)
+            return value
+        } catch {
+            let operationError = error
+            try? await restoreCredential(original, for: provider)
+            throw operationError
+        }
+    }
+
+    private func restoreCredential(
+        _ credential: String?,
+        for provider: AppAIProviderID
+    ) async throws {
+        if let credential, !credential.isEmpty {
+            try await credentialStore.setCredential(
+                credential,
+                for: provider
+            )
+        } else {
+            try await credentialStore.removeCredential(for: provider)
+        }
     }
 
     private static func catalog(

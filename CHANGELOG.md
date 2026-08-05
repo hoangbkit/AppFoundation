@@ -2,7 +2,7 @@
 
 All notable changes to AppFoundation are documented in this file.
 
-AppFoundation follows semantic versioning while its public API remains in the `0.x` development series.
+AppFoundation follows semantic versioning.
 
 ## Unreleased
 
@@ -21,6 +21,20 @@ AppFoundation follows semantic versioning while its public API remains in the `0
 - Added app-icon picker registration and Settings adoption guidance.
 - Rebuilt the changelog from the actual `0.1.0` through `0.1.8` tag history.
 - Updated the README for the current package products, macOS support, multi-video Promo Video Studio, and `0.1.8` installation guidance.
+
+## 1.2.0 - 2026-08-05
+
+### Added
+
+- Added generic app-owned SwiftUI pages to `FoundationOnboardingView` while preserving the existing icon-and-copy initializers.
+- Added `FoundationOnboardingConfiguration` for header labels, navigation labels, page indicators, content positioning and padding, and action-button appearance.
+- Added `FoundationOnboardingPageContext` with page position, selection state, resolved theme, and foreground colors for page-specific layout and animation.
+- Exposed the original onboarding layout as `FoundationOnboardingStandardPage` so apps can mix standard and custom pages.
+- Added flexible onboarding documentation, compatibility tests, and Demo previews.
+
+### Fixed
+
+- Preserved the onboarding header height when Skip becomes unavailable on the final page, preventing custom page content from jumping vertically.
 
 ## 0.1.8 - 2026-07-24
 

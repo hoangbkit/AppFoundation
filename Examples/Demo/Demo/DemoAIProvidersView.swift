@@ -9,7 +9,7 @@ enum DemoAIConfiguration {
         backends: [
             .managed(
                 title: "Managed AI",
-                subtitle: "Proxy-backed capabilities — not configured in Demo"
+                subtitle: "Built into the app"
             ),
             .direct(
                 providerID: .openRouter,
@@ -101,18 +101,6 @@ enum DemoAIConfiguration {
             selectedBackendID: .managed
         )
     }
-
-    static func keyExample(for provider: AppAIProviderID) -> String {
-        switch provider {
-        case .openRouter: "sk-or-v1-…"
-        case .openAI: "sk-…"
-        case .anthropic: "sk-ant-…"
-        case .gemini: "AIza…"
-        case .deepSeek: "sk-…"
-        case .nvidia: "nvapi-…"
-        default: "Provider API key"
-        }
-    }
 }
 
 @MainActor
@@ -144,7 +132,7 @@ struct DemoAIProvidersView: View {
                     )
                 } footer: {
                     Text(
-                        "Managed AI works through the shared proxy. The app also remembers the provider selected for direct BYOK requests."
+                        "Managed AI works automatically. You can also connect your own provider and use its API key directly."
                     )
                 }
                 .listRowBackground(theme.surfaceColor)
@@ -209,8 +197,7 @@ struct DemoAIProvidersView: View {
         for descriptor in manager.catalog.backends {
             switch descriptor.id {
             case .managed:
-                // The Demo has no proxy tenant/app key. Production apps can
-                // replace this with an AppAIStatusStore-backed status.
+                // The Demo has no live managed backend registration.
                 values[descriptor.id] = false
             case .direct:
                 values[descriptor.id] = await manager.isConfigured(
@@ -237,56 +224,38 @@ private struct DemoManagedAIConfigurationView: View {
 
             Form {
                 Section {
-                    AppAIBackendStatusRow(
-                        descriptor: descriptor,
-                        isConfigured: false,
-                        isSelected: true
-                    )
-
-                    Label("Built into each app", systemImage: "sparkles")
-                        .foregroundStyle(theme.accentColor)
-
-                    Text(
-                        "Managed AI requires no personal provider key. The app submits a typed capability and input while ai-proxy-server owns prompts, provider routing, models, quotas, and cost controls."
-                    )
-                    .foregroundStyle(theme.secondaryForegroundColor)
-                } header: {
-                    Text("Managed Provider")
+                    managedSummary
                 }
                 .listRowBackground(theme.surfaceColor)
 
-                Section("Demo Status") {
-                    LabeledContent("Proxy tenant", value: "Not Configured")
-                    LabeledContent("App Attest", value: "Not Connected")
-                    LabeledContent(
-                        "Entitlement sync",
-                        value: "Not Connected"
+                Section("Included") {
+                    benefitRow(
+                        "No API key required",
+                        message: "The app handles provider access for you.",
+                        systemImage: "key.slash.fill"
                     )
-
-                    Text(
-                        "This is intentional. A production app supplies its own app ID, app key, proxy URL, and attestation policy when creating AppAIClient."
+                    benefitRow(
+                        "Monthly allowance",
+                        message: "Usage and limits are shown by the app.",
+                        systemImage: "chart.bar.fill"
                     )
-                    .font(.caption)
-                    .foregroundStyle(theme.secondaryForegroundColor)
+                    benefitRow(
+                        "Works automatically",
+                        message: "No model or provider setup is needed.",
+                        systemImage: "sparkles"
+                    )
                 }
                 .listRowBackground(theme.surfaceColor)
 
-                Section("Production Flow") {
+                Section {
                     Label(
-                        "Typed capability requests",
-                        systemImage: "curlybraces.square"
+                        "Managed AI is unavailable in this Demo build.",
+                        systemImage: "info.circle.fill"
                     )
-                    Label(
-                        "Per-request App Attest assertions",
-                        systemImage: "checkmark.shield.fill"
-                    )
-                    Label(
-                        "Verified StoreKit JWS access",
-                        systemImage: "checkmark.seal.fill"
-                    )
-                    Label(
-                        "Server idempotency and stored replay",
-                        systemImage: "arrow.clockwise.circle.fill"
+                    .foregroundStyle(theme.secondaryForegroundColor)
+                } footer: {
+                    Text(
+                        "Production apps connect this option to their own managed AI service and display the user's remaining allowance here."
                     )
                 }
                 .listRowBackground(theme.surfaceColor)
@@ -297,6 +266,62 @@ private struct DemoManagedAIConfigurationView: View {
         .navigationTitle(descriptor.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
+    }
+
+    private var managedSummary: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(theme.accentColor.opacity(0.14))
+                Image(systemName: "sparkles")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(theme.accentColor)
+            }
+            .frame(width: 48, height: 48)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(descriptor.title)
+                    .font(.headline)
+                Text("Built into the app")
+                    .font(.subheadline)
+                    .foregroundStyle(theme.secondaryForegroundColor)
+            }
+
+            Spacer(minLength: 12)
+
+            Text("Unavailable")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(theme.secondaryForegroundColor)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 5)
+                .background(
+                    theme.secondaryForegroundColor.opacity(0.12),
+                    in: Capsule()
+                )
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func benefitRow(
+        _ title: String,
+        message: String,
+        systemImage: String
+    ) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(theme.accentColor)
+                .frame(width: 22)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(theme.secondaryForegroundColor)
+            }
+        }
+        .padding(.vertical, 3)
     }
 }
 
@@ -337,12 +362,6 @@ private struct DemoAIDirectProviderView: View {
                         removeCredential: removeCredential,
                         testConnection: testConnection
                     )
-                } header: {
-                    Text("Provider Configuration")
-                } footer: {
-                    Text(
-                        "Key format: \(DemoAIConfiguration.keyExample(for: providerID)). The key stays in Keychain and is never synchronized through iCloud."
-                    )
                 }
                 .listRowBackground(theme.surfaceColor)
 
@@ -356,23 +375,21 @@ private struct DemoAIDirectProviderView: View {
                                 model = selectedModel
                             }
                         } label: {
-                            LabeledContent(
-                                "Browse Available Models",
-                                value: hasCredential ? "Open" : "Key Required"
-                            )
+                            LabeledContent("Browse Models") {
+                                Text(hasCredential ? model : "API Key Required")
+                                    .foregroundStyle(
+                                        hasCredential
+                                            ? theme.secondaryForegroundColor
+                                            : Color.secondary
+                                    )
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.75)
+                            }
                         }
                         .disabled(!hasCredential)
                     }
                     .listRowBackground(theme.surfaceColor)
                 }
-
-                Section("Data Routing") {
-                    Text(
-                        "When this provider is selected, the app sends request content directly to \(descriptor.title). Managed proxy quotas, App Attest, and server-side replay do not apply to BYOK calls."
-                    )
-                    .foregroundStyle(theme.secondaryForegroundColor)
-                }
-                .listRowBackground(theme.surfaceColor)
             }
             .scrollContentBackground(.hidden)
         }

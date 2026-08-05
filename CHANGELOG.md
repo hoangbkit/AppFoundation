@@ -31,16 +31,15 @@ AppFoundation follows semantic versioning.
 - Added `FoundationOnboardingPageContext` with page position, selection state, resolved theme, and foreground colors for page-specific layout and animation.
 - Exposed the original onboarding layout as `FoundationOnboardingStandardPage` so apps can mix standard and custom pages.
 - Added flexible onboarding documentation, compatibility tests, and Demo previews.
-- Added `AppAIProviderConfigurationDraft` for normalized provider credentials, dirty-state tracking, save eligibility, and discarding unsaved edits.
 
 ### Changed
 
 - Updated `ProPaywallView` to show the yearly savings percentage whenever monthly and yearly plans are both available.
 - Preserved explicitly configured savings-percentage badges and replaced `BEST VALUE` when the same plan already shows savings.
 - Standardized `ProPaywallView` plan options on the vertical stacked layout and shortened the lifetime subtitle to `Pay once`.
-- Enhanced `AppAIBackendStatusRow` with provider symbols, subtitles, visible default-provider state, connected status, and optional custom status text.
-- Rebuilt direct-provider setup around editable API-key and model-ID fields, reveal, paste and clear actions, recommended-model guidance, model browsing, primary saving, secondary connection testing, removal confirmation, and unsaved-change feedback.
-- Updated the Demo provider flow with save-or-discard navigation protection plus searchable model browsing and a selected-model checkmark.
+- Simplified `AppAIBackendStatusRow` to a native labeled status row with optional custom status text.
+- Rebuilt direct-provider configuration to match DraftX's native Settings design: API-key management, model saving and browsing, then connection testing.
+- Updated the Demo provider screens to use the same native form layout and searchable selected-model picker.
 
 ### Fixed
 

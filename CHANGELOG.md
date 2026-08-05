@@ -37,6 +37,7 @@ AppFoundation follows semantic versioning.
 - Updated `ProPaywallView` to show the yearly savings percentage whenever monthly and yearly plans are both available.
 - Preserved explicitly configured savings-percentage badges and replaced `BEST VALUE` when the same plan already shows savings.
 - Standardized `ProPaywallView` plan options on the vertical stacked layout and shortened the lifetime subtitle to `Pay once`.
+- Simplified the AI Providers overview to a default-provider picker and compact provider-status list, and added optional custom status text to `AppAIBackendStatusRow`.
 
 ### Fixed
 

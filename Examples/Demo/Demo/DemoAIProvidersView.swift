@@ -142,18 +142,9 @@ struct DemoAIProvidersView: View {
                         selection: backendSelection,
                         catalog: manager.catalog
                     )
-
-                    NavigationLink {
-                        DemoAIPlaygroundView(manager: manager)
-                    } label: {
-                        LabeledContent("AI Playground") {
-                            Text(selectedBackendTitle)
-                                .foregroundStyle(theme.secondaryForegroundColor)
-                        }
-                    }
                 } footer: {
                     Text(
-                        "Managed AI uses AppAIClient and a shared proxy. Direct providers use API keys stored only in this device's Keychain."
+                        "Managed AI works through the shared proxy. The app also remembers the provider selected for direct BYOK requests."
                     )
                 }
                 .listRowBackground(theme.surfaceColor)
@@ -170,22 +161,6 @@ struct DemoAIProvidersView: View {
                             )
                         }
                     }
-                }
-                .listRowBackground(theme.surfaceColor)
-
-                Section("Shared Boundary") {
-                    Label(
-                        "AppFoundation owns secure AI transport",
-                        systemImage: "lock.shield.fill"
-                    )
-                    Label(
-                        "Each app owns prompts and result meaning",
-                        systemImage: "app.badge.checkmark"
-                    )
-                    Label(
-                        "Managed and BYOK retry rules remain distinct",
-                        systemImage: "arrow.triangle.2.circlepath"
-                    )
                 }
                 .listRowBackground(theme.surfaceColor)
             }
@@ -209,11 +184,6 @@ struct DemoAIProvidersView: View {
             get: { manager.selectedBackendID },
             set: { manager.select($0) }
         )
-    }
-
-    private var selectedBackendTitle: String {
-        manager.catalog.descriptor(for: manager.selectedBackendID)?.title
-            ?? "Unavailable"
     }
 
     @ViewBuilder
@@ -559,179 +529,6 @@ private struct DemoAIModelBrowserView: View {
                 }
         } catch {
             models = []
-            errorMessage = error.localizedDescription
-        }
-    }
-}
-
-@MainActor
-private struct DemoAIPlaygroundView: View {
-    @Environment(ThemeManager.self) private var themes
-
-    let manager: AppAIBackendManager
-
-    @State private var prompt = "Explain in one sentence why reusable infrastructure helps an indie developer."
-    @State private var output = ""
-    @State private var usage: AppAIDirectUsage?
-    @State private var errorMessage: String?
-    @State private var isGenerating = false
-    @State private var isConfigured = false
-
-    private var theme: AppTheme { themes.effectiveTheme }
-
-    private var descriptor: AppAIBackendDescriptor? {
-        manager.catalog.descriptor(for: manager.selectedBackendID)
-    }
-
-    var body: some View {
-        ZStack {
-            AppThemeBackground(theme: theme)
-
-            Form {
-                Section("Selected Backend") {
-                    if let descriptor {
-                        AppAIBackendStatusRow(
-                            descriptor: descriptor,
-                            isConfigured: isConfigured,
-                            isSelected: true
-                        )
-                    }
-
-                    switch manager.selectedBackendID {
-                    case .managed:
-                        Text(
-                            "Managed AI is intentionally not configured in the Demo. Select and configure a direct provider to run this playground."
-                        )
-                        .foregroundStyle(theme.secondaryForegroundColor)
-                    case .direct(let providerID):
-                        LabeledContent(
-                            "Model",
-                            value: manager.model(for: providerID)
-                        )
-                    }
-                }
-                .listRowBackground(theme.surfaceColor)
-
-                Section("Prompt") {
-                    TextEditor(text: $prompt)
-                        .frame(minHeight: 120)
-
-                    Button {
-                        Task { await generate() }
-                    } label: {
-                        if isGenerating {
-                            HStack {
-                                ProgressView()
-                                Text("Generating…")
-                            }
-                        } else {
-                            Label("Generate", systemImage: "sparkles")
-                        }
-                    }
-                    .disabled(
-                        isGenerating
-                            || !isConfigured
-                            || prompt.trimmingCharacters(
-                                in: .whitespacesAndNewlines
-                            ).isEmpty
-                    )
-                }
-                .listRowBackground(theme.surfaceColor)
-
-                if !output.isEmpty {
-                    Section("Response") {
-                        Text(output)
-                            .textSelection(.enabled)
-
-                        if let usage {
-                            LabeledContent(
-                                "Input tokens",
-                                value: usage.inputTokens?.formatted() ?? "—"
-                            )
-                            LabeledContent(
-                                "Output tokens",
-                                value: usage.outputTokens?.formatted() ?? "—"
-                            )
-                            LabeledContent(
-                                "Cached input",
-                                value: usage.cachedInputTokens?.formatted() ?? "—"
-                            )
-                        }
-                    }
-                    .listRowBackground(theme.surfaceColor)
-                }
-
-                if let errorMessage {
-                    Section("Error") {
-                        Text(errorMessage)
-                            .foregroundStyle(
-                                theme.secondaryForegroundColor
-                            )
-                    }
-                    .listRowBackground(theme.surfaceColor)
-                }
-
-                Section {
-                    Text(
-                        "Direct generation is attempted once. AppFoundation never silently retries an ambiguous network failure because the provider may already have processed and charged for the request."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(theme.secondaryForegroundColor)
-                }
-                .listRowBackground(theme.surfaceColor)
-            }
-            .scrollContentBackground(.hidden)
-        }
-        .foregroundStyle(theme.primaryForegroundColor)
-        .navigationTitle("AI Playground")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.hidden, for: .navigationBar)
-        .task {
-            isConfigured = await configuredState()
-        }
-    }
-
-    private func configuredState() async -> Bool {
-        switch manager.selectedBackendID {
-        case .managed:
-            false
-        case .direct:
-            await manager.isConfigured(manager.selectedBackendID)
-        }
-    }
-
-    private func generate() async {
-        guard case .direct(let providerID) = manager.selectedBackendID else {
-            errorMessage = "Managed AI is not configured in this Demo."
-            return
-        }
-
-        isGenerating = true
-        output = ""
-        usage = nil
-        errorMessage = nil
-        defer { isGenerating = false }
-
-        do {
-            let client = try manager.directClient(for: providerID)
-            let response = try await client.generate(
-                AppAIDirectRequest(
-                    model: manager.model(for: providerID),
-                    messages: [
-                        AppAIMessage(
-                            role: .system,
-                            content: "You are a concise assistant demonstrating an SDK integration."
-                        ),
-                        AppAIMessage(role: .user, content: prompt),
-                    ],
-                    responseFormat: .text,
-                    temperature: 0.3,
-                    maxOutputTokens: 300
-                )
-            )
-            output = response.text
-            usage = response.usage
-        } catch {
             errorMessage = error.localizedDescription
         }
     }

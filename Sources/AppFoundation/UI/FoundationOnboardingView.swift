@@ -299,8 +299,11 @@ public struct FoundationOnboardingView: View {
     }
 
     private var showsHeader: Bool {
-        configuration.headerTitle != nil
-            || (configuration.showsSkipButton && selectedPage < pageEntries.count - 1)
+        configuration.headerTitle != nil || configuration.showsSkipButton
+    }
+
+    private var showsSkipAction: Bool {
+        configuration.showsSkipButton && selectedPage < pageEntries.count - 1
     }
 
     private var header: some View {
@@ -315,12 +318,15 @@ public struct FoundationOnboardingView: View {
 
             Spacer()
 
-            if configuration.showsSkipButton && selectedPage < pageEntries.count - 1 {
+            if configuration.showsSkipButton {
                 Button(configuration.skipTitle) {
                     onCompletion()
                 }
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(secondaryForeground)
+                .opacity(showsSkipAction ? 1 : 0)
+                .disabled(!showsSkipAction)
+                .accessibilityHidden(!showsSkipAction)
             }
         }
         .padding(.horizontal, 24)

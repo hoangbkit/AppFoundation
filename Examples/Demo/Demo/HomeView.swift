@@ -10,6 +10,7 @@ struct HomeView: View {
     @State private var isShowingCelebration = false
     @State private var isShowingSettings = false
     @State private var isShowingOnboarding = false
+    @State private var isShowingFlexibleOnboarding = false
     @State private var isShowingUpsell = false
 
     private var theme: AppTheme { themes.effectiveTheme }
@@ -108,6 +109,20 @@ struct HomeView: View {
                     pages: DemoConfiguration.onboardingPages
                 ) {
                     isShowingOnboarding = false
+                }
+            }
+            .fullScreenCover(isPresented: $isShowingFlexibleOnboarding) {
+                FoundationOnboardingView(
+                    pages: DemoConfiguration.onboardingPages,
+                    configuration: FoundationOnboardingConfiguration(
+                        headerTitle: "APPFOUNDATION",
+                        completionTitle: "Back to Demo",
+                        buttonAppearance: .themed
+                    )
+                ) { page, context in
+                    DemoOnboardingPageView(page: page, context: context)
+                } onCompletion: {
+                    isShowingFlexibleOnboarding = false
                 }
             }
         }
@@ -213,8 +228,25 @@ struct HomeView: View {
             } label: {
                 featureLabel(
                     title: "Onboarding",
-                    subtitle: "Preview the reusable onboarding flow",
+                    subtitle: "Preview the reusable icon-and-copy flow",
                     systemImage: "rectangle.stack.fill",
+                    showsChevron: true
+                )
+            }
+            .buttonStyle(.plain)
+            .featureCardRow(
+                theme: theme,
+                position: .middle,
+                showsDivider: true
+            )
+
+            Button {
+                isShowingFlexibleOnboarding = true
+            } label: {
+                featureLabel(
+                    title: "Flexible Onboarding",
+                    subtitle: "Preview app-owned SwiftUI pages inside the shared flow",
+                    systemImage: "rectangle.stack.badge.plus",
                     showsChevron: true
                 )
             }

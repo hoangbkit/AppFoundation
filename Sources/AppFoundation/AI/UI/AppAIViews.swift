@@ -215,6 +215,12 @@ public struct AppAIConnectionTestButton: View {
     }
 }
 
+/// A focused setup surface for a direct BYOK provider.
+///
+/// The view intentionally keeps advanced provider information out of the main
+/// flow. It shows the current connection state, reveals the API-key editor only
+/// when needed, persists model changes through the supplied binding, and gives
+/// connection testing one clear primary action.
 @MainActor
 public struct AppAIDirectProviderConfigurationView: View {
     private let descriptor: AppAIBackendDescriptor
@@ -226,8 +232,10 @@ public struct AppAIDirectProviderConfigurationView: View {
 
     @State private var apiKey = ""
     @State private var hasSavedKey: Bool
+    @State private var isEditingCredential: Bool
     @State private var isWorking = false
     @State private var statusMessage: String?
+    @State private var statusIsError = false
     @State private var isShowingRemoveConfirmation = false
 
     public init(
@@ -245,121 +253,31 @@ public struct AppAIDirectProviderConfigurationView: View {
         self.removeCredential = removeCredential
         self.testConnection = testConnection
         self._hasSavedKey = State(initialValue: hasCredential)
+        self._isEditingCredential = State(initialValue: !hasCredential)
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            AppAIBackendStatusRow(
-                descriptor: descriptor,
-                isConfigured: hasSavedKey
-            )
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text("API Key")
-                    .font(.headline)
-
-                SecureField(
-                    hasSavedKey
-                        ? "Saved key — enter to replace"
-                        : keyPlaceholder,
-                    text: $apiKey
-                )
-                .textContentType(.password)
-                .autocorrectionDisabled()
-                .textInputAutocapitalization(.never)
-
-                Button(hasSavedKey ? "Replace API Key" : "Save API Key") {
-                    Task { await saveKey() }
-                }
-                .disabled(
-                    apiKey.trimmingCharacters(
-                        in: .whitespacesAndNewlines
-                    ).isEmpty || isWorking
-                )
-
-                if hasSavedKey {
-                    Label(
-                        "Key saved securely on this device",
-                        systemImage: "checkmark.shield.fill"
-                    )
-                    .foregroundStyle(.green)
-
-                    Button("Remove API Key", role: .destructive) {
-                        isShowingRemoveConfirmation = true
-                    }
-                    .disabled(isWorking)
-                }
-            }
+        VStack(alignment: .leading, spacing: 0) {
+            providerSummary
 
             Divider()
+                .padding(.vertical, 16)
 
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Model")
-                    .font(.headline)
-
-                TextField("Model ID", text: $model)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-
-                Button("Save Model") {
-                    model = model.trimmingCharacters(
-                        in: .whitespacesAndNewlines
-                    )
-                    statusMessage = "Model saved"
-                }
-                .disabled(
-                    model.trimmingCharacters(
-                        in: .whitespacesAndNewlines
-                    ).isEmpty || isWorking
-                )
-
-                if let preferredModel = descriptor.preferredModel {
-                    Text(
-                        "Default: \(preferredModel). Enter any model ID available to your account."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-            }
+            credentialSection
 
             Divider()
+                .padding(.vertical, 16)
 
-            VStack(alignment: .leading, spacing: 10) {
-                Button {
-                    Task { await runConnectionTest() }
-                } label: {
-                    if isWorking {
-                        HStack {
-                            ProgressView()
-                            Text("Testing \(descriptor.title)")
-                        }
-                    } else {
-                        Label(
-                            "Test Key and Model",
-                            systemImage: "bolt.horizontal.circle"
-                        )
-                    }
-                }
-                .disabled(
-                    isWorking
-                        || !hasSavedKey
-                        || model.trimmingCharacters(
-                            in: .whitespacesAndNewlines
-                        ).isEmpty
-                )
+            modelSection
 
-                if let statusMessage {
-                    Text(statusMessage)
-                        .foregroundStyle(
-                            statusMessage == "Connection successful"
-                                ? Color.green
-                                : Color.secondary
-                        )
-                }
-            }
+            Divider()
+                .padding(.vertical, 16)
+
+            connectionSection
         }
         .onChange(of: hasCredential) { _, newValue in
             hasSavedKey = newValue
+            isEditingCredential = !newValue
         }
         .confirmationDialog(
             "Remove \(descriptor.title) API key?",
@@ -369,7 +287,211 @@ public struct AppAIDirectProviderConfigurationView: View {
                 Task { await removeKey() }
             }
             Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Requests through this provider will stop working until a new key is saved.")
         }
+    }
+
+    private var providerSummary: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(
+                        hasSavedKey
+                            ? Color.green.opacity(0.14)
+                            : Color.secondary.opacity(0.12)
+                    )
+
+                Image(systemName: descriptor.symbolName ?? "sparkles")
+                    .font(.headline)
+                    .foregroundStyle(hasSavedKey ? Color.green : Color.secondary)
+            }
+            .frame(width: 42, height: 42)
+            .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(descriptor.title)
+                    .font(.headline)
+
+                Text(hasSavedKey ? "Ready to use" : "Add an API key to connect")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 12)
+
+            Text(hasSavedKey ? "Configured" : "Not Configured")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(hasSavedKey ? Color.green : Color.secondary)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 5)
+                .background(
+                    (hasSavedKey ? Color.green : Color.secondary).opacity(0.12),
+                    in: Capsule()
+                )
+        }
+    }
+
+    @ViewBuilder
+    private var credentialSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("API Key", systemImage: "key.fill")
+                    .font(.headline)
+
+                Spacer()
+
+                if hasSavedKey && !isEditingCredential {
+                    Button("Replace") {
+                        apiKey = ""
+                        statusMessage = nil
+                        isEditingCredential = true
+                    }
+                    .font(.subheadline.weight(.semibold))
+                }
+            }
+
+            if hasSavedKey && !isEditingCredential {
+                HStack(spacing: 10) {
+                    Image(systemName: "checkmark.shield.fill")
+                        .foregroundStyle(.green)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Saved securely")
+                            .font(.subheadline.weight(.semibold))
+                        Text("Stored in Keychain on this device")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Button("Remove API Key", role: .destructive) {
+                    isShowingRemoveConfirmation = true
+                }
+                .font(.subheadline)
+                .disabled(isWorking)
+            } else {
+                SecureField(
+                    hasSavedKey ? "Paste replacement key" : keyPlaceholder,
+                    text: $apiKey
+                )
+                .textFieldStyle(.roundedBorder)
+                .textContentType(.password)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+
+                HStack(spacing: 10) {
+                    Button(hasSavedKey ? "Save Replacement" : "Save API Key") {
+                        Task { await saveKey() }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(trimmedAPIKey.isEmpty || isWorking)
+
+                    if hasSavedKey {
+                        Button("Cancel") {
+                            apiKey = ""
+                            statusMessage = nil
+                            isEditingCredential = false
+                        }
+                        .disabled(isWorking)
+                    }
+                }
+            }
+        }
+    }
+
+    private var modelSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Model", systemImage: "cube.fill")
+                .font(.headline)
+
+            TextField("Model ID", text: $model)
+                .textFieldStyle(.roundedBorder)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+
+            HStack(alignment: .firstTextBaseline) {
+                Text("Used automatically for new requests.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Spacer(minLength: 8)
+
+                if let preferredModel = normalizedPreferredModel,
+                   model.trimmingCharacters(in: .whitespacesAndNewlines) != preferredModel {
+                    Button("Use Default") {
+                        model = preferredModel
+                        statusMessage = nil
+                    }
+                    .font(.caption.weight(.semibold))
+                }
+            }
+        }
+    }
+
+    private var connectionSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button {
+                Task { await runConnectionTest() }
+            } label: {
+                HStack {
+                    Spacer()
+                    if isWorking {
+                        ProgressView()
+                        Text("Testing…")
+                    } else {
+                        Image(systemName: "bolt.horizontal.circle.fill")
+                        Text("Test Connection")
+                    }
+                    Spacer()
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .disabled(
+                isWorking
+                    || !hasSavedKey
+                    || model.trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    ).isEmpty
+            )
+
+            if let statusMessage {
+                Label(
+                    statusMessage,
+                    systemImage: statusIsError
+                        ? "exclamationmark.circle.fill"
+                        : "checkmark.circle.fill"
+                )
+                .font(.subheadline)
+                .foregroundStyle(statusIsError ? Color.red : Color.green)
+                .fixedSize(horizontal: false, vertical: true)
+            } else if !hasSavedKey {
+                Text("Save an API key before testing the connection.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Label(
+                "Your key stays in Keychain and is sent only to \(descriptor.title).",
+                systemImage: "lock.shield"
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var trimmedAPIKey: String {
+        apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var normalizedPreferredModel: String? {
+        guard let preferredModel = descriptor.preferredModel?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              !preferredModel.isEmpty else {
+            return nil
+        }
+        return preferredModel
     }
 
     private var keyPlaceholder: String {
@@ -401,12 +523,15 @@ public struct AppAIDirectProviderConfigurationView: View {
         defer { isWorking = false }
 
         do {
-            try await saveCredential(apiKey)
+            try await saveCredential(trimmedAPIKey)
             apiKey = ""
             hasSavedKey = true
+            isEditingCredential = false
             statusMessage = "API key saved"
+            statusIsError = false
         } catch {
             statusMessage = error.localizedDescription
+            statusIsError = true
         }
     }
 
@@ -417,10 +542,14 @@ public struct AppAIDirectProviderConfigurationView: View {
 
         do {
             try await removeCredential()
+            apiKey = ""
             hasSavedKey = false
+            isEditingCredential = true
             statusMessage = "API key removed"
+            statusIsError = false
         } catch {
             statusMessage = error.localizedDescription
+            statusIsError = true
         }
     }
 
@@ -433,8 +562,10 @@ public struct AppAIDirectProviderConfigurationView: View {
         do {
             try await testConnection(model)
             statusMessage = "Connection successful"
+            statusIsError = false
         } catch {
             statusMessage = error.localizedDescription
+            statusIsError = true
         }
     }
 }
@@ -461,28 +592,44 @@ public struct AppAIManagedUsageSection: View {
     public var body: some View {
         Section("AI Usage") {
             if let status {
-                LabeledContent("Plan", value: status.plan.capitalized)
-                LabeledContent(
-                    "Used",
-                    value: "\(status.usage.used) of \(status.usage.limit)"
-                )
-                LabeledContent(
-                    "Remaining",
-                    value: "\(status.usage.remaining)"
-                )
-                LabeledContent("Resets") {
-                    Text(
-                        status.usage.resetsAt,
-                        format: .dateTime.year().month().day().hour().minute()
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .firstTextBaseline) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("\(status.usage.remaining) left")
+                                .font(.title2.weight(.semibold))
+                            Text(status.plan.capitalized)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Spacer()
+
+                        Text("\(status.usage.used) of \(status.usage.limit) used")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    ProgressView(
+                        value: Double(status.usage.used),
+                        total: Double(max(1, status.usage.limit))
                     )
-                }
-                if isStale {
-                    Label(
-                        "Showing the last available usage",
-                        systemImage: "wifi.exclamationmark"
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+
+                    LabeledContent("Resets") {
+                        Text(
+                            status.usage.resetsAt,
+                            format: .dateTime.year().month().day().hour().minute()
+                        )
+                    }
+                    .font(.subheadline)
+
+                    if isStale {
+                        Label(
+                            "Showing the last available usage",
+                            systemImage: "wifi.exclamationmark"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
                 }
             } else if isRefreshing {
                 HStack {
@@ -490,8 +637,12 @@ public struct AppAIManagedUsageSection: View {
                     Text("Refreshing usage…")
                 }
             } else {
-                LabeledContent("Usage", value: "Unavailable")
+                ContentUnavailableView(
+                    "Usage Unavailable",
+                    systemImage: "chart.bar.xaxis"
+                )
             }
+
             Button("Refresh Usage", action: refresh)
                 .disabled(isRefreshing)
         }

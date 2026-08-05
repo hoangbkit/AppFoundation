@@ -654,6 +654,7 @@ private struct DemoAIModelBrowserView: View {
     }
 }
 
+@MainActor
 private enum DemoClipboard {
     static func string() -> String? {
         #if canImport(UIKit)

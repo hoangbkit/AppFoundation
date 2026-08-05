@@ -223,6 +223,12 @@ public struct AppAIConnectionTestButton: View {
 /// connection testing one clear primary action.
 @MainActor
 public struct AppAIDirectProviderConfigurationView: View {
+    private enum Activity {
+        case savingCredential
+        case removingCredential
+        case testingConnection
+    }
+
     private let descriptor: AppAIBackendDescriptor
     @Binding private var model: String
     private let hasCredential: Bool
@@ -233,7 +239,7 @@ public struct AppAIDirectProviderConfigurationView: View {
     @State private var apiKey = ""
     @State private var hasSavedKey: Bool
     @State private var isEditingCredential: Bool
-    @State private var isWorking = false
+    @State private var activity: Activity? = nil
     @State private var statusMessage: String?
     @State private var statusIsError = false
     @State private var isShowingRemoveConfirmation = false
@@ -380,8 +386,17 @@ public struct AppAIDirectProviderConfigurationView: View {
                 .textInputAutocapitalization(.never)
 
                 HStack(spacing: 10) {
-                    Button(hasSavedKey ? "Save Replacement" : "Save API Key") {
+                    Button {
                         Task { await saveKey() }
+                    } label: {
+                        if activity == .savingCredential {
+                            HStack(spacing: 6) {
+                                ProgressView()
+                                Text("Saving…")
+                            }
+                        } else {
+                            Text(hasSavedKey ? "Save Replacement" : "Save API Key")
+                        }
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(trimmedAPIKey.isEmpty || isWorking)
@@ -435,7 +450,7 @@ public struct AppAIDirectProviderConfigurationView: View {
             } label: {
                 HStack {
                     Spacer()
-                    if isWorking {
+                    if activity == .testingConnection {
                         ProgressView()
                         Text("Testing…")
                     } else {
@@ -481,6 +496,10 @@ public struct AppAIDirectProviderConfigurationView: View {
         }
     }
 
+    private var isWorking: Bool {
+        activity != nil
+    }
+
     private var trimmedAPIKey: String {
         apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -518,9 +537,9 @@ public struct AppAIDirectProviderConfigurationView: View {
     }
 
     private func saveKey() async {
-        isWorking = true
+        activity = .savingCredential
         statusMessage = nil
-        defer { isWorking = false }
+        defer { activity = nil }
 
         do {
             try await saveCredential(trimmedAPIKey)
@@ -536,9 +555,9 @@ public struct AppAIDirectProviderConfigurationView: View {
     }
 
     private func removeKey() async {
-        isWorking = true
+        activity = .removingCredential
         statusMessage = nil
-        defer { isWorking = false }
+        defer { activity = nil }
 
         do {
             try await removeCredential()
@@ -555,9 +574,9 @@ public struct AppAIDirectProviderConfigurationView: View {
 
     private func runConnectionTest() async {
         model = model.trimmingCharacters(in: .whitespacesAndNewlines)
-        isWorking = true
+        activity = .testingConnection
         statusMessage = nil
-        defer { isWorking = false }
+        defer { activity = nil }
 
         do {
             try await testConnection(model)

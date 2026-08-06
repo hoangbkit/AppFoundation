@@ -66,6 +66,28 @@ private actor ControlledStatusClient: AppAIStatusServing {
     }
 }
 
+private actor SlowCountingStatusClient: AppAIStatusServing {
+    private var count = 0
+
+    func status() async throws -> AppAIStatus {
+        await nextStatus()
+    }
+
+    func syncCurrentEntitlements() async throws -> AppAIStatus {
+        await nextStatus()
+    }
+
+    func callCount() -> Int {
+        count
+    }
+
+    private func nextStatus() async -> AppAIStatus {
+        count += 1
+        try? await Task.sleep(for: .milliseconds(20))
+        return makeStatus(id: "slow", remaining: 7)
+    }
+}
+
 @Test @MainActor
 func directBackendRequiresRegisteredClientToBeReady() async {
     let credentialStore = AppAIInMemoryCredentialStore(
@@ -269,6 +291,20 @@ func zeroStatusMaxAgeForcesRefresh() async {
     let callCount = await client.callCount()
     #expect(callCount == 2)
     #expect(store.status?.app.id == "second")
+}
+
+@Test @MainActor
+func concurrentEntitlementRefreshesShareInFlightRequest() async {
+    let client = SlowCountingStatusClient()
+    let store = AppAIStatusStore(client: client)
+
+    async let first: Void = store.refreshAndWait(syncEntitlements: true)
+    async let second: Void = store.refreshAndWait(syncEntitlements: true)
+    _ = await (first, second)
+
+    let callCount = await client.callCount()
+    #expect(callCount == 1)
+    #expect(store.status?.app.id == "slow")
 }
 
 private func waitForCallCount(

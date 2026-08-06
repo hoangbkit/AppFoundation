@@ -33,6 +33,7 @@ public final class AppAIStatusStore {
     @ObservationIgnored private let freshnessInterval: TimeInterval
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
     @ObservationIgnored private var activeRefreshID: UUID?
+    @ObservationIgnored private var activeRefreshSyncEntitlements = false
     @ObservationIgnored private var stateBeforeRefresh: State?
     @ObservationIgnored private var queuedSyncEntitlements = false
 
@@ -96,7 +97,7 @@ public final class AppAIStatusStore {
         maxAge: TimeInterval? = nil
     ) {
         if refreshTask != nil {
-            queuedSyncEntitlements = queuedSyncEntitlements || syncEntitlements
+            queueEntitlementSyncIfNeeded(syncEntitlements)
             return
         }
         guard !hasFreshStatus(maxAge: maxAge ?? freshnessInterval) else {
@@ -110,7 +111,7 @@ public final class AppAIStatusStore {
         maxAge: TimeInterval? = nil
     ) async {
         if let refreshTask {
-            queuedSyncEntitlements = queuedSyncEntitlements || syncEntitlements
+            queueEntitlementSyncIfNeeded(syncEntitlements)
             await refreshTask.value
             return
         }
@@ -123,7 +124,7 @@ public final class AppAIStatusStore {
 
     public func refresh(syncEntitlements: Bool) {
         if refreshTask != nil {
-            queuedSyncEntitlements = queuedSyncEntitlements || syncEntitlements
+            queueEntitlementSyncIfNeeded(syncEntitlements)
             return
         }
         _ = startRefresh(syncEntitlements: syncEntitlements)
@@ -131,7 +132,7 @@ public final class AppAIStatusStore {
 
     public func refreshAndWait(syncEntitlements: Bool) async {
         if let refreshTask {
-            queuedSyncEntitlements = queuedSyncEntitlements || syncEntitlements
+            queueEntitlementSyncIfNeeded(syncEntitlements)
             await refreshTask.value
             return
         }
@@ -144,6 +145,7 @@ public final class AppAIStatusStore {
         activeRefreshID = nil
         refreshTask?.cancel()
         refreshTask = nil
+        activeRefreshSyncEntitlements = false
         queuedSyncEntitlements = false
         stateBeforeRefresh = nil
 
@@ -158,6 +160,7 @@ public final class AppAIStatusStore {
     ) -> Task<Void, Never> {
         let refreshID = UUID()
         activeRefreshID = refreshID
+        activeRefreshSyncEntitlements = syncEntitlements
         stateBeforeRefresh = state
 
         let task = Task { [weak self] in
@@ -177,6 +180,7 @@ public final class AppAIStatusStore {
 
         activeRefreshID = nil
         refreshTask = nil
+        activeRefreshSyncEntitlements = false
         stateBeforeRefresh = nil
 
         guard queuedSyncEntitlements else { return }
@@ -228,6 +232,15 @@ public final class AppAIStatusStore {
                 previous: previous
             )
         }
+    }
+
+    private func queueEntitlementSyncIfNeeded(
+        _ syncEntitlements: Bool
+    ) {
+        guard syncEntitlements, !activeRefreshSyncEntitlements else {
+            return
+        }
+        queuedSyncEntitlements = true
     }
 
     private func hasFreshStatus(maxAge: TimeInterval) -> Bool {

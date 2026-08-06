@@ -215,6 +215,62 @@ func cancelledStatusRefreshCannotClobberNewerRefresh() async {
     #expect(!store.isRefreshing)
 }
 
+@Test @MainActor
+func statusRefreshIfNeededUsesFreshCachedValue() async {
+    let client = ControlledStatusClient()
+    let store = AppAIStatusStore(client: client)
+
+    let firstRefresh = Task { @MainActor in
+        await store.refreshAndWait(syncEntitlements: false)
+    }
+    await waitForCallCount(1, client: client)
+    await client.resume(
+        callID: 1,
+        with: makeStatus(id: "cached", remaining: 8)
+    )
+    await firstRefresh.value
+
+    await store.refreshIfNeededAndWait(syncEntitlements: false)
+
+    let callCount = await client.callCount()
+    #expect(callCount == 1)
+    #expect(store.isFresh)
+    #expect(store.status?.app.id == "cached")
+}
+
+@Test @MainActor
+func zeroStatusMaxAgeForcesRefresh() async {
+    let client = ControlledStatusClient()
+    let store = AppAIStatusStore(client: client)
+
+    let firstRefresh = Task { @MainActor in
+        await store.refreshAndWait(syncEntitlements: false)
+    }
+    await waitForCallCount(1, client: client)
+    await client.resume(
+        callID: 1,
+        with: makeStatus(id: "first", remaining: 8)
+    )
+    await firstRefresh.value
+
+    let secondRefresh = Task { @MainActor in
+        await store.refreshIfNeededAndWait(
+            syncEntitlements: false,
+            maxAge: 0
+        )
+    }
+    await waitForCallCount(2, client: client)
+    await client.resume(
+        callID: 2,
+        with: makeStatus(id: "second", remaining: 7)
+    )
+    await secondRefresh.value
+
+    let callCount = await client.callCount()
+    #expect(callCount == 2)
+    #expect(store.status?.app.id == "second")
+}
+
 private func waitForCallCount(
     _ expected: Int,
     client: ControlledStatusClient

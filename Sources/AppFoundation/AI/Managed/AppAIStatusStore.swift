@@ -16,6 +16,8 @@ extension AppAIClient: AppAIStatusServing {}
 @MainActor
 @Observable
 public final class AppAIStatusStore {
+    public static let defaultFreshnessInterval: TimeInterval = 60
+
     public enum State: Sendable {
         case idle
         case refreshing
@@ -28,6 +30,7 @@ public final class AppAIStatusStore {
 
     @ObservationIgnored private let client: (any AppAIStatusServing)?
     @ObservationIgnored private let configurationError: AppAIError?
+    @ObservationIgnored private let freshnessInterval: TimeInterval
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
     @ObservationIgnored private var activeRefreshID: UUID?
     @ObservationIgnored private var stateBeforeRefresh: State?
@@ -35,10 +38,12 @@ public final class AppAIStatusStore {
 
     public init(
         client: (any AppAIStatusServing)?,
-        configurationError: AppAIError? = nil
+        configurationError: AppAIError? = nil,
+        freshnessInterval: TimeInterval = AppAIStatusStore.defaultFreshnessInterval
     ) {
         self.client = client
         self.configurationError = configurationError
+        self.freshnessInterval = max(0, freshnessInterval)
     }
 
     public var status: AppAIStatus? {
@@ -53,6 +58,10 @@ public final class AppAIStatusStore {
     public var isRefreshing: Bool {
         guard case .refreshing = state else { return false }
         return true
+    }
+
+    public var isFresh: Bool {
+        hasFreshStatus(maxAge: freshnessInterval)
     }
 
     public var isStale: Bool {
@@ -80,6 +89,36 @@ public final class AppAIStatusStore {
 
     public func generationDidComplete() {
         refresh(syncEntitlements: false)
+    }
+
+    public func refreshIfNeeded(
+        syncEntitlements: Bool,
+        maxAge: TimeInterval? = nil
+    ) {
+        if refreshTask != nil {
+            queuedSyncEntitlements = queuedSyncEntitlements || syncEntitlements
+            return
+        }
+        guard !hasFreshStatus(maxAge: maxAge ?? freshnessInterval) else {
+            return
+        }
+        _ = startRefresh(syncEntitlements: syncEntitlements)
+    }
+
+    public func refreshIfNeededAndWait(
+        syncEntitlements: Bool,
+        maxAge: TimeInterval? = nil
+    ) async {
+        if let refreshTask {
+            queuedSyncEntitlements = queuedSyncEntitlements || syncEntitlements
+            await refreshTask.value
+            return
+        }
+        guard !hasFreshStatus(maxAge: maxAge ?? freshnessInterval) else {
+            return
+        }
+        let task = startRefresh(syncEntitlements: syncEntitlements)
+        await task.value
     }
 
     public func refresh(syncEntitlements: Bool) {
@@ -189,6 +228,14 @@ public final class AppAIStatusStore {
                 previous: previous
             )
         }
+    }
+
+    private func hasFreshStatus(maxAge: TimeInterval) -> Bool {
+        guard maxAge > 0,
+              case .current(_, let updatedAt) = state else {
+            return false
+        }
+        return Date.now.timeIntervalSince(updatedAt) < maxAge
     }
 
     private func previousStatus(

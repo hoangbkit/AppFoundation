@@ -24,10 +24,12 @@ public struct FoundationOnboardingPage: Identifiable {
 }
 
 public enum FoundationOnboardingButtonAppearance: Sendable {
-    /// Preserves the original white onboarding button.
+    /// Preserved for source compatibility. Onboarding action buttons always
+    /// use the fixed prominent white style.
     case legacyLight
 
-    /// Uses the shared theme gradient button style.
+    /// Preserved for source compatibility. This value no longer changes the
+    /// onboarding action button appearance.
     case themed
 }
 
@@ -42,6 +44,8 @@ public struct FoundationOnboardingConfiguration {
     public var centersPageContent: Bool
     public var contentHorizontalPadding: CGFloat
     public var contentVerticalPadding: CGFloat
+    /// Preserved for source compatibility. The onboarding action button is
+    /// always rendered with the fixed prominent white style.
     public var buttonAppearance: FoundationOnboardingButtonAppearance
 
     public init(
@@ -261,9 +265,7 @@ public struct FoundationOnboardingView: View {
             background
 
             VStack(spacing: 24) {
-                if showsHeader {
-                    header
-                }
+                header
 
                 TabView(selection: $selectedPage) {
                     ForEach(Array(pageEntries.enumerated()), id: \.element.id) { index, entry in
@@ -298,23 +300,17 @@ public struct FoundationOnboardingView: View {
         }
     }
 
-    private var showsHeader: Bool {
-        configuration.headerTitle != nil || configuration.showsSkipButton
-    }
-
     private var showsSkipAction: Bool {
         configuration.showsSkipButton && selectedPage < pageEntries.count - 1
     }
 
     private var header: some View {
         HStack {
-            if let headerTitle = configuration.headerTitle {
-                FoundationPill(
-                    headerTitle,
-                    systemImage: configuration.headerSystemImage,
-                    tint: resolvedTheme.primary
-                )
-            }
+            FoundationPill(
+                configuration.headerTitle ?? "WELCOME",
+                systemImage: configuration.headerSystemImage,
+                tint: resolvedTheme.primary
+            )
 
             Spacer()
 
@@ -379,17 +375,9 @@ public struct FoundationOnboardingView: View {
         .accessibilityLabel("Page \(selectedPage + 1) of \(pageEntries.count)")
     }
 
-    @ViewBuilder
     private var actionButton: some View {
-        switch configuration.buttonAppearance {
-        case .legacyLight:
-            Button(actionTitle, action: advance)
-                .buttonStyle(FoundationOnboardingButtonStyle())
-
-        case .themed:
-            Button(actionTitle, action: advance)
-                .buttonStyle(FoundationPrimaryButtonStyle(theme: resolvedTheme))
-        }
+        Button(actionTitle, action: advance)
+            .buttonStyle(FoundationOnboardingButtonStyle())
     }
 
     private var actionTitle: String {

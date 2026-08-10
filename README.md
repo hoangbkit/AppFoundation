@@ -1,6 +1,6 @@
 # AppFoundation
 
-Shared production infrastructure for SwiftUI apps. AppFoundation targets **iOS 26+**, **macOS 15+**, and **Swift 6.2 strict concurrency**.
+Shared production infrastructure for SwiftUI apps. AppFoundation targets **iOS 26+** and **Swift 6.2 strict concurrency**.
 
 The package centralizes behavior that is expensive to reimplement correctly while keeping each app's navigation, models, copy, branding, fixtures, and visual identity app-owned.
 
@@ -9,18 +9,17 @@ The package centralizes behavior that is expensive to reimplement correctly whil
 | Product | Purpose |
 | --- | --- |
 | `AppFoundation` | Commerce, themes, onboarding, settings, exports, backups, App Group storage, notifications, and shared utilities. It also re-exports the Studio and Showcase products. |
-| `AppFoundationScreenshotStudio` | Exact-size SwiftUI screenshot composition, preview, templates, and export on iOS and macOS. |
-| `AppFoundationPromoVideoStudio` | Deterministic SwiftUI promo-video editing and silent H.264 MP4 export on iOS and macOS. |
+| `AppFoundationScreenshotStudio` | Exact-size SwiftUI screenshot composition, preview, templates, and export on iOS. |
+| `AppFoundationPromoVideoStudio` | Deterministic SwiftUI promo-video editing and silent H.264 MP4 export on iOS. |
 | `AppFoundationWidgetShowcase` | In-app widget catalogs, previews, detail screens, installation guidance, and Free/Pro presentation. |
 
-Individual APIs use conditional compilation when a framework or platform is unavailable. Linking a standalone product is useful when a macOS target only needs one Studio and should not depend on the rest of AppFoundation.
+Individual APIs use conditional compilation when a framework or platform is unavailable.
 
 ## Requirements
 
 - Xcode 26+
 - Swift 6.2+
 - iOS 26+
-- macOS 15+ for supported products and APIs
 - XcodeGen 2.45.4+ for the Demo projects
 
 ## Installation
@@ -159,13 +158,12 @@ ScreenshotStudio(
 }
 ```
 
-The iOS Studio supports App Store presets, locale and appearance selection, full-set preview, and sharing. The macOS Studio uses a native three-column screenshot, preview, and inspector workspace, exports exact-size PNG files to a selected folder, and can reveal the result in Finder.
+The Studio supports App Store presets, locale and appearance selection, full-set preview, and sharing.
 
 See:
 
 - [Screenshot Studio](Documentation/ScreenshotStudio.md)
 - [Reusable Screenshot Components](Documentation/ScreenshotStudioComponents.md)
-- [Screenshot Studio on macOS](Documentation/ScreenshotStudioMacOS.md)
 
 ## Promo Video Studio
 
@@ -190,7 +188,7 @@ PromoVideoStudio(
 
 A single project can still be supplied with `PromoVideoStudio(project:)`. With `videos:`, the toolbar switches among registered videos while preview, scrubbing, configuration, and export remain scoped to the selected video.
 
-Both iOS and macOS support deterministic playback, scrubbing, scene selection, safe-area preview, 30 or 60 fps output, and silent H.264 MP4 export. The macOS implementation adds a native three-column workspace, save panel, Finder reveal, and full-window preview.
+The iOS implementation supports deterministic playback, scrubbing, scene selection, safe-area preview, 30 or 60 fps output, and silent H.264 MP4 export.
 
 Included story templates:
 
@@ -205,7 +203,6 @@ Included story templates:
 See:
 
 - [Promo Video Studio](Documentation/PromoVideoStudio.md)
-- [Promo Video Studio on macOS](Documentation/PromoVideoStudioMacOS.md)
 
 ## Widget Showcase
 
@@ -261,14 +258,7 @@ cd Examples/Demo
 make test
 ```
 
-Build the macOS Demo:
-
-```bash
-cd Examples/Demo
-make build-mac
-```
-
-The simulator and macOS Demo builds require macOS with Xcode 26.
+The simulator build requires macOS with Xcode 26.
 
 ## Migration notes
 

@@ -6,21 +6,24 @@ AppFoundation follows semantic versioning.
 
 ## Unreleased
 
+## 1.2.1 - 2026-08-11
+
 ### Added
 
-- Added `AppIconOption`, `AppIconPickerView`, and `AppIconPickerSection` for registering and presenting primary and alternate app icons in Settings.
-- Added reusable locked-icon, upgrade-routing, loading, error, selection, and accessibility behavior.
-- Added `AppIconManager` for app-owned icon interfaces and plural-name picker aliases.
+- Added configurable freshness caching to `AppAIStatusStore`, including `defaultFreshnessInterval`, `isFresh`, `refreshIfNeeded`, and `refreshIfNeededAndWait`.
+- Added `FoundationOnboardingHeaderProviding` and optional per-step header titles and symbols for standard and custom onboarding page models.
 
 ### Changed
 
-- Generalized alternate icon switching while preserving `ThemeAppIconManager` and `ThemeAppIconError` source compatibility.
+- Coalesced concurrent managed-AI status refreshes and avoided redundant follow-up entitlement synchronization when the active request already includes it.
+- Fixed onboarding chrome to a stable, high-contrast presentation across themes: the header pill remains visible and the primary action remains white with a black label.
+- Preserved `headerTitle: nil`, `FoundationOnboardingButtonAppearance`, and existing onboarding initializers for source compatibility while making their rendered chrome behavior consistent.
+- Changed the package's declared support from iOS and macOS to iOS 26 and later only. Existing conditionally compiled macOS implementations remain in source for compatibility but are no longer supported.
 
 ### Documentation
 
-- Added app-icon picker registration and Settings adoption guidance.
-- Rebuilt the changelog from the actual `0.1.0` through `0.1.8` tag history.
-- Updated the README for the current package products, macOS support, multi-video Promo Video Studio, and `0.1.8` installation guidance.
+- Documented per-step onboarding header metadata, fallback behavior, and fixed onboarding chrome.
+- Updated package requirements, product descriptions, and validation guidance for iOS-only support.
 
 ## 1.2.0 - 2026-08-05
 

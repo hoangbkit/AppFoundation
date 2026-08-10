@@ -4,7 +4,7 @@ import XCTest
 @testable import AppFoundation
 
 final class FoundationOnboardingTests: XCTestCase {
-    func testConfigurationPreservesLegacyDefaults() {
+    func testConfigurationPreservesDefaults() {
         let configuration = FoundationOnboardingConfiguration()
 
         XCTAssertEqual(configuration.headerTitle, "WELCOME")
@@ -17,6 +17,7 @@ final class FoundationOnboardingTests: XCTestCase {
         XCTAssertTrue(configuration.centersPageContent)
         XCTAssertEqual(configuration.contentHorizontalPadding, 24)
         XCTAssertEqual(configuration.contentVerticalPadding, 8)
+        XCTAssertEqual(configuration.buttonAppearance, .legacyLight)
     }
 
     func testConfigurationClampsNegativeContentPadding() {
@@ -27,6 +28,16 @@ final class FoundationOnboardingTests: XCTestCase {
 
         XCTAssertEqual(configuration.contentHorizontalPadding, 0)
         XCTAssertEqual(configuration.contentVerticalPadding, 0)
+    }
+
+    func testLegacyChromeConfigurationRemainsSourceCompatible() {
+        let configuration = FoundationOnboardingConfiguration(
+            headerTitle: nil,
+            buttonAppearance: .themed
+        )
+
+        XCTAssertNil(configuration.headerTitle)
+        XCTAssertEqual(configuration.buttonAppearance, .themed)
     }
 
     @MainActor

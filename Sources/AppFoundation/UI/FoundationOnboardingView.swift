@@ -173,7 +173,6 @@ public struct FoundationOnboardingStandardPage: View {
 
 public struct FoundationOnboardingView: View {
     @Environment(\.appFoundationTheme) private var environmentTheme
-    @Environment(\.colorScheme) private var colorScheme
 
     private struct PageEntry: Identifiable {
         let id: AnyHashable
@@ -284,8 +283,7 @@ public struct FoundationOnboardingView: View {
             FoundationOnboardingHeaderPill(
                 configuration.headerTitle ?? "WELCOME",
                 systemImage: configuration.headerSystemImage,
-                foreground: secondaryForeground.opacity(0.22),
-                isBackgroundLight: isHeaderBackgroundLight
+                tint: resolvedTheme.primary
             )
             Spacer()
             if configuration.showsSkipButton {
@@ -379,33 +377,6 @@ public struct FoundationOnboardingView: View {
         fixedTheme == nil ? environmentTheme.id : "fixed"
     }
 
-    private var isHeaderBackgroundLight: Bool {
-        if fixedTheme == nil {
-            let background = environmentTheme.appearance.background
-            return Self.relativeLuminance(
-                red: background.red,
-                green: background.green,
-                blue: background.blue
-            ) > 0.5
-        }
-
-        var values = EnvironmentValues()
-        values.colorScheme = colorScheme
-        let background = resolvedTheme.background.resolve(in: values)
-        return Self.relativeLuminance(
-            red: Double(background.red),
-            green: Double(background.green),
-            blue: Double(background.blue)
-        ) > 0.5
-    }
-
-    private static func relativeLuminance(red: Double, green: Double, blue: Double) -> Double {
-        func linearize(_ value: Double) -> Double {
-            value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
-        }
-        return 0.2126 * linearize(red) + 0.7152 * linearize(green) + 0.0722 * linearize(blue)
-    }
-
     private static func standardEntries(from pages: [FoundationOnboardingPage]) -> [PageEntry] {
         pages.map { page in
             PageEntry(id: AnyHashable(page.id)) { context in
@@ -440,19 +411,12 @@ public struct FoundationOnboardingView: View {
 private struct FoundationOnboardingHeaderPill: View {
     let text: String
     let systemImage: String?
-    let foreground: Color
-    let isBackgroundLight: Bool
+    let tint: Color
 
-    init(
-        _ text: String,
-        systemImage: String?,
-        foreground: Color,
-        isBackgroundLight: Bool
-    ) {
+    init(_ text: String, systemImage: String?, tint: Color) {
         self.text = text
         self.systemImage = systemImage
-        self.foreground = foreground
-        self.isBackgroundLight = isBackgroundLight
+        self.tint = tint
     }
 
     var body: some View {
@@ -462,16 +426,16 @@ private struct FoundationOnboardingHeaderPill: View {
             if let systemImage { Image(systemName: systemImage) }
         }
         .font(.caption.weight(.semibold))
-        .foregroundStyle(foreground)
+        .foregroundStyle(tint)
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
-        .background(
-            chromeColor.opacity(isBackgroundLight ? 0.04 : 0.06),
-            in: Capsule()
-        )
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay {
+            Capsule()
+                .fill(tint.opacity(0.05))
+                .allowsHitTesting(false)
+        }
     }
-
-    private var chromeColor: Color { isBackgroundLight ? .black : .white }
 }
 
 private struct FoundationOnboardingButtonStyle: ButtonStyle {

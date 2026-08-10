@@ -1,26 +1,40 @@
 #if canImport(SwiftUI)
 import SwiftUI
 
-public struct FoundationOnboardingPage: Identifiable {
+public protocol FoundationOnboardingHeaderProviding {
+    var onboardingHeaderTitle: String? { get }
+    var onboardingHeaderSystemImage: String? { get }
+}
+
+public struct FoundationOnboardingPage: Identifiable, FoundationOnboardingHeaderProviding {
     public let id: String
     public let systemImage: String
     public let eyebrow: String
     public let title: String
     public let message: String
+    public let headerTitle: String?
+    public let headerSystemImage: String?
 
     public init(
         id: String,
         systemImage: String,
         eyebrow: String,
         title: String,
-        message: String
+        message: String,
+        headerTitle: String? = nil,
+        headerSystemImage: String? = nil
     ) {
         self.id = id
         self.systemImage = systemImage
         self.eyebrow = eyebrow
         self.title = title
         self.message = message
+        self.headerTitle = headerTitle
+        self.headerSystemImage = headerSystemImage
     }
+
+    public var onboardingHeaderTitle: String? { headerTitle }
+    public var onboardingHeaderSystemImage: String? { headerSystemImage }
 }
 
 public enum FoundationOnboardingButtonAppearance: Sendable, Equatable {
@@ -177,6 +191,8 @@ public struct FoundationOnboardingView: View {
 
     private struct PageEntry: Identifiable {
         let id: AnyHashable
+        let headerTitle: String?
+        let headerSystemImage: String?
         let content: (FoundationOnboardingPageContext) -> AnyView
     }
 
@@ -279,11 +295,23 @@ public struct FoundationOnboardingView: View {
         configuration.showsSkipButton && selectedPage < pageEntries.count - 1
     }
 
+    private var currentPageEntry: PageEntry {
+        pageEntries[min(max(selectedPage, 0), pageEntries.count - 1)]
+    }
+
+    private var currentHeaderTitle: String {
+        currentPageEntry.headerTitle ?? configuration.headerTitle ?? "WELCOME"
+    }
+
+    private var currentHeaderSystemImage: String? {
+        currentPageEntry.headerSystemImage ?? configuration.headerSystemImage
+    }
+
     private var header: some View {
         HStack {
             FoundationOnboardingHeaderPill(
-                configuration.headerTitle ?? "WELCOME",
-                systemImage: configuration.headerSystemImage,
+                currentHeaderTitle,
+                systemImage: currentHeaderSystemImage,
                 foreground: secondaryForeground.opacity(0.30),
                 usesLightAppearance: usesLightAppearance
             )
@@ -388,7 +416,11 @@ public struct FoundationOnboardingView: View {
 
     private static func standardEntries(from pages: [FoundationOnboardingPage]) -> [PageEntry] {
         pages.map { page in
-            PageEntry(id: AnyHashable(page.id)) { context in
+            PageEntry(
+                id: AnyHashable(page.id),
+                headerTitle: page.headerTitle,
+                headerSystemImage: page.headerSystemImage
+            ) { context in
                 AnyView(FoundationOnboardingStandardPage(page: page, context: context))
             }
         }
@@ -400,7 +432,14 @@ public struct FoundationOnboardingView: View {
     ) -> [PageEntry] {
         guard !pages.isEmpty else { return standardEntries(from: normalizedPages([])) }
         return pages.map { page in
-            PageEntry(id: AnyHashable(page.id)) { context in AnyView(pageContent(page, context)) }
+            let headerProvider = page as? any FoundationOnboardingHeaderProviding
+            return PageEntry(
+                id: AnyHashable(page.id),
+                headerTitle: headerProvider?.onboardingHeaderTitle,
+                headerSystemImage: headerProvider?.onboardingHeaderSystemImage
+            ) { context in
+                AnyView(pageContent(page, context))
+            }
         }
     }
 

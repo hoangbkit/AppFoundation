@@ -1,33 +1,49 @@
 #if canImport(SwiftUI)
 import SwiftUI
 
-public struct FoundationOnboardingPage: Identifiable {
+public protocol FoundationOnboardingHeaderProviding {
+    var onboardingHeaderTitle: String? { get }
+    var onboardingHeaderSystemImage: String? { get }
+}
+
+public struct FoundationOnboardingPage: Identifiable, FoundationOnboardingHeaderProviding {
     public let id: String
     public let systemImage: String
     public let eyebrow: String
     public let title: String
     public let message: String
+    public let headerTitle: String?
+    public let headerSystemImage: String?
 
     public init(
         id: String,
         systemImage: String,
         eyebrow: String,
         title: String,
-        message: String
+        message: String,
+        headerTitle: String? = nil,
+        headerSystemImage: String? = nil
     ) {
         self.id = id
         self.systemImage = systemImage
         self.eyebrow = eyebrow
         self.title = title
         self.message = message
+        self.headerTitle = headerTitle
+        self.headerSystemImage = headerSystemImage
     }
+
+    public var onboardingHeaderTitle: String? { headerTitle }
+    public var onboardingHeaderSystemImage: String? { headerSystemImage }
 }
 
-public enum FoundationOnboardingButtonAppearance: Sendable {
-    /// Preserves the original white onboarding button.
+public enum FoundationOnboardingButtonAppearance: Sendable, Equatable {
+    /// Preserved for source compatibility. Onboarding action buttons always
+    /// use the fixed prominent white style.
     case legacyLight
 
-    /// Uses the shared theme gradient button style.
+    /// Preserved for source compatibility. This value no longer changes the
+    /// onboarding action button appearance.
     case themed
 }
 
@@ -42,6 +58,8 @@ public struct FoundationOnboardingConfiguration {
     public var centersPageContent: Bool
     public var contentHorizontalPadding: CGFloat
     public var contentVerticalPadding: CGFloat
+    /// Preserved for source compatibility. The onboarding action button is
+    /// always rendered with the fixed prominent white style.
     public var buttonAppearance: FoundationOnboardingButtonAppearance
 
     public init(
@@ -169,9 +187,12 @@ public struct FoundationOnboardingStandardPage: View {
 
 public struct FoundationOnboardingView: View {
     @Environment(\.appFoundationTheme) private var environmentTheme
+    @Environment(\.colorScheme) private var colorScheme
 
     private struct PageEntry: Identifiable {
         let id: AnyHashable
+        let headerTitle: String?
+        let headerSystemImage: String?
         let content: (FoundationOnboardingPageContext) -> AnyView
     }
 
@@ -182,8 +203,6 @@ public struct FoundationOnboardingView: View {
 
     @State private var selectedPage = 0
 
-    /// Creates the original icon-and-copy onboarding that follows the active
-    /// theme installed with `.appFoundationTheme(_:)`.
     public init(
         pages: [FoundationOnboardingPage],
         completionTitle: String = "Get Started",
@@ -191,15 +210,12 @@ public struct FoundationOnboardingView: View {
     ) {
         var configuration = FoundationOnboardingConfiguration()
         configuration.completionTitle = completionTitle
-
         self.pageEntries = Self.standardEntries(from: Self.normalizedPages(pages))
         self.fixedTheme = nil
         self.configuration = configuration
         self.onCompletion = onCompletion
     }
 
-    /// Creates the original icon-and-copy onboarding with a fixed legacy
-    /// `FoundationTheme` override.
     public init(
         pages: [FoundationOnboardingPage],
         theme: FoundationTheme,
@@ -208,49 +224,32 @@ public struct FoundationOnboardingView: View {
     ) {
         var configuration = FoundationOnboardingConfiguration()
         configuration.completionTitle = completionTitle
-
         self.pageEntries = Self.standardEntries(from: Self.normalizedPages(pages))
         self.fixedTheme = theme
         self.configuration = configuration
         self.onCompletion = onCompletion
     }
 
-    /// Creates onboarding whose page content is completely owned by the app.
-    /// AppFoundation still manages paging, navigation chrome, theming, and
-    /// completion behavior.
     public init<Page: Identifiable, PageContent: View>(
         pages: [Page],
         configuration: FoundationOnboardingConfiguration = .init(),
-        @ViewBuilder pageContent: @escaping (
-            Page,
-            FoundationOnboardingPageContext
-        ) -> PageContent,
+        @ViewBuilder pageContent: @escaping (Page, FoundationOnboardingPageContext) -> PageContent,
         onCompletion: @escaping @MainActor () -> Void
     ) {
-        self.pageEntries = Self.customEntries(
-            from: pages,
-            pageContent: pageContent
-        )
+        self.pageEntries = Self.customEntries(from: pages, pageContent: pageContent)
         self.fixedTheme = nil
         self.configuration = configuration
         self.onCompletion = onCompletion
     }
 
-    /// Creates custom app-owned onboarding pages with a fixed legacy theme.
     public init<Page: Identifiable, PageContent: View>(
         pages: [Page],
         theme: FoundationTheme,
         configuration: FoundationOnboardingConfiguration = .init(),
-        @ViewBuilder pageContent: @escaping (
-            Page,
-            FoundationOnboardingPageContext
-        ) -> PageContent,
+        @ViewBuilder pageContent: @escaping (Page, FoundationOnboardingPageContext) -> PageContent,
         onCompletion: @escaping @MainActor () -> Void
     ) {
-        self.pageEntries = Self.customEntries(
-            from: pages,
-            pageContent: pageContent
-        )
+        self.pageEntries = Self.customEntries(from: pages, pageContent: pageContent)
         self.fixedTheme = theme
         self.configuration = configuration
         self.onCompletion = onCompletion
@@ -259,12 +258,8 @@ public struct FoundationOnboardingView: View {
     public var body: some View {
         ZStack {
             background
-
             VStack(spacing: 24) {
-                if showsHeader {
-                    header
-                }
-
+                header
                 TabView(selection: $selectedPage) {
                     ForEach(Array(pageEntries.enumerated()), id: \.element.id) { index, entry in
                         pageView(entry, index: index)
@@ -274,9 +269,7 @@ public struct FoundationOnboardingView: View {
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
 
-                if configuration.showsPageIndicator {
-                    pageIndicator
-                }
+                if configuration.showsPageIndicator { pageIndicator }
 
                 actionButton
                     .padding(.horizontal, 24)
@@ -298,35 +291,38 @@ public struct FoundationOnboardingView: View {
         }
     }
 
-    private var showsHeader: Bool {
-        configuration.headerTitle != nil || configuration.showsSkipButton
-    }
-
     private var showsSkipAction: Bool {
         configuration.showsSkipButton && selectedPage < pageEntries.count - 1
     }
 
+    private var currentPageEntry: PageEntry {
+        pageEntries[min(max(selectedPage, 0), pageEntries.count - 1)]
+    }
+
+    private var currentHeaderTitle: String {
+        currentPageEntry.headerTitle ?? configuration.headerTitle ?? "WELCOME"
+    }
+
+    private var currentHeaderSystemImage: String? {
+        currentPageEntry.headerSystemImage ?? configuration.headerSystemImage
+    }
+
     private var header: some View {
         HStack {
-            if let headerTitle = configuration.headerTitle {
-                FoundationPill(
-                    headerTitle,
-                    systemImage: configuration.headerSystemImage,
-                    tint: resolvedTheme.primary
-                )
-            }
-
+            FoundationOnboardingHeaderPill(
+                currentHeaderTitle,
+                systemImage: currentHeaderSystemImage,
+                foreground: secondaryForeground.opacity(0.30),
+                usesLightAppearance: usesLightAppearance
+            )
             Spacer()
-
             if configuration.showsSkipButton {
-                Button(configuration.skipTitle) {
-                    onCompletion()
-                }
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(secondaryForeground)
-                .opacity(showsSkipAction ? 1 : 0)
-                .disabled(!showsSkipAction)
-                .accessibilityHidden(!showsSkipAction)
+                Button(configuration.skipTitle) { onCompletion() }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(secondaryForeground)
+                    .opacity(showsSkipAction ? 1 : 0)
+                    .disabled(!showsSkipAction)
+                    .accessibilityHidden(!showsSkipAction)
             }
         }
         .padding(.horizontal, 24)
@@ -336,7 +332,6 @@ public struct FoundationOnboardingView: View {
     @ViewBuilder
     private func pageView(_ entry: PageEntry, index: Int) -> some View {
         let content = entry.content(pageContext(for: index))
-
         if configuration.centersPageContent {
             VStack {
                 Spacer(minLength: 8)
@@ -366,11 +361,7 @@ public struct FoundationOnboardingView: View {
         HStack(spacing: 8) {
             ForEach(pageEntries.indices, id: \.self) { index in
                 Capsule()
-                    .fill(
-                        index == selectedPage
-                            ? resolvedTheme.primary
-                            : secondaryForeground.opacity(0.22)
-                    )
+                    .fill(index == selectedPage ? resolvedTheme.primary : secondaryForeground.opacity(0.22))
                     .frame(width: index == selectedPage ? 28 : 8, height: 8)
                     .animation(.snappy, value: selectedPage)
             }
@@ -379,32 +370,20 @@ public struct FoundationOnboardingView: View {
         .accessibilityLabel("Page \(selectedPage + 1) of \(pageEntries.count)")
     }
 
-    @ViewBuilder
     private var actionButton: some View {
-        switch configuration.buttonAppearance {
-        case .legacyLight:
-            Button(actionTitle, action: advance)
-                .buttonStyle(FoundationOnboardingButtonStyle())
-
-        case .themed:
-            Button(actionTitle, action: advance)
-                .buttonStyle(FoundationPrimaryButtonStyle(theme: resolvedTheme))
-        }
+        Button(actionTitle, action: advance)
+            .buttonStyle(FoundationOnboardingButtonStyle())
     }
 
     private var actionTitle: String {
-        selectedPage == pageEntries.count - 1
-            ? configuration.completionTitle
-            : configuration.continueTitle
+        selectedPage == pageEntries.count - 1 ? configuration.completionTitle : configuration.continueTitle
     }
 
     private func advance() {
         if selectedPage == pageEntries.count - 1 {
             onCompletion()
         } else {
-            withAnimation(.snappy) {
-                selectedPage += 1
-            }
+            withAnimation(.snappy) { selectedPage += 1 }
         }
     }
 
@@ -424,57 +403,91 @@ public struct FoundationOnboardingView: View {
         fixedTheme == nil ? environmentTheme.appearance.preferredColorScheme.colorScheme : nil
     }
 
+    private var usesLightAppearance: Bool {
+        if let preferredColorScheme {
+            return preferredColorScheme == .light
+        }
+        return colorScheme == .light
+    }
+
     private var animationThemeID: String {
         fixedTheme == nil ? environmentTheme.id : "fixed"
     }
 
-    private static func standardEntries(
-        from pages: [FoundationOnboardingPage]
-    ) -> [PageEntry] {
+    private static func standardEntries(from pages: [FoundationOnboardingPage]) -> [PageEntry] {
         pages.map { page in
-            PageEntry(id: AnyHashable(page.id)) { context in
-                AnyView(
-                    FoundationOnboardingStandardPage(
-                        page: page,
-                        context: context
-                    )
-                )
+            PageEntry(
+                id: AnyHashable(page.id),
+                headerTitle: page.headerTitle,
+                headerSystemImage: page.headerSystemImage
+            ) { context in
+                AnyView(FoundationOnboardingStandardPage(page: page, context: context))
             }
         }
     }
 
     private static func customEntries<Page: Identifiable, PageContent: View>(
         from pages: [Page],
-        @ViewBuilder pageContent: @escaping (
-            Page,
-            FoundationOnboardingPageContext
-        ) -> PageContent
+        @ViewBuilder pageContent: @escaping (Page, FoundationOnboardingPageContext) -> PageContent
     ) -> [PageEntry] {
-        guard !pages.isEmpty else {
-            return standardEntries(from: normalizedPages([]))
-        }
-
+        guard !pages.isEmpty else { return standardEntries(from: normalizedPages([])) }
         return pages.map { page in
-            PageEntry(id: AnyHashable(page.id)) { context in
+            let headerProvider = page as? any FoundationOnboardingHeaderProviding
+            return PageEntry(
+                id: AnyHashable(page.id),
+                headerTitle: headerProvider?.onboardingHeaderTitle,
+                headerSystemImage: headerProvider?.onboardingHeaderSystemImage
+            ) { context in
                 AnyView(pageContent(page, context))
             }
         }
     }
 
-    private static func normalizedPages(
-        _ pages: [FoundationOnboardingPage]
-    ) -> [FoundationOnboardingPage] {
+    private static func normalizedPages(_ pages: [FoundationOnboardingPage]) -> [FoundationOnboardingPage] {
         pages.isEmpty
-            ? [
-                FoundationOnboardingPage(
-                    id: "welcome",
-                    systemImage: "sparkles",
-                    eyebrow: "Welcome",
-                    title: "Ready to begin",
-                    message: "Continue to start using the app."
-                )
-            ]
+            ? [FoundationOnboardingPage(
+                id: "welcome",
+                systemImage: "sparkles",
+                eyebrow: "Welcome",
+                title: "Ready to begin",
+                message: "Continue to start using the app."
+            )]
             : pages
+    }
+}
+
+private struct FoundationOnboardingHeaderPill: View {
+    let text: String
+    let systemImage: String?
+    let foreground: Color
+    let usesLightAppearance: Bool
+
+    init(
+        _ text: String,
+        systemImage: String?,
+        foreground: Color,
+        usesLightAppearance: Bool
+    ) {
+        self.text = text
+        self.systemImage = systemImage
+        self.foreground = foreground
+        self.usesLightAppearance = usesLightAppearance
+    }
+
+    var body: some View {
+        Label {
+            Text(text)
+        } icon: {
+            if let systemImage { Image(systemName: systemImage) }
+        }
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(foreground)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(
+            (usesLightAppearance ? Color.white : Color.black).opacity(0.10),
+            in: Capsule()
+        )
     }
 }
 

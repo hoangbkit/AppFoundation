@@ -23,7 +23,7 @@ public struct FoundationOnboardingPage: Identifiable {
     }
 }
 
-public enum FoundationOnboardingButtonAppearance: Sendable {
+public enum FoundationOnboardingButtonAppearance: Sendable, Equatable {
     /// Preserved for source compatibility. Onboarding action buttons always
     /// use the fixed prominent white style.
     case legacyLight

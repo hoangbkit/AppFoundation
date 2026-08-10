@@ -284,7 +284,7 @@ public struct FoundationOnboardingView: View {
             FoundationOnboardingHeaderPill(
                 configuration.headerTitle ?? "WELCOME",
                 systemImage: configuration.headerSystemImage,
-                foreground: secondaryForeground.opacity(0.22),
+                foreground: secondaryForeground.opacity(0.30),
                 usesLightAppearance: usesLightAppearance
             )
             Spacer()
@@ -446,7 +446,7 @@ private struct FoundationOnboardingHeaderPill: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
         .background(
-            (usesLightAppearance ? Color.white : Color.black).opacity(0.06),
+            (usesLightAppearance ? Color.white : Color.black).opacity(0.10),
             in: Capsule()
         )
     }

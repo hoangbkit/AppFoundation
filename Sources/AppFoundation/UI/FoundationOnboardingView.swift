@@ -173,6 +173,7 @@ public struct FoundationOnboardingStandardPage: View {
 
 public struct FoundationOnboardingView: View {
     @Environment(\.appFoundationTheme) private var environmentTheme
+    @Environment(\.colorScheme) private var colorScheme
 
     private struct PageEntry: Identifiable {
         let id: AnyHashable
@@ -283,7 +284,8 @@ public struct FoundationOnboardingView: View {
             FoundationOnboardingHeaderPill(
                 configuration.headerTitle ?? "WELCOME",
                 systemImage: configuration.headerSystemImage,
-                tint: resolvedTheme.primary
+                foreground: secondaryForeground.opacity(0.22),
+                usesLightAppearance: usesLightAppearance
             )
             Spacer()
             if configuration.showsSkipButton {
@@ -373,6 +375,13 @@ public struct FoundationOnboardingView: View {
         fixedTheme == nil ? environmentTheme.appearance.preferredColorScheme.colorScheme : nil
     }
 
+    private var usesLightAppearance: Bool {
+        if let preferredColorScheme {
+            return preferredColorScheme == .light
+        }
+        return colorScheme == .light
+    }
+
     private var animationThemeID: String {
         fixedTheme == nil ? environmentTheme.id : "fixed"
     }
@@ -411,12 +420,19 @@ public struct FoundationOnboardingView: View {
 private struct FoundationOnboardingHeaderPill: View {
     let text: String
     let systemImage: String?
-    let tint: Color
+    let foreground: Color
+    let usesLightAppearance: Bool
 
-    init(_ text: String, systemImage: String?, tint: Color) {
+    init(
+        _ text: String,
+        systemImage: String?,
+        foreground: Color,
+        usesLightAppearance: Bool
+    ) {
         self.text = text
         self.systemImage = systemImage
-        self.tint = tint
+        self.foreground = foreground
+        self.usesLightAppearance = usesLightAppearance
     }
 
     var body: some View {
@@ -426,15 +442,13 @@ private struct FoundationOnboardingHeaderPill: View {
             if let systemImage { Image(systemName: systemImage) }
         }
         .font(.caption.weight(.semibold))
-        .foregroundStyle(tint)
+        .foregroundStyle(foreground)
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay {
-            Capsule()
-                .fill(tint.opacity(0.05))
-                .allowsHitTesting(false)
-        }
+        .background(
+            (usesLightAppearance ? Color.white : Color.black).opacity(0.06),
+            in: Capsule()
+        )
     }
 }
 

@@ -284,7 +284,6 @@ public struct FoundationOnboardingView: View {
             FoundationOnboardingHeaderPill(
                 configuration.headerTitle ?? "WELCOME",
                 systemImage: configuration.headerSystemImage,
-                tint: resolvedTheme.primary,
                 isBackgroundLight: isHeaderBackgroundLight
             )
             Spacer()
@@ -440,13 +439,11 @@ public struct FoundationOnboardingView: View {
 private struct FoundationOnboardingHeaderPill: View {
     let text: String
     let systemImage: String?
-    let tint: Color
     let isBackgroundLight: Bool
 
-    init(_ text: String, systemImage: String?, tint: Color, isBackgroundLight: Bool) {
+    init(_ text: String, systemImage: String?, isBackgroundLight: Bool) {
         self.text = text
         self.systemImage = systemImage
-        self.tint = tint
         self.isBackgroundLight = isBackgroundLight
     }
 
@@ -457,7 +454,7 @@ private struct FoundationOnboardingHeaderPill: View {
             if let systemImage { Image(systemName: systemImage) }
         }
         .font(.caption.weight(.semibold))
-        .foregroundStyle(tint)
+        .foregroundStyle(chromeColor)
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
         .background(chromeColor.opacity(isBackgroundLight ? 0.06 : 0.12), in: Capsule())

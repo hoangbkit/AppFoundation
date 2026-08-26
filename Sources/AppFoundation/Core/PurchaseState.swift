@@ -36,7 +36,7 @@ public enum RestoreOutcome: Sendable, Equatable {
     case failed(PurchaseFailure)
 }
 
-public struct PurchaseFailure: Error, LocalizedError, Sendable, Equatable {
+public struct PurchaseFailure: Error, LocalizedError, Sendable, Equatable, Hashable {
     public enum Code: String, Sendable, Equatable {
         case noProductsAvailable
         case productUnavailable
@@ -46,6 +46,8 @@ public struct PurchaseFailure: Error, LocalizedError, Sendable, Equatable {
         case storefrontUnavailable
         case notEntitled
         case system
+        case timeout
+        case userCancelled
         case unknown
     }
 
@@ -79,5 +81,19 @@ public struct PurchaseFailure: Error, LocalizedError, Sendable, Equatable {
     public static let unknown = PurchaseFailure(
         code: .unknown,
         message: "Something went wrong. Please try again."
+    )
+
+    /// The App Store did not answer within the allotted timeout.
+    ///
+    /// The underlying request may still complete later; its result is discarded.
+    public static let timeout = PurchaseFailure(
+        code: .timeout,
+        message: "The App Store isn't responding. Please try again."
+    )
+
+    /// The user dismissed an App Store prompt or cancelled the operation.
+    public static let userCancelled = PurchaseFailure(
+        code: .userCancelled,
+        message: "Canceled."
     )
 }

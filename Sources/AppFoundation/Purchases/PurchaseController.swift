@@ -1,6 +1,7 @@
 #if canImport(Observation) && canImport(StoreKit)
 import Foundation
 import Observation
+import OSLog
 import StoreKit
 
 @MainActor
@@ -18,7 +19,14 @@ public final class PurchaseController {
     @ObservationIgnored private let simulatedPersistenceKey: String?
     @ObservationIgnored private let simulatedOperationDelay: Duration
     @ObservationIgnored private var updateTask: Task<Void, Never>?
+    @ObservationIgnored private var restoreTask: Task<RestoreOutcome, Never>?
+    @ObservationIgnored private var restoreGeneration = 0
     @ObservationIgnored private var hasPrepared = false
+
+    @ObservationIgnored private static let logger = Logger(
+        subsystem: "com.appfoundation.purchases",
+        category: "restore"
+    )
 
     /// Creates a purchase controller backed by live StoreKit by default.
     ///
@@ -92,6 +100,22 @@ public final class PurchaseController {
 
     public var isBusy: Bool {
         activity.isBusy
+    }
+
+    /// True while a StoreKit purchase flow is in flight (a purchase sheet could be up).
+    public var isPurchasing: Bool {
+        if case .purchasing = activity {
+            return true
+        }
+        return false
+    }
+
+    /// True while an App Store restore sync is in flight.
+    public var isRestoring: Bool {
+        if case .restoring = activity {
+            return true
+        }
+        return false
     }
 
     public var preferredProduct: StoreProduct? {
@@ -170,11 +194,17 @@ public final class PurchaseController {
     }
 
     public func refreshEntitlements() async {
+        _ = await refreshEntitlementsWithRecords()
+    }
+
+    @discardableResult
+    private func refreshEntitlementsWithRecords() async -> [EntitlementRecord] {
         let records = await service.currentEntitlements()
         entitlementState = EntitlementEvaluator.evaluate(
             records,
             entitledProductIDs: configuration.entitledProductIDs
         )
+        return records
     }
 
     public func purchase(_ product: StoreProduct) async {
@@ -205,25 +235,182 @@ public final class PurchaseController {
         }
     }
 
+    /// Restores purchases by syncing with the App Store and re-evaluating entitlements.
+    ///
+    /// Concurrent calls coalesce into the in-flight attempt and receive its outcome.
+    /// Pass a `timeout` to stop waiting when the App Store never answers; the abandoned
+    /// sync may still finish later, but its late result is discarded. Cancellation via
+    /// `cancelRestore()` behaves the same way — the wait ends immediately for UI
+    /// purposes while a stuck request drains in the background.
     @discardableResult
-    public func restorePurchases() async -> RestoreOutcome {
-        guard !isBusy else {
-            return isEntitled ? .restored : .nothingToRestore
+    public func restorePurchases(timeout: Duration? = nil) async -> RestoreOutcome {
+        if let restoreTask {
+            return await restoreTask.value
         }
 
+        restoreGeneration += 1
+        let generation = restoreGeneration
         activity = .restoring
 
+        let task = Task { [weak self] () -> RestoreOutcome in
+            guard let self else { return .nothingToRestore }
+            return await self.performRestore(timeout: timeout, generation: generation)
+        }
+        restoreTask = task
+
+        defer {
+            if restoreGeneration == generation {
+                restoreTask = nil
+            }
+        }
+        return await task.value
+    }
+
+    /// Stops waiting on the in-flight restore, if any, and resets `activity` to idle.
+    ///
+    /// A request that ignores cancellation (for example an App Store sync that never
+    /// answers) keeps draining in the background; its eventual outcome is discarded.
+    public func cancelRestore() {
+        guard restoreTask != nil || isBusy else { return }
+
+        restoreGeneration += 1
+        restoreTask?.cancel()
+        restoreTask = nil
+        activity = .idle
+    }
+
+    private func performRestore(timeout: Duration?, generation: Int) async -> RestoreOutcome {
         do {
-            try await service.sync()
-            await refreshEntitlements()
+            try await runSyncOperation(timeout: timeout)
+            guard restoreGeneration == generation else {
+                return .failed(.userCancelled)
+            }
+
+            let records = await refreshEntitlementsWithRecords()
+            #if DEBUG
+            Self.logRestoreDiagnostics(records, entitledProductIDs: configuration.entitledProductIDs)
+            #endif
+            guard restoreGeneration == generation else {
+                return .failed(.userCancelled)
+            }
+
             activity = .idle
             return isEntitled ? .restored : .nothingToRestore
         } catch {
+            guard restoreGeneration == generation else {
+                return .failed(.userCancelled)
+            }
+
             let failure = Self.mapFailure(error)
-            activity = .failed(failure)
+            // A user-initiated cancellation ends silently instead of surfacing as
+            // a failure state that other surfaces might replay.
+            activity = failure.code == .userCancelled ? .idle : .failed(failure)
             return .failed(failure)
         }
     }
+
+    /// Runs the StoreKit sync, racing it against `timeout`.
+    ///
+    /// The timeout does not rely on `sync()` honoring cancellation: whichever side
+    /// settles first wins, and a slow sync is simply abandoned.
+    private func runSyncOperation(timeout: Duration?) async throws {
+        guard let timeout else {
+            try await service.sync()
+            return
+        }
+
+        let gate = RestoreGate()
+        return try await withCheckedThrowingContinuation { continuation in
+            gate.activate(continuation)
+
+            // Abandoned intentionally on timeout; the gate discards its late result.
+            Task { [service, gate] in
+                do {
+                    try await service.sync()
+                    gate.resumeReturning()
+                } catch {
+                    gate.resumeThrowing(error)
+                }
+            }
+
+            let timeoutTask = Task { [gate] in
+                try? await Task.sleep(for: timeout)
+                gate.resumeThrowing(PurchaseFailure.timeout)
+            }
+            gate.attachTimeoutTask(timeoutTask)
+        }
+    }
+
+    /// Resume-once gate shared by the sync task and the timeout task.
+    ///
+    /// Both sides run on the main actor, so plain fields are safe; the flag only
+    /// guards against double resumption.
+    @MainActor
+    private final class RestoreGate {
+        private var continuation: CheckedContinuation<Void, Error>?
+        private var timeoutTask: Task<Void, Never>?
+        private var didFinish = false
+
+        func activate(_ continuation: CheckedContinuation<Void, Error>) {
+            self.continuation = continuation
+        }
+
+        func attachTimeoutTask(_ task: Task<Void, Never>) {
+            guard !didFinish else {
+                task.cancel()
+                return
+            }
+            timeoutTask = task
+        }
+
+        func resumeReturning() {
+            finish { $0.resume(returning: ()) }
+        }
+
+        func resumeThrowing(_ error: Error) {
+            finish { $0.resume(throwing: error) }
+        }
+
+        private func finish(_ resume: (CheckedContinuation<Void, Error>) -> Void) {
+            guard !didFinish, let continuation else { return }
+            didFinish = true
+            self.continuation = nil
+            timeoutTask?.cancel()
+            timeoutTask = nil
+            resume(continuation)
+        }
+    }
+
+    #if DEBUG
+    /// Surfaces configuration mistakes that would otherwise reach users as a
+    /// plain "no previous purchases were found" result.
+    private static func logRestoreDiagnostics(
+        _ records: [EntitlementRecord],
+        entitledProductIDs: Set<String>
+    ) {
+        let returnedProductIDs = Set(records.map(\.productID))
+        let matchedIDs = returnedProductIDs.intersection(entitledProductIDs)
+
+        if matchedIDs.isEmpty {
+            let returnedList = returnedProductIDs.sorted().joined(separator: ", ")
+            let configuredList = entitledProductIDs.sorted().joined(separator: ", ")
+            logger.fault("""
+            Restore found transactions for [\(returnedList, privacy: .public)] but none match \
+            the configured entitlement products [\(configuredList, privacy: .public)]; users will \
+            see "No previous purchases were found." Check PurchaseConfiguration.productIDs.
+            """)
+        } else if matchedIDs.count < returnedProductIDs.count {
+            let unmatchedList = returnedProductIDs
+                .subtracting(entitledProductIDs)
+                .sorted()
+                .joined(separator: ", ")
+            logger.notice("""
+            Restore matched \(matchedIDs.count) of \(returnedProductIDs.count) transaction(s), \
+            ignoring [\(unmatchedList, privacy: .public)].
+            """)
+        }
+    }
+    #endif
 
     public func clearActivity() {
         activity = .idle
@@ -273,8 +460,15 @@ public final class PurchaseController {
                 guard !Task.isCancelled else {
                     return
                 }
-                await self?.refreshEntitlements()
-                self?.activity = .idle
+                guard let self else {
+                    return
+                }
+                await self.refreshEntitlements()
+                // Only retire ask-to-buy style pending state; in-flight purchase and
+                // restore flows own their own activity transitions.
+                if case .pending = self.activity {
+                    self.activity = .idle
+                }
             }
         }
     }
@@ -282,6 +476,10 @@ public final class PurchaseController {
     private static func mapFailure(_ error: Error) -> PurchaseFailure {
         if let failure = error as? PurchaseFailure {
             return failure
+        }
+
+        if error is CancellationError {
+            return .userCancelled
         }
 
         if let storeKitError = error as? StoreKitError {
@@ -312,10 +510,7 @@ public final class PurchaseController {
                     message: "The App Store could not complete the request. Please try again."
                 )
             case .userCancelled:
-                return PurchaseFailure(
-                    code: .unknown,
-                    message: "The purchase was cancelled."
-                )
+                return .userCancelled
             case .unknown:
                 return .unknown
             @unknown default:

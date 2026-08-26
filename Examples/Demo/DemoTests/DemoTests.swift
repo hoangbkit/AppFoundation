@@ -106,6 +106,8 @@ final class DemoTests: XCTestCase {
             title: "Fixed",
             subtitle: "Compatibility",
             features: [],
+            privacyURL: URL(string: "https://example.com/privacy")!,
+            termsURL: URL(string: "https://example.com/terms")!,
             theme: .indigo
         )
         let settings = FoundationSettingsConfiguration(

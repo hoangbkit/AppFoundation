@@ -187,7 +187,6 @@ public struct FoundationOnboardingStandardPage: View {
 
 public struct FoundationOnboardingView: View {
     @Environment(\.appFoundationTheme) private var environmentTheme
-    @Environment(\.colorScheme) private var colorScheme
 
     private struct PageEntry: Identifiable {
         let id: AnyHashable
@@ -312,8 +311,7 @@ public struct FoundationOnboardingView: View {
             FoundationOnboardingHeaderPill(
                 currentHeaderTitle,
                 systemImage: currentHeaderSystemImage,
-                foreground: secondaryForeground.opacity(0.30),
-                usesLightAppearance: usesLightAppearance
+                foreground: secondaryForeground
             )
             Spacer()
             if configuration.showsSkipButton {
@@ -403,13 +401,6 @@ public struct FoundationOnboardingView: View {
         fixedTheme == nil ? environmentTheme.appearance.preferredColorScheme.colorScheme : nil
     }
 
-    private var usesLightAppearance: Bool {
-        if let preferredColorScheme {
-            return preferredColorScheme == .light
-        }
-        return colorScheme == .light
-    }
-
     private var animationThemeID: String {
         fixedTheme == nil ? environmentTheme.id : "fixed"
     }
@@ -460,18 +451,15 @@ private struct FoundationOnboardingHeaderPill: View {
     let text: String
     let systemImage: String?
     let foreground: Color
-    let usesLightAppearance: Bool
 
     init(
         _ text: String,
         systemImage: String?,
-        foreground: Color,
-        usesLightAppearance: Bool
+        foreground: Color
     ) {
         self.text = text
         self.systemImage = systemImage
         self.foreground = foreground
-        self.usesLightAppearance = usesLightAppearance
     }
 
     var body: some View {
@@ -484,10 +472,7 @@ private struct FoundationOnboardingHeaderPill: View {
         .foregroundStyle(foreground)
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
-        .background(
-            (usesLightAppearance ? Color.white : Color.black).opacity(0.10),
-            in: Capsule()
-        )
+        .glassEffect(.regular, in: Capsule())
     }
 }
 

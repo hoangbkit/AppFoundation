@@ -84,6 +84,150 @@ final class PurchaseControllerTests: XCTestCase {
         XCTAssertEqual(controller.activity, .failed(.unknown))
     }
 
+    func testRestoreTimesOutWhenSyncNeverAnswers() async throws {
+        let service = MockPurchaseService()
+        service.hangSync = true
+        let controller = PurchaseController(
+            configuration: PurchaseConfiguration(productIDs: [Self.monthly.id]),
+            service: service
+        )
+
+        let task = Task { await controller.restorePurchases(timeout: .milliseconds(150)) }
+        try await Task.sleep(for: .milliseconds(500))
+
+        XCTAssertEqual(controller.activity, .failed(.timeout))
+        XCTAssertEqual(await task.value, .failed(.timeout))
+        XCTAssertEqual(service.syncCount, 1)
+
+        // The abandoned sync drains in the background; settle it so the test ends
+        // without a leaked continuation.
+        service.resumeHangingSync()
+        try await Task.sleep(for: .milliseconds(50))
+    }
+
+    func testCancelRestoreStopsWaitingAndEndsSilently() async throws {
+        let service = MockPurchaseService()
+        service.hangSync = true
+        let controller = PurchaseController(
+            configuration: PurchaseConfiguration(productIDs: [Self.monthly.id]),
+            service: service
+        )
+
+        let task = Task { await controller.restorePurchases() }
+        try await Task.sleep(for: .milliseconds(100))
+        XCTAssertEqual(controller.activity, .restoring)
+
+        controller.cancelRestore()
+
+        XCTAssertEqual(controller.activity, .idle)
+
+        service.resumeHangingSync()
+        let outcome = await task.value
+        XCTAssertEqual(outcome, .failed(.userCancelled))
+        XCTAssertEqual(controller.activity, .idle)
+    }
+
+    func testRestoreExposesIsRestoringDistinctFromIsPurchasing() async throws {
+        let service = MockPurchaseService()
+        service.hangSync = true
+        let controller = PurchaseController(
+            configuration: PurchaseConfiguration(productIDs: [Self.monthly.id]),
+            service: service
+        )
+
+        XCTAssertFalse(controller.isRestoring)
+        XCTAssertFalse(controller.isPurchasing)
+
+        let task = Task { await controller.restorePurchases(timeout: .seconds(2)) }
+        try await Task.sleep(for: .milliseconds(100))
+
+        XCTAssertTrue(controller.isRestoring)
+        XCTAssertFalse(controller.isPurchasing)
+        XCTAssertTrue(controller.isBusy)
+
+        service.resumeHangingSync()
+        _ = await task.value
+
+        XCTAssertFalse(controller.isRestoring)
+        XCTAssertEqual(controller.activity, .idle)
+    }
+
+    func testConcurrentRestoreCallsJoinASingleAttempt() async {
+        let service = MockPurchaseService()
+        service.entitlements = [EntitlementRecord(productID: Self.monthly.id)]
+        let controller = PurchaseController(
+            configuration: PurchaseConfiguration(productIDs: [Self.monthly.id]),
+            service: service
+        )
+
+        async let first = controller.restorePurchases()
+        async let second = controller.restorePurchases()
+
+        let outcomes = await [first, second]
+
+        XCTAssertEqual(outcomes, [.restored, .restored])
+        XCTAssertEqual(service.syncCount, 1)
+    }
+
+    func testCancelledSyncEndsIdleWithoutPoisoningActivity() async {
+        let service = MockPurchaseService()
+        service.syncFailure = .userCancelled
+        let controller = PurchaseController(
+            configuration: PurchaseConfiguration(productIDs: [Self.monthly.id]),
+            service: service
+        )
+
+        let outcome = await controller.restorePurchases()
+
+        XCTAssertEqual(outcome, .failed(.userCancelled))
+        XCTAssertEqual(controller.activity, .idle)
+    }
+
+    func testTransactionUpdateDoesNotClearInFlightRestore() async throws {
+        let service = MockPurchaseService()
+        service.hangSync = true
+        service.productsResult = [Self.monthly]
+        let controller = PurchaseController(
+            configuration: PurchaseConfiguration(productIDs: [Self.monthly.id]),
+            service: service
+        )
+
+        await controller.prepare()
+
+        let task = Task { await controller.restorePurchases(timeout: .seconds(5)) }
+        try await Task.sleep(for: .milliseconds(100))
+        XCTAssertEqual(controller.activity, .restoring)
+
+        service.yieldEntitlementUpdate()
+        try await Task.sleep(for: .milliseconds(100))
+        XCTAssertEqual(controller.activity, .restoring)
+
+        service.resumeHangingSync()
+        let outcome = await task.value
+        XCTAssertEqual(outcome, .nothingToRestore)
+        XCTAssertEqual(controller.activity, .idle)
+    }
+
+    func testTransactionUpdateStillClearsPendingAskToBuy() async throws {
+        let service = MockPurchaseService()
+        service.productsResult = [Self.monthly]
+        service.purchaseOutcome = .pending
+        let controller = PurchaseController(
+            configuration: PurchaseConfiguration(productIDs: [Self.monthly.id]),
+            service: service
+        )
+
+        await controller.prepare()
+
+        await controller.purchase(Self.monthly)
+        XCTAssertEqual(controller.activity, .pending(productID: Self.monthly.id))
+
+        service.yieldEntitlementUpdate()
+        try await Task.sleep(for: .milliseconds(100))
+
+        XCTAssertEqual(controller.activity, .idle)
+    }
+
     func testScreenshotPreviewPreloadsProductsSynchronously() {
         let configuration = PurchaseConfiguration(
             productIDs: [Self.monthly.id, Self.yearly.id],
@@ -160,13 +304,19 @@ final class PurchaseControllerTests: XCTestCase {
 }
 
 @MainActor
-private final class MockPurchaseService: PurchaseServing {
+final class MockPurchaseService: PurchaseServing {
     var productsResult: [StoreProduct] = []
     var purchaseOutcome: PurchaseOutcome = .userCancelled
     var entitlements: [EntitlementRecord] = []
     var productLoadCount = 0
     var syncCount = 0
     var syncFailure: PurchaseFailure?
+    /// When true, `sync()` blocks until `resumeHangingSync()` is called — a stand-in
+    /// for an App Store that never answers.
+    var hangSync = false
+
+    private var syncContinuation: CheckedContinuation<Void, Error>?
+    private var updateContinuations: [AsyncStream<Void>.Continuation] = []
 
     func products(for identifiers: [String]) async throws -> [StoreProduct] {
         productLoadCount += 1
@@ -183,7 +333,13 @@ private final class MockPurchaseService: PurchaseServing {
 
     func entitlementUpdates() -> AsyncStream<Void> {
         AsyncStream { continuation in
-            continuation.finish()
+            self.updateContinuations.append(continuation)
+        }
+    }
+
+    func yieldEntitlementUpdate() {
+        for continuation in updateContinuations {
+            continuation.yield()
         }
     }
 
@@ -192,6 +348,16 @@ private final class MockPurchaseService: PurchaseServing {
         if let syncFailure {
             throw syncFailure
         }
+        if hangSync {
+            try await withCheckedThrowingContinuation { continuation in
+                syncContinuation = continuation
+            }
+        }
+    }
+
+    func resumeHangingSync() {
+        syncContinuation?.resume(returning: ())
+        syncContinuation = nil
     }
 }
 #endif

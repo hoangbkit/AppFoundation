@@ -6,6 +6,32 @@ AppFoundation follows semantic versioning.
 
 ## Unreleased
 
+### Added
+
+- Added `RestorePurchasesView`, an extremely compact restore control: a single line of text that transitions through every state — "Restoring purchases…" with a trailing cancel affordance mid-flight, then short colored outcome labels (green success, blue nothing-found, red failure, amber timeout) that auto-clear; tapping an outcome retries. The container owns any leading icon (embed inside `Label`'s title slot to inherit list-row alignment); `contentAlignment: .center` suits free-floating placements like paywalls. Nothing is ever presented modally, so the system App Store sign-in prompt can appear without conflict.
+- Added `RestorePurchasesRowConfiguration` and `RestorePurchasesRowModel` for hosts building custom restore surfaces, with short single-line labels and a generous 60-second default timeout.
+- Added `PurchaseController.restorePurchases(timeout:)`; concurrent calls coalesce into the in-flight attempt, and a timeout stops waiting on an App Store sync that never answers without requiring the request to honor cancellation.
+- Added `PurchaseController.cancelRestore()` to stop waiting on an in-flight restore; abandoned requests drain in the background and their late results are discarded.
+- Added `PurchaseFailure.timeout` and `PurchaseFailure.userCancelled` with default copy.
+
+### Changed
+
+- **Breaking:** `FoundationPaywallConfiguration` now requires non-optional `privacyURL` and `termsURL`; the `example.com` fallbacks and conditional legal links are gone, so every paywall ships usable legal links or does not compile.
+- `ProPaywallView`'s plan-selection recovery now falls back to `highlightedProductID` when no preferred product resolves, instead of leaving the purchase CTA permanently disabled for configurations that set only a highlighted product.
+- Onboarding header pills render their title and symbol in the theme's primary accent instead of 30%-opacity secondary text that read as disabled.
+- `ProPaywallView`'s purchase CTA dims while a restore is in flight (it stays disabled without implying a purchase is running).
+- Added `PurchaseController.isPurchasing` and `isRestoring` so surfaces can tell the two busy states apart; `ProPaywallView`'s purchase button now only shows its spinner for real purchases while still disabling during a restore.
+- `ProPaywallView` embeds `RestorePurchasesView` below the purchase CTA (reachable even when the product catalog fails to load) instead of a footer alert-based flow.
+- `ProPlanSettingsSection` embeds `RestorePurchasesView` as its restore row, replacing the alert-based flow.
+
+- Restore failures caused by user cancellation now end silently in `idle` instead of surfacing as an error state, and `StoreKitError.userCancelled` maps to `PurchaseFailure.userCancelled` instead of a generic failure.
+- Transaction updates no longer reset in-flight purchase or restore activity; only ask-to-buy style pending state is retired.
+- `ProPlanSettingsSection` presents restore through `RestorePurchasesRow` instead of an alert.
+
+### Debug
+
+- Restore diagnostics log App Store transactions that match none of the configured entitlement products (which users experience as "No previous purchases were found"), partial matches, and skipped unverified entitlements.
+
 ## 1.2.1 - 2026-08-11
 
 ### Added

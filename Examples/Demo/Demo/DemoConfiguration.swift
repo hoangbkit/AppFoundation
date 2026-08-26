@@ -130,7 +130,9 @@ enum DemoConfiguration {
             title: "Make every app premium",
             subtitle: "Monthly, yearly, and lifetime plans in the gradient style.",
             purchaseButtonTitle: "Unlock Demo Pro",
-            highlightedProductID: activePreferredProductID
+            highlightedProductID: activePreferredProductID,
+            privacyURL: URL(string: "https://example.com/privacy")!,
+            termsURL: URL(string: "https://example.com/terms")!
         )
     }
 
@@ -138,8 +140,8 @@ enum DemoConfiguration {
         FoundationPaywallConfiguration(
             purchaseButtonTitle: "Continue",
             highlightedProductID: activePreferredProductID,
-            privacyURL: URL(string: "https://example.com/privacy"),
-            termsURL: URL(string: "https://example.com/terms")
+            privacyURL: URL(string: "https://example.com/privacy")!,
+            termsURL: URL(string: "https://example.com/terms")!
         )
     }
 

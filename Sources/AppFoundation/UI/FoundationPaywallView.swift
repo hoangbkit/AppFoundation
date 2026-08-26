@@ -32,8 +32,11 @@ public struct FoundationPaywallConfiguration {
     public let purchaseButtonTitle: String
     public let highlightedProductID: String?
     public let highlightedProductBadge: String
-    public let privacyURL: URL?
-    public let termsURL: URL?
+
+    /// Required so every paywall ships usable legal links; there is no fallback.
+    public let privacyURL: URL
+    /// Required so every paywall ships usable legal links; there is no fallback.
+    public let termsURL: URL
 
     /// Retained for source compatibility with configurations that explicitly
     /// supplied a `FoundationTheme`.
@@ -56,8 +59,8 @@ public struct FoundationPaywallConfiguration {
         purchaseButtonTitle: String = "Continue",
         highlightedProductID: String? = nil,
         highlightedProductBadge: String = "BEST VALUE",
-        privacyURL: URL? = nil,
-        termsURL: URL? = nil,
+        privacyURL: URL,
+        termsURL: URL,
         themeOverride: AppTheme? = nil
     ) {
         self.badge = badge
@@ -83,8 +86,8 @@ public struct FoundationPaywallConfiguration {
         purchaseButtonTitle: String = "Continue",
         highlightedProductID: String? = nil,
         highlightedProductBadge: String = "BEST VALUE",
-        privacyURL: URL? = nil,
-        termsURL: URL? = nil,
+        privacyURL: URL,
+        termsURL: URL,
         theme: FoundationTheme
     ) {
         self.badge = badge
@@ -373,12 +376,8 @@ public struct FoundationPaywallView: View {
                 .disabled(purchases.isBusy)
 
             HStack(spacing: 18) {
-                if let privacyURL = configuration.privacyURL {
-                    Link("Privacy", destination: privacyURL)
-                }
-                if let termsURL = configuration.termsURL {
-                    Link("Terms", destination: termsURL)
-                }
+                Link("Privacy", destination: configuration.privacyURL)
+                Link("Terms", destination: configuration.termsURL)
             }
             .font(.caption)
             .foregroundStyle(theme.accent)

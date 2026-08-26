@@ -13,7 +13,6 @@ public struct ProPaywallView: View {
     private let rendersForScreenshot: Bool
 
     @State private var selectedProductID: String?
-    @State private var restoreMessage: String?
 
     public init(
         configuration: FoundationPaywallConfiguration,
@@ -100,11 +99,6 @@ public struct ProPaywallView: View {
             } message: {
                 Text(purchaseFailure?.message ?? PurchaseFailure.unknown.message)
             }
-            .alert("Restore Purchases", isPresented: restoreAlertBinding) {
-                Button("OK", role: .cancel) { restoreMessage = nil }
-            } message: {
-                Text(restoreMessage ?? "")
-            }
         }
     }
 
@@ -174,6 +168,14 @@ public struct ProPaywallView: View {
             if !purchases.products.isEmpty {
                 purchaseButton
             }
+
+            // Restore works without a loaded catalog, so it stays reachable even
+            // when the plan options above failed to load. Centered and bare: the
+            // paywall has no sibling rows to align icons with.
+            RestorePurchasesView(
+                purchaseManager: purchases,
+                contentAlignment: .center
+            )
 
             if !resolvedFeatures.isEmpty {
                 Divider().overlay(theme.border)
@@ -305,7 +307,9 @@ public struct ProPaywallView: View {
             }
         } label: {
             HStack {
-                if purchases.isBusy { ProgressView().tint(.black) }
+                // Only a real purchase puts a spinner here; a concurrent restore
+                // keeps the button disabled but visually calm.
+                if purchases.isPurchasing { ProgressView().tint(.black) }
                 Text(purchaseButtonTitle).font(.headline)
             }
             .frame(maxWidth: .infinity)
@@ -314,6 +318,9 @@ public struct ProPaywallView: View {
         .background(Color.white, in: Capsule())
         .foregroundStyle(.black)
         .shadow(color: .black.opacity(0.16), radius: 12, y: 6)
+        // A concurrent restore keeps the CTA disabled; dimming it closes the loop
+        // visually since the spinner is reserved for real purchases.
+        .opacity(purchases.isRestoring ? 0.55 : 1)
         .disabled(selectedProduct == nil || purchases.isBusy)
     }
 
@@ -345,10 +352,8 @@ public struct ProPaywallView: View {
                 .multilineTextAlignment(.center)
 
             HStack(spacing: 16) {
-                Link("Terms of Use", destination: termsURL)
-                Link("Privacy Policy", destination: privacyURL)
-                Button("Restore Purchases") { restore() }
-                    .disabled(purchases.isBusy)
+                Link("Terms of Use", destination: configuration.termsURL)
+                Link("Privacy Policy", destination: configuration.privacyURL)
             }
             .font(.caption)
             .foregroundStyle(theme.accent)
@@ -390,7 +395,10 @@ public struct ProPaywallView: View {
         guard selectedProductID == nil
             || purchases.product(withID: selectedProductID ?? "") == nil
         else { return }
+        // Recovery must honor both selection hints; a configuration with only a
+        // highlighted product would otherwise leave the CTA permanently disabled.
         selectedProductID = purchases.preferredProduct?.id
+            ?? purchases.product(withID: configuration.highlightedProductID ?? "")?.id
     }
 
     private func badge(for product: StoreProduct) -> String? {
@@ -445,21 +453,6 @@ public struct ProPaywallView: View {
             && (normalizedBadge.contains("save") || normalizedBadge.contains("off"))
     }
 
-    private func restore() {
-        Task {
-            let outcome = await purchases.restorePurchases()
-            switch outcome {
-            case .restored:
-                restoreMessage = "Your purchases have been restored."
-            case .nothingToRestore:
-                restoreMessage = "No previous purchases were found."
-            case .failed(let failure):
-                restoreMessage = failure.message
-                purchases.clearActivity()
-            }
-        }
-    }
-
     private var purchaseFailure: PurchaseFailure? {
         if case .failed(let failure) = purchases.activity { return failure }
         return nil
@@ -470,21 +463,6 @@ public struct ProPaywallView: View {
             get: { purchaseFailure != nil },
             set: { if !$0 { purchases.clearActivity() } }
         )
-    }
-
-    private var restoreAlertBinding: Binding<Bool> {
-        Binding(
-            get: { restoreMessage != nil },
-            set: { if !$0 { restoreMessage = nil } }
-        )
-    }
-
-    private var termsURL: URL {
-        configuration.termsURL ?? URL(string: "https://example.com/terms")!
-    }
-
-    private var privacyURL: URL {
-        configuration.privacyURL ?? URL(string: "https://example.com/privacy")!
     }
 }
 #endif

@@ -1,5 +1,6 @@
 #if canImport(StoreKit)
 import Foundation
+import OSLog
 import StoreKit
 
 @MainActor
@@ -13,6 +14,11 @@ public protocol PurchaseServing: AnyObject {
 
 @MainActor
 public final class LiveStoreKitService: PurchaseServing {
+    private static let logger = Logger(
+        subsystem: "com.appfoundation.purchases",
+        category: "storekit"
+    )
+
     private var productsByID: [String: Product] = [:]
 
     public init() {}
@@ -54,10 +60,16 @@ public final class LiveStoreKitService: PurchaseServing {
         var records: [EntitlementRecord] = []
 
         for await verification in Transaction.currentEntitlements {
-            guard case .verified(let transaction) = verification else {
-                continue
+            switch verification {
+            case .verified(let transaction):
+                records.append(Self.makeEntitlementRecord(transaction))
+            case .unverified(_, let error):
+                // Silently dropping these makes a valid purchase look like
+                // "nothing to restore"; surface it instead.
+                Self.logger.warning(
+                    "Skipping unverified StoreKit entitlement: \(String(describing: error), privacy: .public)"
+                )
             }
-            records.append(Self.makeEntitlementRecord(transaction))
         }
 
         return records

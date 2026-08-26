@@ -27,7 +27,12 @@ final class PurchasePresentationCatalogTests: XCTestCase {
 
     func testPurchaseSurfaceConfigurationsDefaultToCatalogFallback() {
         let modern = PaywallConfiguration(title: "Pro", subtitle: "Unlock")
-        let legacy = FoundationPaywallConfiguration(title: "Pro", subtitle: "Unlock")
+        let legacy = FoundationPaywallConfiguration(
+            title: "Pro",
+            subtitle: "Unlock",
+            privacyURL: URL(string: "https://example.com/privacy")!,
+            termsURL: URL(string: "https://example.com/terms")!
+        )
         let upsell = LimitReachedUpsellConfiguration(title: "Limit", message: "Upgrade")
         let celebration = FoundationProCelebrationConfiguration(
             title: "You’re Pro",
@@ -43,7 +48,10 @@ final class PurchasePresentationCatalogTests: XCTestCase {
     }
 
     func testFoundationPaywallDefaultsToAppSpecificCopy() {
-        let configuration = FoundationPaywallConfiguration()
+        let configuration = FoundationPaywallConfiguration(
+            privacyURL: URL(string: "https://example.com/privacy")!,
+            termsURL: URL(string: "https://example.com/terms")!
+        )
         let appName = AppMetadata.current().name
 
         XCTAssertEqual(configuration.title, "\(appName) Pro")

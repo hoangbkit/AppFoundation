@@ -44,8 +44,6 @@ public struct ProPlanSettingsSection: View {
     private let configuration: ProPlanSettingsConfiguration
     private let onUpgrade: (() -> Void)?
 
-    @State private var restoreMessage: String?
-
     public init(
         purchaseManager: PurchaseManager,
         configuration: ProPlanSettingsConfiguration = .init(),
@@ -98,51 +96,20 @@ public struct ProPlanSettingsSection: View {
                 .buttonStyle(.plain)
             }
 
-            Button {
-                restorePurchases()
-            } label: {
-                HStack {
-                    Label(configuration.restorePurchasesTitle, systemImage: "arrow.clockwise")
-                    Spacer()
-                    if case .restoring = purchaseManager.activity {
-                        ProgressView()
-                    }
-                }
-            }
-            .disabled(purchaseManager.isBusy)
-        }
-        .alert("Restore Purchases", isPresented: restoreAlertBinding) {
-            Button("OK", role: .cancel) {
-                restoreMessage = nil
-            }
-        } message: {
-            Text(restoreMessage ?? "")
-        }
-    }
-
-    private func restorePurchases() {
-        Task {
-            switch await purchaseManager.restorePurchases() {
-            case .restored:
-                restoreMessage = "Your purchases have been restored."
-            case .nothingToRestore:
-                restoreMessage = "No previous purchases were found."
-            case .failed(let failure):
-                restoreMessage = failure.message
-                purchaseManager.clearActivity()
+            // The container owns the leading icon so the label aligns with every
+            // other Label-based row; the view itself is text-only.
+            Label {
+                RestorePurchasesView(
+                    purchaseManager: purchaseManager,
+                    configuration: RestorePurchasesRowConfiguration(
+                        title: configuration.restorePurchasesTitle
+                    )
+                )
+            } icon: {
+                Image(systemName: "arrow.clockwise")
+                    .foregroundStyle(theme.accentColor)
             }
         }
-    }
-
-    private var restoreAlertBinding: Binding<Bool> {
-        Binding(
-            get: { restoreMessage != nil },
-            set: { isPresented in
-                if !isPresented {
-                    restoreMessage = nil
-                }
-            }
-        )
     }
 }
 #endif

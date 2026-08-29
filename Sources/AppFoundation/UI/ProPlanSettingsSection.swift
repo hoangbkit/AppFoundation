@@ -54,10 +54,26 @@ public struct ProPlanSettingsSection: View {
         self.onUpgrade = onUpgrade
     }
 
+    /// "Free" without Pro; with Pro, "Pro" suffixed by the active plan's duration —
+    /// e.g. "Pro Monthly", "Pro Yearly", "Pro Lifetime". The duration is always
+    /// appended to the literal "Pro", never to `activePlanTitle`, which apps may set
+    /// to a longer branded name.
+    private var currentPlanTitle: String {
+        guard purchaseManager.hasPro else {
+            return configuration.freePlanTitle
+        }
+
+        guard let activeProduct = purchaseManager.activeProduct else {
+            return configuration.activePlanTitle
+        }
+
+        return "Pro \(activeProduct.planLabel)"
+    }
+
     public var body: some View {
         Section(configuration.sectionTitle) {
             LabeledContent(configuration.currentPlanLabel) {
-                Text(purchaseManager.hasPro ? configuration.activePlanTitle : configuration.freePlanTitle)
+                Text(currentPlanTitle)
                     .foregroundStyle(purchaseManager.hasPro ? theme.accentColor : theme.secondaryForegroundColor)
             }
 
@@ -96,18 +112,20 @@ public struct ProPlanSettingsSection: View {
                 .buttonStyle(.plain)
             }
 
-            // The container owns the leading icon so the label aligns with every
-            // other Label-based row; the view itself is text-only.
-            Label {
-                RestorePurchasesView(
-                    purchaseManager: purchaseManager,
-                    configuration: RestorePurchasesRowConfiguration(
-                        title: configuration.restorePurchasesTitle
+            // The container owns the leading icon, so the whole row hides once Pro
+            // is active — otherwise a lone `arrow.clockwise` icon would linger.
+            if !purchaseManager.hasPro {
+                Label {
+                    RestorePurchasesView(
+                        purchaseManager: purchaseManager,
+                        configuration: RestorePurchasesRowConfiguration(
+                            title: configuration.restorePurchasesTitle
+                        )
                     )
-                )
-            } icon: {
-                Image(systemName: "arrow.clockwise")
-                    .foregroundStyle(theme.accentColor)
+                } icon: {
+                    Image(systemName: "arrow.clockwise")
+                        .foregroundStyle(theme.accentColor)
+                }
             }
         }
     }

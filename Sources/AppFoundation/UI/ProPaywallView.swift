@@ -85,6 +85,7 @@ public struct ProPaywallView: View {
                 }
             }
             .toolbarBackground(.hidden, for: .navigationBar)
+            .navigationBarTitleDisplayMode(.inline)
             .task {
                 if purchases.products.isEmpty {
                     await purchases.loadProducts(force: true)
@@ -129,26 +130,10 @@ public struct ProPaywallView: View {
     }
 
     private var contentStack: some View {
-        VStack(spacing: 28) {
-            header
+        VStack(spacing: 24) {
             planCard
             legalFooter
         }
-    }
-
-    private var header: some View {
-        VStack(spacing: 10) {
-            ProCrownIcon()
-
-            Text(configuration.title)
-                .font(.system(size: 32, weight: .semibold, design: .rounded))
-                .foregroundStyle(theme.primaryForeground)
-            Text(configuration.subtitle)
-                .font(.title3)
-                .foregroundStyle(theme.secondaryForeground)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .multilineTextAlignment(.center)
     }
 
     private var planCard: some View {

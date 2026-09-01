@@ -32,9 +32,9 @@ struct WidgetShowcaseDemoView: View {
             background: { AppThemeBackground(theme: theme) }
         )
         .sheet(isPresented: $isShowingPaywall) {
-            PaywallView(
-                purchaseManager: purchases,
-                configuration: DemoConfiguration.modernPaywall
+            ProPaywallView(
+                purchases: purchases,
+                configuration: DemoConfiguration.proPaywall
             )
         }
         .animation(.smooth, value: theme.id)

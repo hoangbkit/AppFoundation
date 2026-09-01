@@ -50,6 +50,8 @@ public struct ProPlanSettingsSection: View {
     @Environment(\.openURL) private var openURL
 
     @State private var restoreModel = RestorePurchasesRowModel()
+    @State private var isShowingPlanComparison = false
+    @State private var opensPaywallAfterComparison = false
 
     private let purchaseManager: PurchaseManager
     private let configuration: ProPlanSettingsConfiguration
@@ -96,6 +98,16 @@ public struct ProPlanSettingsSection: View {
             .onAppear { restoreModel.reconcile(using: purchaseManager) }
             .onChange(of: purchaseManager.activity) { _, _ in
                 restoreModel.reconcile(using: purchaseManager)
+            }
+            .sheet(
+                isPresented: $isShowingPlanComparison,
+                onDismiss: handlePlanComparisonDismiss
+            ) {
+                ProPlansComparisonView {
+                    opensPaywallAfterComparison = true
+                    isShowingPlanComparison = false
+                }
+                .environment(purchaseManager)
             }
         }
     }
@@ -162,12 +174,13 @@ public struct ProPlanSettingsSection: View {
                     }
                 }
 
-                if let onUpgrade {
+                if onUpgrade != nil {
                     actionPill(
                         configuration.comparePlansTitle,
-                        systemImage: "rectangle.3.group",
-                        action: onUpgrade
-                    )
+                        systemImage: "rectangle.3.group"
+                    ) {
+                        isShowingPlanComparison = true
+                    }
                 }
 
                 if let redeemCodeURL = configuration.redeemCodeURL {
@@ -289,6 +302,12 @@ public struct ProPlanSettingsSection: View {
         default:
             "arrow.clockwise"
         }
+    }
+
+    private func handlePlanComparisonDismiss() {
+        guard opensPaywallAfterComparison else { return }
+        opensPaywallAfterComparison = false
+        onUpgrade?()
     }
 }
 #endif

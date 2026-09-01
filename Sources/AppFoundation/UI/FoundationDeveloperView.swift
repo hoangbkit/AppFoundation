@@ -134,7 +134,6 @@ public struct FoundationDeveloperValue: Identifiable {
     fileprivate var value: String { readValue() }
 }
 
-@MainActor
 public enum FoundationDeveloperItem: Identifiable {
     case action(FoundationDeveloperAction)
     case toggle(FoundationDeveloperToggle)

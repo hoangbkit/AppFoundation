@@ -2,8 +2,11 @@ import AppFoundation
 import SwiftUI
 
 struct HomeView: View {
+    @Environment(PurchaseManager.self) private var purchases
     @Environment(ThemeManager.self) private var themes
 
+    @State private var isShowingPaywall = false
+    @State private var isShowingCelebration = false
     @State private var isShowingSettings = false
     @State private var isShowingFlexibleOnboarding = false
 
@@ -15,6 +18,10 @@ struct HomeView: View {
                 AppThemeBackground(theme: theme)
 
                 List {
+                    #if DEBUG
+                    developerToolsRow
+                    #endif
+
                     heroSection
                     appExperiencesSection
                     studiosAndInfrastructureSection
@@ -34,16 +41,30 @@ struct HomeView: View {
                     .labelStyle(.iconOnly)
                 }
 
-                #if DEBUG
                 ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink {
-                        DemoDeveloperView()
-                    } label: {
-                        Image(systemName: "hammer.fill")
+                    Button(
+                        purchases.hasPro ? "Show Pro celebration" : "Unlock Pro",
+                        systemImage: "crown.fill"
+                    ) {
+                        if purchases.hasPro {
+                            isShowingCelebration = true
+                        } else {
+                            isShowingPaywall = true
+                        }
                     }
-                    .accessibilityLabel("Developer Tools")
+                    .labelStyle(.iconOnly)
                 }
-                #endif
+            }
+            .sheet(isPresented: $isShowingPaywall) {
+                ProPaywallView(
+                    purchases: purchases,
+                    configuration: DemoConfiguration.proPaywall
+                )
+            }
+            .sheet(isPresented: $isShowingCelebration) {
+                ProCelebrationView(
+                    configuration: DemoConfiguration.proCelebration(for: purchases)
+                )
             }
             .sheet(isPresented: $isShowingSettings) {
                 DemoSettingsView()
@@ -66,6 +87,23 @@ struct HomeView: View {
         .tint(theme.accentColor)
         .animation(.smooth, value: theme.id)
     }
+
+    #if DEBUG
+    private var developerToolsRow: some View {
+        Section {
+            NavigationLink {
+                DemoDeveloperView()
+            } label: {
+                demoRow(
+                    title: "Developer Tools",
+                    subtitle: "Purchases, failures, replay flows, startup recovery, and diagnostics",
+                    systemImage: "hammer.fill"
+                )
+            }
+        }
+        .listRowBackground(theme.surfaceColor)
+    }
+    #endif
 
     private var heroSection: some View {
         Section {

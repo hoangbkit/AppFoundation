@@ -25,8 +25,8 @@ public struct StartupComponent: Sendable {
         name: String,
         criticality: StartupComponentCriticality = .required,
         operation: @escaping @Sendable () async throws -> Void,
-        repair: (@escaping @Sendable () async throws -> Void)? = nil,
-        fallback: (@escaping @Sendable () async throws -> Void)? = nil
+        repair: (@Sendable () async throws -> Void)? = nil,
+        fallback: (@Sendable () async throws -> Void)? = nil
     ) {
         self.id = id
         self.name = name
@@ -84,8 +84,10 @@ public struct StartupComponentReport: Sendable, Equatable {
 
     public var isDegraded: Bool {
         switch resolution {
-        case .ready, .repaired: false
-        case .fallback, .skipped: true
+        case .ready, .repaired:
+            false
+        case .fallback, .skipped:
+            true
         }
     }
 }
@@ -211,10 +213,10 @@ public enum StartupResilience {
             )
         )
 
-        let readiness: StartupReadiness = reports.contains(where: \.isDegraded)
-            ? .degraded
-            : .ready
-        return StartupRunReport(readiness: readiness, components: reports)
+        return StartupRunReport(
+            readiness: reports.contains(where: \.isDegraded) ? .degraded : .ready,
+            components: reports
+        )
     }
 
     private static func run(
@@ -222,15 +224,7 @@ public enum StartupResilience {
     ) async -> (report: StartupComponentReport, fatalFailure: StartupFatalFailure?) {
         do {
             try await component.operation()
-            return (
-                StartupComponentReport(
-                    id: component.id,
-                    name: component.name,
-                    criticality: component.criticality,
-                    resolution: .ready
-                ),
-                nil
-            )
+            return (report(component, resolution: .ready), nil)
         } catch {
             var diagnostics = [diagnostic(stage: .operation, error: error)]
 
@@ -239,16 +233,7 @@ public enum StartupResilience {
                     try await repair()
                     do {
                         try await component.operation()
-                        return (
-                            StartupComponentReport(
-                                id: component.id,
-                                name: component.name,
-                                criticality: component.criticality,
-                                resolution: .repaired,
-                                diagnostics: diagnostics
-                            ),
-                            nil
-                        )
+                        return (report(component, resolution: .repaired, diagnostics: diagnostics), nil)
                     } catch {
                         diagnostics.append(diagnostic(stage: .retry, error: error))
                     }
@@ -260,50 +245,40 @@ public enum StartupResilience {
             if let fallback = component.fallback {
                 do {
                     try await fallback()
-                    return (
-                        StartupComponentReport(
-                            id: component.id,
-                            name: component.name,
-                            criticality: component.criticality,
-                            resolution: .fallback,
-                            diagnostics: diagnostics
-                        ),
-                        nil
-                    )
+                    return (report(component, resolution: .fallback, diagnostics: diagnostics), nil)
                 } catch {
                     diagnostics.append(diagnostic(stage: .fallback, error: error))
                 }
             }
 
-            if component.criticality == .required {
-                let failure = StartupFatalFailure(
+            let skipped = report(component, resolution: .skipped, diagnostics: diagnostics)
+            guard component.criticality == .required else {
+                return (skipped, nil)
+            }
+
+            return (
+                skipped,
+                StartupFatalFailure(
                     componentID: component.id,
                     componentName: component.name,
                     diagnostics: diagnostics
                 )
-                return (
-                    StartupComponentReport(
-                        id: component.id,
-                        name: component.name,
-                        criticality: component.criticality,
-                        resolution: .skipped,
-                        diagnostics: diagnostics
-                    ),
-                    failure
-                )
-            }
-
-            return (
-                StartupComponentReport(
-                    id: component.id,
-                    name: component.name,
-                    criticality: component.criticality,
-                    resolution: .skipped,
-                    diagnostics: diagnostics
-                ),
-                nil
             )
         }
+    }
+
+    private static func report(
+        _ component: StartupComponent,
+        resolution: StartupComponentResolution,
+        diagnostics: [StartupDiagnostic] = []
+    ) -> StartupComponentReport {
+        StartupComponentReport(
+            id: component.id,
+            name: component.name,
+            criticality: component.criticality,
+            resolution: resolution,
+            diagnostics: diagnostics
+        )
     }
 
     private static func diagnostic(stage: StartupAttemptStage, error: any Error) -> StartupDiagnostic {

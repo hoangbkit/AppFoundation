@@ -1,6 +1,8 @@
 # Theme-aware paywalls
 
-`PaywallView`, `FoundationPaywallView`, and `ProPaywallView` automatically follow the active `AppTheme` installed at the app root.
+`ProPaywallView` is the canonical AppFoundation paywall. It follows the active `AppTheme` installed at the app root and stays consistent with the rest of the Pro view family, including `ProPlanSettingsSection`, `ProUpsellView`, `ProCelebrationView`, `ProBadgeView`, and `ProCrownIcon`.
+
+`PaywallView` and `FoundationPaywallView` remain public for source compatibility but are deprecated. Existing apps may continue using them; new integrations should use `ProPaywallView`.
 
 ```swift
 @State private var themes = ThemeManager(
@@ -23,52 +25,43 @@ WindowGroup {
 }
 ```
 
-Present a paywall normally. Do not pass `ThemeManager` into the paywall.
+Present the primary paywall normally. Do not pass `ThemeManager` into the paywall.
 
 ```swift
-PaywallView(
-    purchaseManager: purchaseManager,
-    configuration: paywallConfiguration
+ProPaywallView(
+    purchases: purchaseManager,
+    configuration: proPaywallConfiguration
 )
 ```
 
-The paywall reads `ThemeManager.effectiveTheme` through the SwiftUI environment. Selected themes, active Pro previews, preview expiry, foreground colors, surfaces, borders, shadows, corner radius, accent gradient, and preferred light or dark appearance update together.
+The paywall reads the active theme through the SwiftUI environment. Selected themes, active Pro previews, preview expiry, foreground colors, surfaces, borders, shadows, corner radius, accent gradient, and preferred light or dark appearance update together.
 
-## Overrides
+## Configuration and overrides
 
-The primary paywall can override the complete theme for one presentation:
-
-```swift
-PaywallConfiguration(
-    title: "Unlock Pro",
-    subtitle: "Access every feature.",
-    features: features,
-    themeOverride: campaignTheme
-)
-```
-
-Use `tint` when only the accent should differ:
-
-```swift
-PaywallConfiguration(
-    title: "Unlock Pro",
-    subtitle: "Access every feature.",
-    features: features,
-    tint: .orange
-)
-```
-
-`FoundationPaywallConfiguration` follows the active app theme when created without a theme argument:
+`ProPaywallView` uses `FoundationPaywallConfiguration`. The configuration follows the active app theme when created without a theme argument:
 
 ```swift
 FoundationPaywallConfiguration(
     title: "Unlock Pro",
     subtitle: "Access every feature.",
-    features: features
+    features: features,
+    privacyURL: privacyURL,
+    termsURL: termsURL
 )
 ```
 
-It also accepts a full `AppTheme` override through `themeOverride`.
+Use `themeOverride` when one paywall presentation needs a complete `AppTheme` override:
+
+```swift
+FoundationPaywallConfiguration(
+    title: "Unlock Pro",
+    subtitle: "Access every feature.",
+    features: features,
+    privacyURL: privacyURL,
+    termsURL: termsURL,
+    themeOverride: campaignTheme
+)
+```
 
 The older explicit `theme: FoundationTheme` initializer remains available for source compatibility. Passing `theme:` intentionally creates a fixed visual override and does not follow later app-theme changes.
 
@@ -77,8 +70,14 @@ FoundationPaywallConfiguration(
     title: "Unlock Pro",
     subtitle: "Access every feature.",
     features: features,
+    privacyURL: privacyURL,
+    termsURL: termsURL,
     theme: legacyTheme
 )
 ```
 
 Use the fixed initializer only for an app that has not adopted `ThemeManager` yet or for a deliberately static branded paywall.
+
+## Legacy paywalls
+
+`PaywallView` and `FoundationPaywallView` are deprecated rather than removed because AppFoundation is a public package. Their existing APIs remain intact so current clients keep compiling, while compiler deprecation messages direct new code to `ProPaywallView`.

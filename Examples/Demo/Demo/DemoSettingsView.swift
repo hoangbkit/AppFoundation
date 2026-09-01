@@ -76,10 +76,6 @@ struct DemoSettingsView: View {
                     supportSection
                     legalSection
                     aboutSection
-
-                    #if DEBUG
-                    developerToolsSection
-                    #endif
                 }
                 .scrollContentBackground(.hidden)
             }
@@ -172,21 +168,4 @@ struct DemoSettingsView: View {
         }
         .listRowBackground(theme.surfaceColor)
     }
-
-    #if DEBUG
-    private var developerToolsSection: some View {
-        Section {
-            NavigationLink {
-                DemoDeveloperView()
-            } label: {
-                Label("Developer Tools", systemImage: "hammer.fill")
-            }
-        } header: {
-            Text("Developer")
-        } footer: {
-            Text("Purchase simulation, failure modes, replay flows, startup recovery, and diagnostics.")
-        }
-        .listRowBackground(theme.surfaceColor)
-    }
-    #endif
 }

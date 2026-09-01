@@ -167,16 +167,6 @@ public struct ProPaywallView: View {
                 featureList
             }
         }
-        .padding(20)
-        .background(
-            theme.surface,
-            in: RoundedRectangle(cornerRadius: theme.cardCornerRadius, style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: theme.cardCornerRadius, style: .continuous)
-                .strokeBorder(theme.border)
-        }
-        .shadow(color: theme.shadow, radius: 18, y: 10)
     }
 
     @ViewBuilder

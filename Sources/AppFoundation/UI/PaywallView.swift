@@ -2,10 +2,12 @@
 import StoreKit
 import SwiftUI
 
-/// The primary theme-aware paywall provided by AppFoundation.
+/// Legacy theme-aware paywall retained for source compatibility.
 ///
-/// The manager and registered feature catalog are read from the environment by default.
-/// The older explicit-manager initializer remains available for compatibility.
+/// New integrations should use `ProPaywallView`, the canonical paywall in the
+/// AppFoundation Pro view family. The manager and registered feature catalog are
+/// read from the environment by default.
+@available(*, deprecated, message: "Use ProPaywallView with FoundationPaywallConfiguration instead.")
 public struct PaywallView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL

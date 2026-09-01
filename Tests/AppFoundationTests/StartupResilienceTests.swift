@@ -14,11 +14,12 @@ final class StartupResilienceTests: XCTestCase {
         ]
 
         let report = await StartupResilience.run(components)
+        let values = await recorder.values()
 
         XCTAssertEqual(report.readiness, .ready)
         XCTAssertTrue(report.canLaunch)
         XCTAssertEqual(report.components.map(\.resolution), [.ready, .ready])
-        XCTAssertEqual(await recorder.values(), ["one", "two"])
+        XCTAssertEqual(values, ["one", "two"])
     }
 
     func testRepairRetriesOriginalOperation() async {
@@ -37,11 +38,12 @@ final class StartupResilienceTests: XCTestCase {
         )
 
         let report = await StartupResilience.run([component])
+        let loadCount = await state.loadCount
 
         XCTAssertEqual(report.readiness, .ready)
         XCTAssertEqual(report.components.first?.resolution, .repaired)
         XCTAssertEqual(report.components.first?.diagnostics.map(\.stage), [.operation])
-        XCTAssertEqual(await state.loadCount, 1)
+        XCTAssertEqual(loadCount, 1)
     }
 
     func testFallbackCreatesDegradedReadyState() async {
@@ -57,11 +59,12 @@ final class StartupResilienceTests: XCTestCase {
         )
 
         let report = await StartupResilience.run([component])
+        let values = await recorder.values()
 
         XCTAssertEqual(report.readiness, .degraded)
         XCTAssertTrue(report.canLaunch)
         XCTAssertEqual(report.components.first?.resolution, .fallback)
-        XCTAssertEqual(await recorder.values(), ["empty-projects"])
+        XCTAssertEqual(values, ["empty-projects"])
     }
 
     func testOptionalFailureIsSkippedAndStartupContinues() async {
@@ -79,10 +82,11 @@ final class StartupResilienceTests: XCTestCase {
         ]
 
         let report = await StartupResilience.run(components)
+        let values = await recorder.values()
 
         XCTAssertEqual(report.readiness, .degraded)
         XCTAssertEqual(report.components.map(\.resolution), [.skipped, .ready])
-        XCTAssertEqual(await recorder.values(), ["content"])
+        XCTAssertEqual(values, ["content"])
     }
 
     func testRequiredFailureStopsLaterComponents() async {
@@ -101,6 +105,7 @@ final class StartupResilienceTests: XCTestCase {
         ]
 
         let report = await StartupResilience.run(components)
+        let values = await recorder.values()
 
         XCTAssertFalse(report.canLaunch)
         XCTAssertEqual(report.components.count, 1)
@@ -108,7 +113,7 @@ final class StartupResilienceTests: XCTestCase {
             report.components.first?.diagnostics.map(\.stage),
             [.operation, .repair, .fallback]
         )
-        XCTAssertEqual(await recorder.values(), [])
+        XCTAssertEqual(values, [])
 
         guard case .failed(let failure) = report.readiness else {
             return XCTFail("Expected fatal startup failure")

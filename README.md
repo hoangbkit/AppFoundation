@@ -8,7 +8,7 @@ The package centralizes behavior that is expensive to reimplement correctly whil
 
 | Product | Purpose |
 | --- | --- |
-| `AppFoundation` | Commerce, themes, onboarding, settings, exports, backups, App Group storage, notifications, and shared utilities. It also re-exports the Studio and Showcase products. |
+| `AppFoundation` | Commerce, themes, onboarding, settings, exports, backups, startup resilience, App Group storage, notifications, and shared utilities. It also re-exports the Studio and Showcase products. |
 | `AppFoundationScreenshotStudio` | Exact-size SwiftUI screenshot composition, preview, templates, and export on iOS. |
 | `AppFoundationPromoVideoStudio` | Deterministic SwiftUI promo-video editing and silent H.264 MP4 export on iOS. |
 | `AppFoundationWidgetShowcase` | In-app widget catalogs, previews, detail screens, installation guidance, and Free/Pro presentation. |
@@ -126,6 +126,19 @@ Apps may exclude, replace, reorder, or append themes. AppFoundation does not req
 - Actor-isolated package reader and writer
 
 Each app remains responsible for migrations, duplicate handling, replace-versus-merge behavior, restore confirmation, and transactional mutation of its own database.
+
+### Startup resilience
+
+- Ordered app-owned startup components with `required`, `important`, and `optional` criticality
+- Best-effort load → repair → retry → fallback execution
+- Degraded-but-ready startup when noncritical components cannot load safely
+- Structured component diagnostics and startup progress reporting
+- `StartupRecoveryView` as a last-resort retry/recovery-copy/start-fresh experience
+- No automatic destructive reset or package-owned persistence assumptions
+
+Apps remain responsible for storage schemas, migrations, repair/quarantine behavior, deciding whether a fallback state is safe, and destructive reset implementation.
+
+See [Startup Resilience](Documentation/StartupResilience.md) for policy guidance and adoption examples.
 
 ### App and platform support
 
@@ -268,7 +281,8 @@ The simulator build requires macOS with Xcode 26.
 - Existing monthly/yearly purchase configurations continue working.
 - Adding weekly or lifetime access only requires adding the StoreKit product identifier to the entitlement catalog.
 - Existing purchase, theme, onboarding, settings, and legacy paywall APIs remain available.
-- Move only reusable infrastructure into AppFoundation; keep app-specific models, navigation, copy, branding, and final presentation in each app.
+- Startup resilience is opt-in and does not change existing app startup behavior.
+- Move only reusable infrastructure into AppFoundation; keep app-specific models, navigation, copy, branding, persistence, migrations, and final presentation in each app.
 
 See [CHANGELOG.md](CHANGELOG.md) for tagged release history and [PLAN.md](PLAN.md) for package boundaries and development phases.
 

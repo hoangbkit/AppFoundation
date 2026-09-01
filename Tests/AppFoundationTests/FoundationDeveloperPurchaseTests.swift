@@ -39,7 +39,7 @@ final class FoundationDeveloperPurchaseTests: XCTestCase {
 
         await controller.setSimulatedPurchasedProductIDs([Self.monthly.id])
         XCTAssertTrue(controller.isEntitled)
-        XCTAssertEqual(controller.simulatedPurchasedProductIDs, [Self.monthly.id])
+        XCTAssertEqual(controller.simulatedPurchasedProductIDs, Set([Self.monthly.id]))
 
         await controller.setSimulatedPurchasedProductIDs([])
         XCTAssertFalse(controller.isEntitled)

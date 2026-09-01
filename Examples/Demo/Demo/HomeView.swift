@@ -11,10 +11,6 @@ struct HomeView: View {
     @State private var isShowingOnboarding = false
     @State private var isShowingFlexibleOnboarding = false
 
-    #if DEBUG
-    @State private var isShowingDeveloperTools = false
-    #endif
-
     private var theme: AppTheme { themes.effectiveTheme }
 
     var body: some View {
@@ -44,10 +40,12 @@ struct HomeView: View {
 
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     #if DEBUG
-                    Button("Developer Tools", systemImage: "hammer.fill") {
-                        isShowingDeveloperTools = true
+                    NavigationLink {
+                        DemoDeveloperView()
+                    } label: {
+                        Image(systemName: "hammer.fill")
                     }
-                    .labelStyle(.iconOnly)
+                    .accessibilityLabel("Developer Tools")
                     #endif
 
                     Button(
@@ -77,13 +75,6 @@ struct HomeView: View {
             .sheet(isPresented: $isShowingSettings) {
                 DemoSettingsView()
             }
-            #if DEBUG
-            .sheet(isPresented: $isShowingDeveloperTools) {
-                NavigationStack {
-                    DemoDeveloperView()
-                }
-            }
-            #endif
             .fullScreenCover(isPresented: $isShowingOnboarding) {
                 FoundationOnboardingView(
                     pages: DemoConfiguration.onboardingPages

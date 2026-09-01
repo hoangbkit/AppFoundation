@@ -21,7 +21,7 @@ public final class SimulatedPurchaseService: PurchaseServing {
     private let productsByID: [String: StoreProduct]
     private let persistenceKey: String?
     private let userDefaults: UserDefaults
-    private let operationDelay: Duration
+    private var operationDelay: Duration
 
     private var purchaseResults: [String: SimulatedPurchaseResult]
     private var productLoadingFailure: PurchaseFailure?
@@ -153,10 +153,23 @@ public final class SimulatedPurchaseService: PurchaseServing {
         publishEntitlementUpdate()
     }
 
+    /// Updates artificial latency for subsequent simulated StoreKit operations.
+    public func setOperationDelay(_ delay: Duration) {
+        operationDelay = delay
+    }
+
+    /// Clears injected failures while preserving the simulated entitlement.
+    public func resetFailures() {
+        purchaseResults = [:]
+        productLoadingFailure = nil
+        syncFailure = nil
+    }
+
     /// Clears all simulated transactions and entitlements.
     public func reset() {
         purchasedProductIDs = []
         purchaseDates = [:]
+        resetFailures()
         if let persistenceKey {
             userDefaults.removeObject(forKey: persistenceKey)
         }

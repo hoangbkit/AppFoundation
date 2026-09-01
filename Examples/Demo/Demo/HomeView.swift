@@ -159,6 +159,16 @@ struct HomeView: View {
     private var appExperiencesSection: some View {
         Section("App Experiences") {
             NavigationLink {
+                DemoAIProvidersView()
+            } label: {
+                demoRow(
+                    title: "AI Providers",
+                    subtitle: "Managed AI and direct BYOK provider configuration",
+                    systemImage: "sparkles"
+                )
+            }
+
+            NavigationLink {
                 WidgetShowcaseDemoView()
             } label: {
                 demoRow(

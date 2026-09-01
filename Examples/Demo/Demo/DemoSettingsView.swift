@@ -44,12 +44,6 @@ struct DemoSettingsView: View {
                 AppThemeBackground(theme: theme)
 
                 Form {
-                    premiumStatusSection
-
-                    #if DEBUG
-                    developerToolsSection
-                    #endif
-
                     ProPlanSettingsSection(
                         purchaseManager: purchases,
                         configuration: configuration.proPlanConfiguration,
@@ -57,31 +51,11 @@ struct DemoSettingsView: View {
                     )
                     .listRowBackground(theme.surfaceColor)
 
-                    Section("AI") {
-                        NavigationLink {
-                            DemoAIProvidersView()
-                        } label: {
-                            Label("AI Providers", systemImage: "sparkles")
-                        }
-                    }
-                    .listRowBackground(theme.surfaceColor)
-
-                    Section {
-                        ThemePickerView(
-                            manager: themes,
-                            title: nil,
-                            onRequestUpgrade: { isShowingPaywall = true }
-                        )
-                    } header: {
-                        Text("App Theme")
-                    } footer: {
-                        Text("Choose a theme for the Demo app. Pro themes can be previewed before upgrading.")
-                    }
-                    .listRowBackground(theme.surfaceColor)
+                    appearanceSection
 
                     AppIconPickerSection(
                         icons: appIcons,
-                        footer: "Default and Midnight are included with Free. Rose demonstrates a Pro-only alternate icon.",
+                        footer: "Rose demonstrates a Pro-only alternate icon.",
                         isLocked: { icon in
                             icon.requiresUnlock && !purchases.hasPro
                         },
@@ -91,15 +65,22 @@ struct DemoSettingsView: View {
                     )
                     .listRowBackground(theme.surfaceColor)
 
-                    supportSection
-                    legalSection
-
-                    Section("About") {
-                        LabeledContent("Version", value: metadata.versionAndBuild)
-                        LabeledContent("Built with", value: "AppFoundation")
-                        LabeledContent("Platform", value: "iOS 26")
+                    Section("App") {
+                        NavigationLink {
+                            DemoAIProvidersView()
+                        } label: {
+                            Label("AI Providers", systemImage: "sparkles")
+                        }
                     }
                     .listRowBackground(theme.surfaceColor)
+
+                    supportSection
+                    legalSection
+                    aboutSection
+
+                    #if DEBUG
+                    developerToolsSection
+                    #endif
                 }
                 .scrollContentBackground(.hidden)
             }
@@ -112,6 +93,7 @@ struct DemoSettingsView: View {
                     Button("Close", systemImage: "xmark") {
                         dismiss()
                     }
+                    .labelStyle(.iconOnly)
                 }
             }
             .sheet(isPresented: $isShowingPaywall) {
@@ -124,28 +106,70 @@ struct DemoSettingsView: View {
         .tint(theme.accentColor)
     }
 
-    private var premiumStatusSection: some View {
-        Section("Premium status") {
-            HStack(spacing: 12) {
-                Image(systemName: entitlementIcon)
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(entitlementColor)
-                    .frame(width: 38, height: 38)
-                    .background(
-                        entitlementColor.opacity(0.12),
-                        in: RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    )
+    private var appearanceSection: some View {
+        Section {
+            ThemePickerView(
+                manager: themes,
+                title: nil,
+                onRequestUpgrade: { isShowingPaywall = true }
+            )
+        } header: {
+            Text("Theme")
+        } footer: {
+            Text("Pro themes can be previewed before upgrading.")
+        }
+        .listRowBackground(theme.surfaceColor)
+    }
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(entitlementTitle)
-                        .font(.headline)
-                    Text(entitlementMessage)
-                        .font(.caption)
-                        .foregroundStyle(theme.secondaryForegroundColor)
+    @ViewBuilder
+    private var supportSection: some View {
+        Section("Support") {
+            if let supportURL = configuration.supportURL {
+                Link(destination: supportURL) {
+                    Label("Contact Support", systemImage: "questionmark.circle")
+                }
+            }
+
+            Button {
+                requestReview()
+            } label: {
+                Label("Rate Demo", systemImage: "star")
+            }
+
+            if let shareURL = configuration.shareURL {
+                ShareLink(item: shareURL) {
+                    Label("Share Demo", systemImage: "square.and.arrow.up")
+                }
+            }
+        }
+        .listRowBackground(theme.surfaceColor)
+    }
+
+    @ViewBuilder
+    private var legalSection: some View {
+        if configuration.privacyURL != nil || configuration.termsURL != nil {
+            Section("Legal") {
+                if let privacyURL = configuration.privacyURL {
+                    Link(destination: privacyURL) {
+                        Label("Privacy Policy", systemImage: "hand.raised")
+                    }
                 }
 
-                Spacer(minLength: 8)
+                if let termsURL = configuration.termsURL {
+                    Link(destination: termsURL) {
+                        Label("Terms of Service", systemImage: "doc.text")
+                    }
+                }
             }
+            .listRowBackground(theme.surfaceColor)
+        }
+    }
+
+    private var aboutSection: some View {
+        Section("About") {
+            LabeledContent("Version", value: metadata.versionAndBuild)
+            LabeledContent("Built with", value: "AppFoundation")
+            LabeledContent("Platform", value: "iOS 26")
         }
         .listRowBackground(theme.surfaceColor)
     }
@@ -161,6 +185,8 @@ struct DemoSettingsView: View {
             } label: {
                 Label("Developer Tools", systemImage: "hammer.fill")
             }
+        } footer: {
+            Text("Purchase simulation, failure modes, replay flows, startup recovery, and diagnostics.")
         }
         .listRowBackground(theme.surfaceColor)
     }
@@ -266,94 +292,4 @@ struct DemoSettingsView: View {
         )
     }
     #endif
-
-    private var entitlementTitle: String {
-        switch purchases.entitlementState {
-        case .checking: "Checking premium access"
-        case .inactive: "Free plan"
-        case .active: "Demo Pro is active"
-        }
-    }
-
-    private var entitlementMessage: String {
-        switch purchases.entitlementState {
-        case .checking:
-            "Verifying current App Store entitlements."
-        case .inactive:
-            #if DEBUG
-            purchases.isUsingSimulatedPurchases
-                ? "Open Developer Tools to test purchases without App Store Connect."
-                : "The Demo is currently using live StoreKit."
-            #else
-            "Open the default paywall to test StoreKit purchases."
-            #endif
-        case .active:
-            #if DEBUG
-            purchases.isUsingSimulatedPurchases
-                ? "This entitlement comes from the Developer Tools simulator."
-                : "This status comes from verified StoreKit transactions."
-            #else
-            "This status comes from verified StoreKit transactions."
-            #endif
-        }
-    }
-
-    private var entitlementIcon: String {
-        switch purchases.entitlementState {
-        case .checking: "clock.arrow.circlepath"
-        case .inactive: "lock.fill"
-        case .active: "crown.fill"
-        }
-    }
-
-    private var entitlementColor: Color {
-        switch purchases.entitlementState {
-        case .checking: theme.secondaryForegroundColor
-        case .inactive, .active: theme.accentColor
-        }
-    }
-
-    @ViewBuilder
-    private var supportSection: some View {
-        Section("Support") {
-            if let supportURL = configuration.supportURL {
-                Link(destination: supportURL) {
-                    Label("Contact Support", systemImage: "questionmark.circle")
-                }
-            }
-
-            Button {
-                requestReview()
-            } label: {
-                Label("Rate Demo", systemImage: "star")
-            }
-
-            if let shareURL = configuration.shareURL {
-                ShareLink(item: shareURL) {
-                    Label("Share Demo", systemImage: "square.and.arrow.up")
-                }
-            }
-        }
-        .listRowBackground(theme.surfaceColor)
-    }
-
-    @ViewBuilder
-    private var legalSection: some View {
-        if configuration.privacyURL != nil || configuration.termsURL != nil {
-            Section("Legal") {
-                if let privacyURL = configuration.privacyURL {
-                    Link(destination: privacyURL) {
-                        Label("Privacy Policy", systemImage: "hand.raised")
-                    }
-                }
-
-                if let termsURL = configuration.termsURL {
-                    Link(destination: termsURL) {
-                        Label("Terms of Service", systemImage: "doc.text")
-                    }
-                }
-            }
-            .listRowBackground(theme.surfaceColor)
-        }
-    }
 }

@@ -1,5 +1,4 @@
 import AppFoundation
-import StoreKit
 import SwiftUI
 
 struct DemoSettingsView: View {
@@ -49,7 +48,6 @@ struct DemoSettingsView: View {
 
                     #if DEBUG
                     developerToolsSection
-                    simulatedPurchasesSection
                     #endif
 
                     ProPlanSettingsSection(
@@ -267,38 +265,6 @@ struct DemoSettingsView: View {
             ]
         )
     }
-
-    private var simulatedPurchasesSection: some View {
-        Section("Debug purchases") {
-            Toggle(
-                "Simulated purchases",
-                isOn: Binding(
-                    get: { purchases.isUsingSimulatedPurchases },
-                    set: { enabled in
-                        Task {
-                            await purchases.setSimulatedPurchasesEnabled(enabled)
-                        }
-                    }
-                )
-            )
-
-            NavigationLink {
-                SimulatedPlansEditorView()
-            } label: {
-                LabeledContent(
-                    "Configure simulated plans",
-                    value: "\(purchases.configuration.productIDs.count)"
-                )
-            }
-            .disabled(!purchases.isUsingSimulatedPurchases)
-
-            Button("Reset simulated purchases", role: .destructive) {
-                Task { await purchases.resetSimulatedPurchases() }
-            }
-            .disabled(!purchases.isUsingSimulatedPurchases)
-        }
-        .listRowBackground(theme.surfaceColor)
-    }
     #endif
 
     private var entitlementTitle: String {
@@ -316,7 +282,7 @@ struct DemoSettingsView: View {
         case .inactive:
             #if DEBUG
             purchases.isUsingSimulatedPurchases
-                ? "Use the paywall to test purchases without App Store Connect."
+                ? "Open Developer Tools to test purchases without App Store Connect."
                 : "The Demo is currently using live StoreKit."
             #else
             "Open the default paywall to test StoreKit purchases."
@@ -324,7 +290,7 @@ struct DemoSettingsView: View {
         case .active:
             #if DEBUG
             purchases.isUsingSimulatedPurchases
-                ? "This entitlement comes from the Debug purchase simulator."
+                ? "This entitlement comes from the Developer Tools simulator."
                 : "This status comes from verified StoreKit transactions."
             #else
             "This status comes from verified StoreKit transactions."

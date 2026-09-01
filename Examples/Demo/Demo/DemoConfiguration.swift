@@ -3,9 +3,9 @@ import SwiftUI
 
 @MainActor
 enum DemoConfiguration {
-    static let monthlyProductID = DemoProductID.monthly
-    static let yearlyProductID = DemoProductID.yearly
-    static let lifetimeProductID = DemoProductID.lifetime
+    static let monthlyProductID = "com.hoangbkit.appfoundationdemo.pro.monthly"
+    static let yearlyProductID = "com.hoangbkit.appfoundationdemo.pro.yearly"
+    static let lifetimeProductID = "com.hoangbkit.appfoundationdemo.pro.lifetime"
 
     static let purchases = PurchaseConfiguration(
         productIDs: [
@@ -95,10 +95,6 @@ enum DemoConfiguration {
         ),
     ]
 
-    private static var activePreferredProductID: String {
-        DemoSimulatedPlanConfiguration.load().preferredProductID
-    }
-
     static var modernPaywall: PaywallConfiguration {
         PaywallConfiguration(
             title: "Unlock Demo Pro",
@@ -107,8 +103,8 @@ enum DemoConfiguration {
                 : "Choose monthly, yearly, or lifetime access through StoreKit.",
             planTitle: "Demo Pro",
             planSubtitle: "Monthly, yearly, or lifetime access",
-            preferredProductID: activePreferredProductID,
-            highlightedProductID: activePreferredProductID,
+            preferredProductID: nil,
+            highlightedProductID: lifetimeProductID,
             purchaseButtonTitle: "Unlock Demo Pro",
             privacyURL: URL(string: "https://example.com/privacy"),
             termsURL: URL(string: "https://example.com/terms")
@@ -130,7 +126,7 @@ enum DemoConfiguration {
             title: "Make every app premium",
             subtitle: "Monthly, yearly, and lifetime plans in the gradient style.",
             purchaseButtonTitle: "Unlock Demo Pro",
-            highlightedProductID: activePreferredProductID,
+            highlightedProductID: lifetimeProductID,
             privacyURL: URL(string: "https://example.com/privacy")!,
             termsURL: URL(string: "https://example.com/terms")!
         )
@@ -139,7 +135,7 @@ enum DemoConfiguration {
     static var proPaywall: FoundationPaywallConfiguration {
         FoundationPaywallConfiguration(
             purchaseButtonTitle: "Continue",
-            highlightedProductID: activePreferredProductID,
+            highlightedProductID: lifetimeProductID,
             privacyURL: URL(string: "https://example.com/privacy")!,
             termsURL: URL(string: "https://example.com/terms")!
         )

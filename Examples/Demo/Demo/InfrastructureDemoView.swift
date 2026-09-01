@@ -29,6 +29,7 @@ struct InfrastructureDemoView: View {
 
                 exportSection
                 backupSection
+                startupResilienceSection
                 sharedPlatformSection
                 notificationSection
                 utilitiesSection
@@ -124,6 +125,21 @@ struct InfrastructureDemoView: View {
             Button("Create and verify package", systemImage: "archivebox") {
                 runBackupRoundTrip()
             }
+        }
+        .listRowBackground(theme.surfaceColor)
+    }
+
+    private var startupResilienceSection: some View {
+        Section("Startup resilience") {
+            NavigationLink {
+                StartupResilienceDemoView()
+            } label: {
+                Label("Simulate startup recovery", systemImage: "heart.text.square")
+            }
+
+            Text("Preview healthy, auto-repaired, degraded, and fatal startup outcomes.")
+                .font(.caption)
+                .foregroundStyle(theme.secondaryForegroundColor)
         }
         .listRowBackground(theme.surfaceColor)
     }

@@ -273,6 +273,7 @@ public struct FoundationDeveloperView: View {
                     set: { enabled in
                         Task { @MainActor in
                             await purchaseManager.setSimulatedPurchasesEnabled(enabled)
+                            resetFailureControls()
                         }
                     }
                 )
@@ -280,7 +281,12 @@ public struct FoundationDeveloperView: View {
 
             LabeledContent("Entitlement", value: entitlementTitle)
             LabeledContent("Product state", value: productLoadingTitle)
-            LabeledContent("Products", value: "\(purchaseManager.products.count)")
+
+            NavigationLink {
+                FoundationDeveloperProductCatalogView(products: purchaseManager.products)
+            } label: {
+                LabeledContent("Loaded product prices", value: "\(purchaseManager.products.count)")
+            }
 
             NavigationLink {
                 FoundationDeveloperEntitlementView(purchaseManager: purchaseManager)
@@ -562,6 +568,44 @@ public struct FoundationDeveloperView: View {
 }
 
 @MainActor
+private struct FoundationDeveloperProductCatalogView: View {
+    let products: [StoreProduct]
+
+    var body: some View {
+        List {
+            if products.isEmpty {
+                ContentUnavailableView(
+                    "No Products Loaded",
+                    systemImage: "cart",
+                    description: Text("Reload products or enable the simulator to inspect pricing.")
+                )
+            } else {
+                ForEach(products) { product in
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack {
+                            Text(product.displayName)
+                                .font(.headline)
+                            Spacer()
+                            Text(product.displayPrice)
+                                .font(.headline)
+                        }
+                        Text(product.id)
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.secondary)
+                        Text(product.subscriptionPeriod?.shortLabel ?? "lifetime")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 3)
+                }
+            }
+        }
+        .navigationTitle("Product Prices")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+@MainActor
 private struct FoundationDeveloperEntitlementView: View {
     let purchaseManager: PurchaseManager
 
@@ -610,7 +654,7 @@ private struct FoundationDeveloperEntitlementView: View {
     private func isSelected(_ productID: String?) -> Bool {
         let active = purchaseManager.simulatedPurchasedProductIDs
         guard let productID else { return active.isEmpty }
-        return active == [productID]
+        return active == Set([productID])
     }
 }
 

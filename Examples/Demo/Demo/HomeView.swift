@@ -123,7 +123,7 @@ struct HomeView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 8, trailing: 16))
+        .listRowInsets(EdgeInsets(top: 12, leading: 0, bottom: 8, trailing: 0))
         .listRowBackground(Color.clear)
     }
 

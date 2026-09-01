@@ -57,13 +57,19 @@ struct PurchaseUpsellDemoView: View {
         .toolbarBackground(.hidden, for: .navigationBar)
         .tint(theme.accentColor)
         .sheet(isPresented: $isShowingPaywall) {
-            PaywallView(configuration: DemoConfiguration.modernPaywall)
+            ProPaywallView(
+                purchases: purchases,
+                configuration: DemoConfiguration.proPaywall
+            )
         }
         .sheet(isPresented: $isShowingLimitUpsell) {
             LimitReachedUpsellFlow(
                 configuration: DemoConfiguration.limitReachedUpsell
             ) {
-                PaywallView(configuration: DemoConfiguration.modernPaywall)
+                ProPaywallView(
+                    purchases: purchases,
+                    configuration: DemoConfiguration.proPaywall
+                )
             }
         }
         .animation(.smooth, value: theme.id)

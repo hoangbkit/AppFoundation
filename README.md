@@ -8,7 +8,7 @@ The package centralizes behavior that is expensive to reimplement correctly whil
 
 | Product | Purpose |
 | --- | --- |
-| `AppFoundation` | Commerce, themes, onboarding, settings, exports, backups, startup resilience, App Group storage, notifications, and shared utilities. It also re-exports the Studio and Showcase products. |
+| `AppFoundation` | Commerce, themes, onboarding, settings, exports, backups, startup resilience, Debug developer tools, App Group storage, notifications, and shared utilities. It also re-exports the Studio and Showcase products. |
 | `AppFoundationScreenshotStudio` | Exact-size SwiftUI screenshot composition, preview, templates, and export on iOS. |
 | `AppFoundationPromoVideoStudio` | Deterministic SwiftUI promo-video editing and silent H.264 MP4 export on iOS. |
 | `AppFoundationWidgetShowcase` | In-app widget catalogs, previews, detail screens, installation guidance, and Free/Pro presentation. |
@@ -140,6 +140,31 @@ Apps remain responsible for storage schemas, migrations, repair/quarantine behav
 
 See [Startup Resilience](Documentation/StartupResilience.md) for policy guidance and adoption examples.
 
+### Developer tools
+
+Debug builds can present `FoundationDeveloperView` from Settings and receive the common AppFoundation developer baseline without rebuilding it in every app.
+
+Built-in tools include:
+
+- App/version/build/runtime information
+- Live StoreKit / Simulated purchase switching
+- Current entitlement and product loading state
+- Loaded product names and prices
+- Direct Free/Pro simulated entitlement selection
+- Editable simulated products, ordering, entitlement mapping, preferred plan, prices, and billing periods
+- Success, pending, cancellation, network, unavailable-product, and system purchase outcomes
+- Product-loading and restore failure injection
+- Simulated StoreKit latency
+- Purchase/failure reset, entitlement refresh, and product reload
+- Neutral `StartupRecoveryView` preview
+- Copyable diagnostics
+
+Apps register their real paywall, upsell, onboarding, celebration, or other product flows through `FoundationDeveloperReplay`. App-specific values, toggles, destinations, and async/destructive actions are appended with `FoundationDeveloperSection` instead of replacing the common view.
+
+All developer view types and purchase mutation APIs are Debug-only. Simulated pricing never changes App Store Connect, and the live production `PurchaseConfiguration` remains separate from the editable Debug simulated catalog.
+
+See [Foundation Developer Tools](Documentation/DeveloperTools.md) for integration and extension examples.
+
 ### App and platform support
 
 - Typed App Group snapshot storage
@@ -250,6 +275,19 @@ let purchaseManager = PurchaseManager(
 
 Simulation code is Debug-only. Release builds always use live StoreKit. Runtime switching remains available through `setSimulatedPurchasesEnabled(_:)` in Debug builds.
 
+For portfolio apps, prefer presenting the reusable developer surface instead of rebuilding simulator controls:
+
+```swift
+#if DEBUG
+NavigationLink("Developer") {
+    FoundationDeveloperView(
+        purchaseManager: purchaseManager,
+        configuration: developerConfiguration
+    )
+}
+#endif
+```
+
 ## Validation
 
 Run portable package validation:
@@ -282,6 +320,7 @@ The simulator build requires macOS with Xcode 26.
 - Adding weekly or lifetime access only requires adding the StoreKit product identifier to the entitlement catalog.
 - Existing purchase, theme, onboarding, settings, and legacy paywall APIs remain available.
 - Startup resilience is opt-in and does not change existing app startup behavior.
+- Developer Tools are Debug-only and do not alter Release purchase behavior.
 - Move only reusable infrastructure into AppFoundation; keep app-specific models, navigation, copy, branding, persistence, migrations, and final presentation in each app.
 
 See [CHANGELOG.md](CHANGELOG.md) for tagged release history and [PLAN.md](PLAN.md) for package boundaries and development phases.

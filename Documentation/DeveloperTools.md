@@ -81,7 +81,7 @@ The common view shows current purchase mode, purchase activity, preferred produc
 
 ## Register production flows for replay
 
-The developer view should replay the app's real production UI rather than recreate a fake debug version of it.
+The developer view should replay the app's real production UI rather than recreate a fake debug version of it. `ProPaywallView` is the canonical AppFoundation paywall and is the recommended replay target.
 
 ```swift
 let developerConfiguration = FoundationDeveloperConfiguration(
@@ -91,9 +91,9 @@ let developerConfiguration = FoundationDeveloperConfiguration(
             title: "Paywall",
             systemImage: "rectangle.portrait.and.arrow.forward"
         ) { _ in
-            PaywallView(
-                purchaseManager: purchases,
-                configuration: appPaywallConfiguration
+            ProPaywallView(
+                purchases: purchases,
+                configuration: proPaywallConfiguration
             )
         },
         FoundationDeveloperReplay(

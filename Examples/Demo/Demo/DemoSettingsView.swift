@@ -115,9 +115,9 @@ struct DemoSettingsView: View {
                 }
             }
             .sheet(isPresented: $isShowingPaywall) {
-                PaywallView(
-                    purchaseManager: purchases,
-                    configuration: DemoConfiguration.modernPaywall
+                ProPaywallView(
+                    purchases: purchases,
+                    configuration: DemoConfiguration.proPaywall
                 )
             }
         }
@@ -173,9 +173,9 @@ struct DemoSettingsView: View {
                     title: "Paywall",
                     systemImage: "rectangle.portrait.and.arrow.forward"
                 ) { _ in
-                    PaywallView(
-                        purchaseManager: purchases,
-                        configuration: DemoConfiguration.modernPaywall
+                    ProPaywallView(
+                        purchases: purchases,
+                        configuration: DemoConfiguration.proPaywall
                     )
                 },
                 FoundationDeveloperReplay(
@@ -186,9 +186,9 @@ struct DemoSettingsView: View {
                     LimitReachedUpsellFlow(
                         configuration: DemoConfiguration.limitReachedUpsell
                     ) {
-                        PaywallView(
-                            purchaseManager: purchases,
-                            configuration: DemoConfiguration.modernPaywall
+                        ProPaywallView(
+                            purchases: purchases,
+                            configuration: DemoConfiguration.proPaywall
                         )
                     }
                 },

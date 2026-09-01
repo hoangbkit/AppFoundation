@@ -95,9 +95,9 @@ struct HomeView: View {
                 LimitReachedUpsellFlow(
                     configuration: DemoConfiguration.limitReachedUpsell
                 ) {
-                    PaywallView(
-                        purchaseManager: purchases,
-                        configuration: DemoConfiguration.modernPaywall
+                    ProPaywallView(
+                        purchases: purchases,
+                        configuration: DemoConfiguration.proPaywall
                     )
                 }
             }

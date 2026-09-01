@@ -43,9 +43,9 @@ struct InfrastructureDemoView: View {
         .tint(theme.accentColor)
         .animation(.smooth, value: theme.id)
         .sheet(isPresented: $isShowingPaywall) {
-            PaywallView(
-                purchaseManager: purchases,
-                configuration: DemoConfiguration.modernPaywall
+            ProPaywallView(
+                purchases: purchases,
+                configuration: DemoConfiguration.proPaywall
             )
         }
         .sheet(item: $sharePayload) { payload in

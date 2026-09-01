@@ -13,6 +13,7 @@ public struct ProPaywallView: View {
     private let rendersForScreenshot: Bool
 
     @State private var selectedProductID: String?
+    @State private var restoreModel = RestorePurchasesRowModel()
 
     public init(
         configuration: FoundationPaywallConfiguration,
@@ -91,9 +92,18 @@ public struct ProPaywallView: View {
                     await purchases.loadProducts(force: true)
                 }
                 selectDefaultPlanIfNeeded()
+                restoreModel.reconcile(using: purchases)
             }
             .onChange(of: purchases.products) { _, _ in
                 selectDefaultPlanIfNeeded()
+            }
+            .onChange(of: purchases.activity) { _, _ in
+                restoreModel.reconcile(using: purchases)
+            }
+            .onDisappear {
+                if restoreModel.hasLocalAttemptInFlight {
+                    restoreModel.cancel(using: purchases)
+                }
             }
             .alert("Purchase", isPresented: purchaseErrorBinding) {
                 Button("OK", role: .cancel) { purchases.clearActivity() }
@@ -153,14 +163,6 @@ public struct ProPaywallView: View {
             if !purchases.products.isEmpty {
                 purchaseButton
             }
-
-            // Restore works without a loaded catalog, so it stays reachable even
-            // when the plan options above failed to load. Centered and bare: the
-            // paywall has no sibling rows to align icons with.
-            RestorePurchasesView(
-                purchaseManager: purchases,
-                contentAlignment: .center
-            )
 
             if !resolvedFeatures.isEmpty {
                 Divider().overlay(theme.border)
@@ -282,8 +284,6 @@ public struct ProPaywallView: View {
             }
         } label: {
             HStack {
-                // Only a real purchase puts a spinner here; a concurrent restore
-                // keeps the button disabled but visually calm.
                 if purchases.isPurchasing { ProgressView().tint(.black) }
                 Text(purchaseButtonTitle).font(.headline)
             }
@@ -293,8 +293,6 @@ public struct ProPaywallView: View {
         .background(Color.white, in: Capsule())
         .foregroundStyle(.black)
         .shadow(color: .black.opacity(0.16), radius: 12, y: 6)
-        // A concurrent restore keeps the CTA disabled; dimming it closes the loop
-        // visually since the spinner is reserved for real purchases.
         .opacity(purchases.isRestoring ? 0.55 : 1)
         .disabled(selectedProduct == nil || purchases.isBusy)
     }
@@ -329,11 +327,89 @@ public struct ProPaywallView: View {
             HStack(spacing: 16) {
                 Link("Terms of Use", destination: configuration.termsURL)
                 Link("Privacy Policy", destination: configuration.privacyURL)
+                restoreFooterAction
             }
             .font(.caption)
             .foregroundStyle(theme.accent)
+
+            restoreFooterMessage
         }
         .padding(.horizontal, 8)
+    }
+
+    private var restoreFooterAction: some View {
+        Button {
+            switch restoreModel.phase {
+            case .restoring:
+                restoreModel.cancel(using: purchases)
+            case .idle, .result(.nothingToRestore), .result(.failure):
+                restoreModel.start(using: purchases, configuration: restoreConfiguration)
+            case .result(.restored):
+                break
+            }
+        } label: {
+            HStack(spacing: 4) {
+                if restoreModel.phase == .restoring {
+                    ProgressView()
+                        .controlSize(.mini)
+                }
+                Text(restoreFooterLabel)
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(
+            (purchases.isBusy && restoreModel.phase != .restoring)
+                || restoreModel.phase == .result(.restored)
+        )
+        .opacity(purchases.isBusy && restoreModel.phase != .restoring ? 0.5 : 1)
+        .accessibilityLabel(restoreFooterAccessibilityLabel)
+    }
+
+    @ViewBuilder
+    private var restoreFooterMessage: some View {
+        switch restoreModel.phase {
+        case .idle, .restoring, .result(.restored):
+            EmptyView()
+        case .result(.nothingToRestore):
+            Text("No previous purchases were found for this Apple Account.")
+                .font(.caption2)
+                .foregroundStyle(theme.secondaryForeground)
+                .multilineTextAlignment(.center)
+        case .result(.failure(let failure)):
+            Text(failure.message)
+                .font(.caption2)
+                .foregroundStyle(theme.secondaryForeground)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var restoreConfiguration: RestorePurchasesRowConfiguration {
+        RestorePurchasesRowConfiguration(title: "Restore Purchases")
+    }
+
+    private var restoreFooterLabel: String {
+        switch restoreModel.phase {
+        case .idle:
+            "Restore Purchases"
+        case .restoring:
+            "Restoring…"
+        case .result(.restored):
+            "Purchases Restored"
+        case .result(.nothingToRestore):
+            "Restore Again"
+        case .result(.failure):
+            "Retry Restore"
+        }
+    }
+
+    private var restoreFooterAccessibilityLabel: String {
+        switch restoreModel.phase {
+        case .restoring:
+            "Restoring purchases. Double tap to cancel."
+        default:
+            restoreFooterLabel
+        }
     }
 
     private var purchases: PurchaseController {
@@ -370,8 +446,6 @@ public struct ProPaywallView: View {
         guard selectedProductID == nil
             || purchases.product(withID: selectedProductID ?? "") == nil
         else { return }
-        // Recovery must honor both selection hints; a configuration with only a
-        // highlighted product would otherwise leave the CTA permanently disabled.
         selectedProductID = purchases.preferredProduct?.id
             ?? purchases.product(withID: configuration.highlightedProductID ?? "")?.id
     }

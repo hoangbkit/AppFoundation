@@ -89,7 +89,7 @@ Verified StoreKit transactions remain the source of truth. Do not mirror `hasPro
 - Debug-only in-process purchase simulation
 - `PurchaseManager` and simple `hasPro` entitlement access
 - Weekly, monthly, yearly, and non-consumable lifetime plans
-- Theme-aware `PaywallView`, `FoundationPaywallView`, and `ProPaywallView`
+- Theme-aware `ProPaywallView` as the canonical paywall; deprecated `PaywallView` and `FoundationPaywallView` remain available for source compatibility
 - Premium gates, badges, locked overlays, settings sections, and limit-reached upsells
 - Access policy that can keep existing user-created content available after entitlement expiry
 
@@ -315,7 +315,8 @@ The simulator build requires macOS with Xcode 26.
 
 - Prefer `PurchaseManager` over `PurchaseController` in new code.
 - Prefer `hasPro` over `isEntitled` for normal feature checks.
-- Prefer `PaywallView` and `PaywallConfiguration` for new paywalls.
+- Prefer `ProPaywallView` with `FoundationPaywallConfiguration` for new paywalls.
+- `PaywallView` and `FoundationPaywallView` are deprecated but remain available for existing public-package clients.
 - Existing monthly/yearly purchase configurations continue working.
 - Adding weekly or lifetime access only requires adding the StoreKit product identifier to the entitlement catalog.
 - Existing purchase, theme, onboarding, settings, and legacy paywall APIs remain available.

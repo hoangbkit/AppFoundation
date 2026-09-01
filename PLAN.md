@@ -2,7 +2,7 @@
 
 ## Implementation status
 
-All five phases in this plan were implemented on `develop` on July 21, 2026. The branch includes the public APIs, portable tests, adoption documentation, changelog entries, and continuous Swift package validation described below.
+Phases 1–5 were implemented on `develop` on July 21, 2026. Phase 6 adds reusable startup resilience without moving app-owned persistence or migration policy into the package.
 
 Apple-platform-only UI, StoreKit, WidgetKit, and UserNotifications code still requires the normal Xcode 26 build and simulator/device validation before a tagged release.
 
@@ -22,6 +22,7 @@ AppFoundation should own:
 - App Group snapshot storage and widget reload helpers
 - Local notification permission and scheduling helpers
 - Small production utilities such as app metadata, safe file replacement, review policy, logging, haptics, and async controls
+- Reusable startup resilience orchestration and last-resort recovery presentation
 - Focused tests and adoption documentation
 
 AppFoundation should not own:
@@ -33,6 +34,7 @@ AppFoundation should not own:
 - AppReel editing, templates, timelines, or video rendering
 - MyApps project or note schemas
 - Onlink network probes or Spokio-specific logic
+- App-specific database schemas, migrations, repair algorithms, or destructive-reset policy
 - A mandatory cross-app visual design system
 
 The existing reusable theme module remains supported, but AppFoundation should not grow into a universal UI framework.
@@ -151,9 +153,56 @@ Finish the package with small production utilities and clear adoption guidance.
 - Changelog updates
 - GitHub Actions Swift package validation
 
+---
+
+# Phase 6 — Startup resilience
+
+## Goal
+
+Help apps launch into a safe usable state whenever possible, preserve user data before fallback, and reserve full-screen recovery UI for failures that cannot be handled safely in the background.
+
+## Phase 6.1 — Neutral orchestration model
+
+- Add app-neutral startup component descriptors with `required`, `important`, and `optional` criticality.
+- Add ordered startup execution with observable progress and structured outcomes.
+- Let each app supply its own async load, migration, repair, quarantine, and fallback closures.
+- Keep the package unaware of database schemas, filenames, model types, and migration versions.
+- Treat successful fallback as a degraded-but-ready launch rather than a fatal startup failure.
+
+## Phase 6.2 — Best-effort recovery policy
+
+- Support an initial operation, optional automatic repair, and optional fallback for each component.
+- Preserve the original failure and recovery diagnostics for logs or app-owned telemetry.
+- Never require destructive deletion as an automatic recovery strategy.
+- Make `required` components fail startup only after configured recovery paths are exhausted.
+- Allow `important` and `optional` components to continue startup after safe fallback.
+- Expose a concise degraded-startup report so apps may silently log, show a nonblocking notice, or ignore recovered failures.
+
+## Phase 6.3 — Last-resort recovery UI
+
+- Add `StartupRecoveryView` as an intentionally rare safety net.
+- Lead with user-readable copy, a clear data-safety message, and a primary retry action.
+- Support optional recovery-copy and start-fresh actions with progressive disclosure.
+- Keep technical diagnostics out of the primary experience.
+- Keep branding, exact copy, storage behavior, and destructive-reset implementation app-owned.
+- Handle async busy state, recovery-action errors, destructive confirmation, Dynamic Type, and VoiceOver in the shared view.
+
+## Phase 6.4 — Adoption, Demo, tests, and release readiness
+
+- Add portable tests for ordering, criticality, repair, fallback, degraded readiness, and fatal exhaustion.
+- Add a Demo feature that can simulate normal, auto-repaired, degraded, and fatal startup outcomes.
+- Document recommended recovery policy and anti-patterns.
+- Update README and changelog.
+- Prepare the next minor release notes without changing or tagging the release version in this feature PR.
+
+## Completion criteria
+
+An app can register independent startup components and get consistent best-effort startup behavior without exposing its persistence model to AppFoundation. Recoverable failures do not block launch; only an exhausted required component reaches `StartupRecoveryView`.
+
 ## Release rules
 
 - Keep semantic versioning and migration notes.
 - Pin stable AppFoundation versions in released apps instead of tracking `develop`.
 - Add a shared feature only when its API is stable enough for multiple apps.
 - Prefer small neutral components over mandatory all-in-one screens.
+- Startup resilience must preserve user-owned data by default and must not silently convert corruption into destructive reset.

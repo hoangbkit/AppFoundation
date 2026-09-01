@@ -11,6 +11,10 @@ struct HomeView: View {
     @State private var isShowingOnboarding = false
     @State private var isShowingFlexibleOnboarding = false
 
+    #if DEBUG
+    @State private var isShowingDeveloperTools = false
+    #endif
+
     private var theme: AppTheme { themes.effectiveTheme }
 
     var body: some View {
@@ -24,6 +28,7 @@ struct HomeView: View {
                     studiosAndInfrastructureSection
                 }
                 .scrollContentBackground(.hidden)
+                .scrollIndicators(.hidden)
             }
             .foregroundStyle(theme.primaryForegroundColor)
             .navigationTitle("AppFoundation")
@@ -37,7 +42,14 @@ struct HomeView: View {
                     .labelStyle(.iconOnly)
                 }
 
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    #if DEBUG
+                    Button("Developer Tools", systemImage: "hammer.fill") {
+                        isShowingDeveloperTools = true
+                    }
+                    .labelStyle(.iconOnly)
+                    #endif
+
                     Button(
                         purchases.hasPro ? "Show Pro celebration" : "Unlock Pro",
                         systemImage: "crown.fill"
@@ -65,6 +77,13 @@ struct HomeView: View {
             .sheet(isPresented: $isShowingSettings) {
                 DemoSettingsView()
             }
+            #if DEBUG
+            .sheet(isPresented: $isShowingDeveloperTools) {
+                NavigationStack {
+                    DemoDeveloperView()
+                }
+            }
+            #endif
             .fullScreenCover(isPresented: $isShowingOnboarding) {
                 FoundationOnboardingView(
                     pages: DemoConfiguration.onboardingPages
@@ -94,29 +113,51 @@ struct HomeView: View {
     private var heroSection: some View {
         Section {
             AppThemeCard(theme: theme) {
-                HStack(spacing: 16) {
-                    Image("AppIconDefaultPreview")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 64, height: 64)
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                VStack(alignment: .leading, spacing: 14) {
+                    FoundationPill(
+                        "AppFoundation",
+                        systemImage: "swift",
+                        tint: theme.accentColor
+                    )
 
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text("Build the app. Skip the boilerplate.")
-                            .font(.headline)
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text("Build the app.\nSkip the boilerplate.")
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
                             .foregroundStyle(theme.primaryForegroundColor)
+                            .fixedSize(horizontal: false, vertical: true)
 
-                        Text("Explore the reusable production systems shipped by AppFoundation.")
+                        Text("Explore production-ready systems from one focused Demo app.")
                             .font(.subheadline)
                             .foregroundStyle(theme.secondaryForegroundColor)
-                            .fixedSize(horizontal: false, vertical: true)
+                            .lineSpacing(3)
                     }
+
+                    ScrollView(.horizontal) {
+                        HStack(spacing: 8) {
+                            platformTag("iOS 26.0+")
+                            platformTag("macOS 15.0+")
+                        }
+                        .padding(.horizontal, 1)
+                    }
+                    .scrollIndicators(.hidden)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 8, trailing: 16))
         .listRowBackground(Color.clear)
+    }
+
+    private func platformTag(_ title: String) -> some View {
+        Text(title)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(theme.secondaryForegroundColor)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(theme.elevatedSurfaceColor, in: Capsule())
+            .overlay { Capsule().strokeBorder(theme.borderColor) }
     }
 
     private var appExperiencesSection: some View {

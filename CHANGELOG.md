@@ -6,15 +6,46 @@ AppFoundation follows semantic versioning.
 
 ## Unreleased
 
+## 1.4.0 - 2026-09-01
+
 ### Added
 
 - Added `StartupResilience`, `StartupComponent`, criticality policies, structured diagnostics, progress reporting, automatic repair/retry, explicit safe fallback, degraded readiness, and fatal required-component exhaustion.
 - Added `StartupRecoveryView` with user-readable retry-first presentation, progressive recovery options, optional recovery-copy sharing through `ExportShareSheet`, and optional confirmed start-fresh behavior.
-- Added Startup Resilience documentation, portable policy tests, four deterministic Demo scenarios, and ready-to-publish `1.3.0` minor-release notes.
 - Added Debug-only `FoundationDeveloperView` with a common app/purchase/diagnostics baseline, simulated entitlement selection, editable simulated plans and prices, failure injection, StoreKit latency controls, reset/reload actions, and startup-recovery preview.
 - Added `FoundationDeveloperReplay`, `FoundationDeveloperSection`, `FoundationDeveloperAction`, `FoundationDeveloperToggle`, `FoundationDeveloperValue`, and `FoundationDeveloperDestination` so apps can replay their real production flows and append app-specific tools without replacing the common developer UI.
 - Added Debug purchase APIs for replacing the simulated catalog, directly setting simulated entitlement, configuring purchase outcomes, injecting product-load/restore failures, changing simulator latency, and independently resetting failure or purchase state.
-- Added Developer Tools documentation, Demo Settings integration, purchase-simulation tests, and expanded `1.3.0` release notes.
+- Added `ProPlansComparisonView` for a dedicated Free-versus-Pro comparison flow from Settings.
+- Added Startup Resilience and Developer Tools documentation, portable policy and purchase-simulation tests, and deterministic Demo scenarios.
+
+### Changed
+
+- Made `ProPaywallView` the canonical paywall and deprecated `PaywallView` and `FoundationPaywallView` without removing them, preserving source compatibility for existing clients.
+- Flattened `ProPaywallView` into the surrounding themed surface and moved purchase restoration into its legal footer with inline progress and result feedback.
+- Redesigned `ProPlanSettingsSection` with a two-line plan identity and horizontally scrollable actions for restore, upgrade, plan comparison, subscription management, and code redemption.
+- Extended `ProPlanSettingsConfiguration` with defaulted plan-comparison and code-redemption labels and URLs while retaining its existing initializer arguments.
+- Kept Debug simulated-catalog edits separate from the original live `PurchaseConfiguration`, so switching back to Live StoreKit restores the production product identifiers and entitlement policy.
+- Simplified the Demo around a single reusable Developer Tools entry and moved user-facing AI provider access to Home.
+
+### Compatibility
+
+- Startup resilience is opt-in and does not change existing app startup behavior.
+- Developer Tools and purchase-simulation mutation APIs remain Debug-only and do not alter Release purchase behavior.
+- Existing `PaywallView` and `FoundationPaywallView` integrations continue to compile with deprecation warnings; new integrations should use `ProPaywallView`.
+- `ProPlanSettingsSection` remains source-compatible, but its refreshed identity replaces the old labeled presentation and derives active plan copy from the StoreKit plan duration.
+
+## 1.3.1 - 2026-08-29
+
+### Changed
+
+- Simplified `ProPaywallView` chrome and kept its navigation title presentation compact.
+- Included the active billing duration in `ProPlanSettingsSection` plan labels.
+- Hid the Settings restore row while Pro is already active.
+
+## 1.3.0 - 2026-08-26
+
+### Added
+
 - Added `RestorePurchasesView`, an extremely compact restore control: a single line of text that transitions through every state — "Restoring purchases…" with a trailing cancel affordance mid-flight, then short colored outcome labels (green success, blue nothing-found, red failure, amber timeout) that auto-clear; tapping an outcome retries. The container owns any leading icon (embed inside `Label`'s title slot to inherit list-row alignment); `contentAlignment: .center` suits free-floating placements like paywalls. Nothing is ever presented modally, so the system App Store sign-in prompt can appear without conflict.
 - Added `RestorePurchasesRowConfiguration` and `RestorePurchasesRowModel` for hosts building custom restore surfaces, with short single-line labels and a generous 60-second default timeout.
 - Added `PurchaseController.restorePurchases(timeout:)`; concurrent calls coalesce into the in-flight attempt, and a timeout stops waiting on an App Store sync that never answers without requiring the request to honor cancellation.
@@ -23,7 +54,6 @@ AppFoundation follows semantic versioning.
 
 ### Changed
 
-- Debug simulated-catalog edits now stay separate from the original live `PurchaseConfiguration`, so switching back to Live StoreKit restores the production product identifiers and entitlement policy.
 - **Breaking:** `FoundationPaywallConfiguration` now requires non-optional `privacyURL` and `termsURL`; the `example.com` fallbacks and conditional legal links are gone, so every paywall ships usable legal links or does not compile.
 - `ProPaywallView`'s plan-selection recovery now falls back to `highlightedProductID` when no preferred product resolves, instead of leaving the purchase CTA permanently disabled for configurations that set only a highlighted product.
 - Onboarding header pills render their title and symbol in the theme's primary accent instead of 30%-opacity secondary text that read as disabled.
@@ -39,7 +69,6 @@ AppFoundation follows semantic versioning.
 ### Debug
 
 - Restore diagnostics log App Store transactions that match none of the configured entitlement products (which users experience as "No previous purchases were found"), partial matches, and skipped unverified entitlements.
-- `FoundationDeveloperView` centralizes reusable simulator state instead of requiring each app to rebuild toggles for Free/Pro, prices, purchase outcomes, catalog failures, restore failures, and latency.
 
 ## 1.2.1 - 2026-08-11
 

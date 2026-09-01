@@ -42,8 +42,8 @@ public struct ProPlanSettingsConfiguration {
     }
 }
 
-/// A compact subscription control surface for Settings: one plan card followed by
-/// horizontally scrollable actions. Purchase behavior stays shared through
+/// A compact subscription control surface for Settings: a flat two-line plan identity
+/// followed by horizontally scrollable actions. Purchase behavior stays shared through
 /// `PurchaseManager`, while this view owns its presentation and restore feedback.
 public struct ProPlanSettingsSection: View {
     @Environment(\.appFoundationTheme) private var theme
@@ -70,17 +70,17 @@ public struct ProPlanSettingsSection: View {
             return configuration.freePlanTitle
         }
         guard let activeProduct = purchaseManager.activeProduct else {
-            return configuration.activePlanTitle
+            return "Pro"
         }
-        return "\(configuration.activePlanTitle) \(activeProduct.planLabel)"
+        return "Pro \(activeProduct.planLabel)"
     }
 
     private var planSubtitle: String {
         guard purchaseManager.hasPro else {
-            return "Unlock every Pro feature and choose the plan that fits you."
+            return "Upgrade to Pro"
         }
         guard let activeProduct = purchaseManager.activeProduct else {
-            return "Pro is active on this account."
+            return "Pro is active"
         }
         return activeProduct.isLifetime ? "Lifetime access" : activeProduct.billingDescription
     }
@@ -88,7 +88,7 @@ public struct ProPlanSettingsSection: View {
     public var body: some View {
         Section(configuration.sectionTitle) {
             VStack(alignment: .leading, spacing: 14) {
-                planCard
+                planIdentity
                 actionStrip
                 restoreFeedback
             }
@@ -100,65 +100,53 @@ public struct ProPlanSettingsSection: View {
         }
     }
 
-    private var planCard: some View {
-        HStack(spacing: 14) {
-            Image(systemName: purchaseManager.hasPro ? "crown.fill" : "sparkles")
-                .font(.title2.weight(.semibold))
+    private var planIdentity: some View {
+        HStack(spacing: 12) {
+            Image(systemName: purchaseManager.hasPro ? "crown.fill" : "crown")
+                .font(.headline.weight(.bold))
                 .foregroundStyle(theme.accentColor)
-                .frame(width: 46, height: 46)
-                .background(theme.surfaceColor.opacity(0.78), in: Circle())
+                .frame(width: 40, height: 40)
+                .background(
+                    LinearGradient(
+                        colors: [
+                            theme.accentColor.opacity(purchaseManager.hasPro ? 0.24 : 0.14),
+                            theme.accentColor.opacity(purchaseManager.hasPro ? 0.08 : 0.04)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    in: Circle()
+                )
+                .overlay {
+                    Circle()
+                        .strokeBorder(theme.accentColor.opacity(purchaseManager.hasPro ? 0.28 : 0.14))
+                }
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(configuration.currentPlanLabel.uppercased())
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(theme.secondaryForegroundColor)
-
+            VStack(alignment: .leading, spacing: 3) {
                 Text(currentPlanTitle)
-                    .font(.title3.weight(.bold))
+                    .font(.headline.weight(.semibold))
                     .foregroundStyle(theme.primaryForegroundColor)
 
                 Text(planSubtitle)
-                    .font(.caption)
+                    .font(.subheadline)
                     .foregroundStyle(theme.secondaryForegroundColor)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
             Spacer(minLength: 0)
         }
-        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            LinearGradient(
-                colors: [
-                    theme.accentColor.opacity(purchaseManager.hasPro ? 0.28 : 0.16),
-                    theme.surfaceColor
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(theme.accentColor.opacity(purchaseManager.hasPro ? 0.32 : 0.16))
-        }
     }
 
     private var actionStrip: some View {
         ScrollView(.horizontal) {
             HStack(spacing: 8) {
+                restorePill
+
                 if !purchaseManager.hasPro, let onUpgrade {
                     actionPill(
                         configuration.unlockTitle,
                         systemImage: "crown.fill",
-                        action: onUpgrade
-                    )
-                }
-
-                if let onUpgrade {
-                    actionPill(
-                        configuration.comparePlansTitle,
-                        systemImage: "rectangle.3.group",
                         action: onUpgrade
                     )
                 }
@@ -174,7 +162,13 @@ public struct ProPlanSettingsSection: View {
                     }
                 }
 
-                restorePill
+                if let onUpgrade {
+                    actionPill(
+                        configuration.comparePlansTitle,
+                        systemImage: "rectangle.3.group",
+                        action: onUpgrade
+                    )
+                }
 
                 if let redeemCodeURL = configuration.redeemCodeURL {
                     actionPill(

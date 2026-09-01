@@ -18,11 +18,12 @@ struct HomeView: View {
                 AppThemeBackground(theme: theme)
 
                 List {
+                    heroSection
+
                     #if DEBUG
                     developerToolsRow
                     #endif
 
-                    heroSection
                     appExperiencesSection
                     studiosAndInfrastructureSection
                 }
@@ -88,23 +89,6 @@ struct HomeView: View {
         .animation(.smooth, value: theme.id)
     }
 
-    #if DEBUG
-    private var developerToolsRow: some View {
-        Section {
-            NavigationLink {
-                DemoDeveloperView()
-            } label: {
-                demoRow(
-                    title: "Developer Tools",
-                    subtitle: "Purchases, failures, replay flows, startup recovery, and diagnostics",
-                    systemImage: "hammer.fill"
-                )
-            }
-        }
-        .listRowBackground(theme.surfaceColor)
-    }
-    #endif
-
     private var heroSection: some View {
         Section {
             AppThemeCard(theme: theme) {
@@ -142,6 +126,23 @@ struct HomeView: View {
         .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 8, trailing: 16))
         .listRowBackground(Color.clear)
     }
+
+    #if DEBUG
+    private var developerToolsRow: some View {
+        Section {
+            NavigationLink {
+                DemoDeveloperView()
+            } label: {
+                demoRow(
+                    title: "Developer Tools",
+                    subtitle: "Purchases, failures, replay flows, startup recovery, and diagnostics",
+                    systemImage: "hammer.fill"
+                )
+            }
+        }
+        .listRowBackground(theme.surfaceColor)
+    }
+    #endif
 
     private func platformTag(_ title: String) -> some View {
         Text(title)

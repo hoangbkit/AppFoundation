@@ -2,7 +2,7 @@
 
 ## Implementation status
 
-Phases 1–5 were implemented on `develop` on July 21, 2026. Phase 6 adds reusable startup resilience without moving app-owned persistence or migration policy into the package.
+Phases 1–5 were implemented on `develop` on July 21, 2026. Phase 6 adds reusable startup resilience without moving app-owned persistence or migration policy into the package. Phase 7 adds one consistent Debug developer surface with common AppFoundation controls and structured app extension points.
 
 Apple-platform-only UI, StoreKit, WidgetKit, and UserNotifications code still requires the normal Xcode 26 build and simulator/device validation before a tagged release.
 
@@ -23,6 +23,7 @@ AppFoundation should own:
 - Local notification permission and scheduling helpers
 - Small production utilities such as app metadata, safe file replacement, review policy, logging, haptics, and async controls
 - Reusable startup resilience orchestration and last-resort recovery presentation
+- A consistent Debug developer view for AppFoundation-owned state, simulation, diagnostics, and replay registration
 - Focused tests and adoption documentation
 
 AppFoundation should not own:
@@ -35,6 +36,7 @@ AppFoundation should not own:
 - MyApps project or note schemas
 - Onlink network probes or Spokio-specific logic
 - App-specific database schemas, migrations, repair algorithms, or destructive-reset policy
+- App-specific developer actions, seed data, cache policy, or product-flow implementations
 - A mandatory cross-app visual design system
 
 The existing reusable theme module remains supported, but AppFoundation should not grow into a universal UI framework.
@@ -199,6 +201,53 @@ Help apps launch into a safe usable state whenever possible, preserve user data 
 
 An app can register independent startup components and get consistent best-effort startup behavior without exposing its persistence model to AppFoundation. Recoverable failures do not block launch; only an exhausted required component reaches `StartupRecoveryView`.
 
+---
+
+# Phase 7 — Reusable developer tools
+
+## Goal
+
+Give every Debug build the same powerful AppFoundation developer surface while letting each app register only the flows and domain-specific controls that AppFoundation cannot own.
+
+## Phase 7.1 — Common developer shell
+
+- Add Debug-only `FoundationDeveloperView`.
+- Always show app/version/build/runtime information, purchase state, diagnostics, and startup-recovery preview.
+- Keep the view native and Settings-oriented rather than introducing a separate developer design system.
+- Make integration require only the app's `PurchaseManager` for the common baseline.
+
+## Phase 7.2 — Purchase simulator controls
+
+- Switch between Live StoreKit and the in-process simulator at runtime.
+- Inspect loaded product names and prices.
+- Directly select Free or a simulated entitlement product.
+- Reset simulated purchases and force entitlement/product refresh.
+- Add a reusable simulated catalog editor for ordering, enablement, entitlement mapping, preferred product, metadata, prices, and billing periods.
+- Preserve the original live `PurchaseConfiguration` when the Debug simulated catalog is edited.
+- Add success, pending, cancellation, network failure, unavailable-product, and system-failure purchase outcomes.
+- Add product-load failure, restore failure, and configurable simulated latency.
+- Add explicit failure reset independent of entitlement reset.
+
+## Phase 7.3 — Replay and app registration
+
+- Let apps register their real paywall, upsell, onboarding, celebration, and other production flows for replay.
+- Support sheet and full-screen replay presentation with a completion/dismiss callback.
+- Keep replay separate from state reset so previewing onboarding does not implicitly alter first-run state.
+- Let apps register structured values, toggles, destinations, async actions, and destructive actions in additional sections.
+- Keep app-specific seed data, caches, storage reset, startup mutation, and diagnostics app-owned.
+
+## Phase 7.4 — Demo, tests, documentation, and release readiness
+
+- Wire the Demo Settings screen to `FoundationDeveloperView` without removing the existing Demo debug controls.
+- Register the Demo paywall, limit upsell, onboarding, Pro celebration, onboarding reset, theme reset, and Startup Resilience simulator.
+- Add purchase-controller tests for simulated catalog isolation, entitlement forcing, purchase/catalog/restore failure injection, and reset behavior.
+- Add dedicated Developer Tools documentation and next-minor release notes.
+- Validate the full Developer flow on Xcode 26 before tagging.
+
+## Completion criteria
+
+A new AppFoundation app can add one Debug-only Settings destination and immediately receive the common developer baseline. The app can then register its real product flows and domain-specific controls without duplicating the purchase simulator, pricing editor, diagnostics, or developer navigation infrastructure.
+
 ## Release rules
 
 - Keep semantic versioning and migration notes.
@@ -206,3 +255,4 @@ An app can register independent startup components and get consistent best-effor
 - Add a shared feature only when its API is stable enough for multiple apps.
 - Prefer small neutral components over mandatory all-in-one screens.
 - Startup resilience must preserve user-owned data by default and must not silently convert corruption into destructive reset.
+- Developer mutation and simulation APIs must remain Debug-only and must never alter App Store Connect configuration or leak into Release UI.

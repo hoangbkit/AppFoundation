@@ -28,7 +28,7 @@ public struct StartupRecoveryConfiguration: Sendable, Equatable {
         startFreshTitle: String = "Start Fresh",
         startFreshMessage: String = "Remove this app's local data from this device and start again.",
         resetConfirmationTitle: String = "Start fresh on this device?",
-        resetConfirmationMessage: String = "Only continue if retrying does not work. The app decides what data is preserved before reset.",
+        resetConfirmationMessage: String = "This removes local app data from this device. Continue only if retrying does not work.",
         resetConfirmationButtonTitle: String = "Start Fresh",
         actionErrorTitle: String = "Recovery Action Failed"
     ) {
@@ -48,6 +48,7 @@ public struct StartupRecoveryConfiguration: Sendable, Equatable {
     }
 }
 
+@MainActor
 public struct StartupRecoveryStyle {
     public var backgroundColor: Color
     public var foregroundColor: Color
@@ -72,9 +73,9 @@ public struct StartupRecoveryStyle {
 
 @MainActor
 public struct StartupRecoveryView: View {
-    public typealias RetryAction = () async throws -> Void
-    public typealias RecoveryCopyAction = () async throws -> ExportFile
-    public typealias StartFreshAction = () async throws -> Void
+    public typealias RetryAction = @MainActor () async throws -> Void
+    public typealias RecoveryCopyAction = @MainActor () async throws -> ExportFile
+    public typealias StartFreshAction = @MainActor () async throws -> Void
 
     private let configuration: StartupRecoveryConfiguration
     private let style: StartupRecoveryStyle
@@ -296,7 +297,7 @@ public struct StartupRecoveryView: View {
 
     private func perform(
         _ activeAction: ActiveAction,
-        action: @escaping () async throws -> Void
+        action: @escaping @MainActor () async throws -> Void
     ) {
         guard !isWorking else { return }
         self.activeAction = activeAction

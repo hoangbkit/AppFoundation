@@ -2,13 +2,9 @@ import AppFoundation
 import SwiftUI
 
 struct HomeView: View {
-    @Environment(PurchaseManager.self) private var purchases
     @Environment(ThemeManager.self) private var themes
 
-    @State private var isShowingPaywall = false
-    @State private var isShowingCelebration = false
     @State private var isShowingSettings = false
-    @State private var isShowingOnboarding = false
     @State private var isShowingFlexibleOnboarding = false
 
     private var theme: AppTheme { themes.effectiveTheme }
@@ -38,49 +34,19 @@ struct HomeView: View {
                     .labelStyle(.iconOnly)
                 }
 
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    #if DEBUG
+                #if DEBUG
+                ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink {
                         DemoDeveloperView()
                     } label: {
                         Image(systemName: "hammer.fill")
                     }
                     .accessibilityLabel("Developer Tools")
-                    #endif
-
-                    Button(
-                        purchases.hasPro ? "Show Pro celebration" : "Unlock Pro",
-                        systemImage: "crown.fill"
-                    ) {
-                        if purchases.hasPro {
-                            isShowingCelebration = true
-                        } else {
-                            isShowingPaywall = true
-                        }
-                    }
-                    .labelStyle(.iconOnly)
                 }
-            }
-            .sheet(isPresented: $isShowingPaywall) {
-                ProPaywallView(
-                    purchases: purchases,
-                    configuration: DemoConfiguration.proPaywall
-                )
-            }
-            .sheet(isPresented: $isShowingCelebration) {
-                ProCelebrationView(
-                    configuration: DemoConfiguration.proCelebration(for: purchases)
-                )
+                #endif
             }
             .sheet(isPresented: $isShowingSettings) {
                 DemoSettingsView()
-            }
-            .fullScreenCover(isPresented: $isShowingOnboarding) {
-                FoundationOnboardingView(
-                    pages: DemoConfiguration.onboardingPages
-                ) {
-                    isShowingOnboarding = false
-                }
             }
             .fullScreenCover(isPresented: $isShowingFlexibleOnboarding) {
                 FoundationOnboardingView(
@@ -154,16 +120,6 @@ struct HomeView: View {
     private var appExperiencesSection: some View {
         Section("App Experiences") {
             NavigationLink {
-                PurchaseUpsellDemoView()
-            } label: {
-                demoRow(
-                    title: "Pro & Upsells",
-                    subtitle: "Paywall, plan settings, and limit-reached upgrade flow",
-                    systemImage: "crown.fill"
-                )
-            }
-
-            NavigationLink {
                 WidgetShowcaseDemoView()
             } label: {
                 demoRow(
@@ -182,17 +138,6 @@ struct HomeView: View {
                     systemImage: "paintpalette.fill"
                 )
             }
-
-            Button {
-                isShowingOnboarding = true
-            } label: {
-                demoRow(
-                    title: "Onboarding",
-                    subtitle: "Reusable icon-and-copy onboarding flow",
-                    systemImage: "rectangle.stack.fill"
-                )
-            }
-            .buttonStyle(.plain)
 
             Button {
                 isShowingFlexibleOnboarding = true

@@ -1,5 +1,6 @@
-#if canImport(SwiftUI)
+#if canImport(SwiftUI) && canImport(UIKit)
 import SwiftUI
+import UIKit
 
 public struct StartupRecoveryConfiguration: Sendable, Equatable {
     public var title: String

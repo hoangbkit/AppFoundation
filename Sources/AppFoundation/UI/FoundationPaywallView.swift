@@ -105,7 +105,11 @@ public struct FoundationPaywallConfiguration {
     }
 }
 
-/// The original gradient paywall, supporting all configured recurring and lifetime plans.
+/// Legacy gradient paywall retained for source compatibility.
+///
+/// New integrations should use `ProPaywallView`, the canonical paywall in the
+/// AppFoundation Pro view family.
+@available(*, deprecated, message: "Use ProPaywallView instead.")
 public struct FoundationPaywallView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appFoundationTheme) private var environmentTheme

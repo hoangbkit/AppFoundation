@@ -8,6 +8,9 @@ AppFoundation follows semantic versioning.
 
 ### Added
 
+- Added `StartupResilience`, `StartupComponent`, criticality policies, structured diagnostics, progress reporting, automatic repair/retry, explicit safe fallback, degraded readiness, and fatal required-component exhaustion.
+- Added `StartupRecoveryView` with user-readable retry-first presentation, progressive recovery options, optional recovery-copy sharing through `ExportShareSheet`, and optional confirmed start-fresh behavior.
+- Added Startup Resilience documentation, portable policy tests, four deterministic Demo scenarios, and ready-to-publish `1.3.0` minor-release notes.
 - Added `RestorePurchasesView`, an extremely compact restore control: a single line of text that transitions through every state — "Restoring purchases…" with a trailing cancel affordance mid-flight, then short colored outcome labels (green success, blue nothing-found, red failure, amber timeout) that auto-clear; tapping an outcome retries. The container owns any leading icon (embed inside `Label`'s title slot to inherit list-row alignment); `contentAlignment: .center` suits free-floating placements like paywalls. Nothing is ever presented modally, so the system App Store sign-in prompt can appear without conflict.
 - Added `RestorePurchasesRowConfiguration` and `RestorePurchasesRowModel` for hosts building custom restore surfaces, with short single-line labels and a generous 60-second default timeout.
 - Added `PurchaseController.restorePurchases(timeout:)`; concurrent calls coalesce into the in-flight attempt, and a timeout stops waiting on an App Store sync that never answers without requiring the request to honor cancellation.

@@ -176,7 +176,7 @@ struct DemoSettingsView: View {
 
     #if DEBUG
     private var developerToolsSection: some View {
-        Section("Developer") {
+        Section {
             NavigationLink {
                 FoundationDeveloperView(
                     purchaseManager: purchases,
@@ -185,6 +185,8 @@ struct DemoSettingsView: View {
             } label: {
                 Label("Developer Tools", systemImage: "hammer.fill")
             }
+        } header: {
+            Text("Developer")
         } footer: {
             Text("Purchase simulation, failure modes, replay flows, startup recovery, and diagnostics.")
         }

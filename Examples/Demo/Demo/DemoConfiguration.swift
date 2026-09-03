@@ -32,7 +32,14 @@ enum DemoConfiguration {
             description: "Annual access to every Demo Pro feature.",
             displayPrice: "$39.99",
             price: 39.99,
-            subscriptionPeriod: .init(value: 1, unit: .year)
+            subscriptionPeriod: .init(value: 1, unit: .year),
+            introductoryOffer: .init(
+                paymentMode: .freeTrial,
+                period: .init(value: 7, unit: .day),
+                displayPrice: "$0.00",
+                price: 0,
+                isEligible: true
+            )
         ),
         PurchaseProduct(
             id: lifetimeProductID,

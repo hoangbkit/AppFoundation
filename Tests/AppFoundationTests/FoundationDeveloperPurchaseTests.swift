@@ -33,6 +33,53 @@ final class FoundationDeveloperPurchaseTests: XCTestCase {
         XCTAssertEqual(controller.preferredProduct, yearly)
     }
 
+    func testCatalogEditPreservesPurchaseFailureSimulation() async {
+        let controller = makeController()
+        await controller.prepare()
+        let failure = PurchaseFailure(
+            code: .networkUnavailable,
+            message: "Simulated network failure."
+        )
+        controller.setSimulatedPurchaseResult(.failure(failure), for: Self.monthly.id)
+
+        let editedMonthly = StoreProduct(
+            id: Self.monthly.id,
+            displayName: "Monthly Edited",
+            description: "Edited monthly plan",
+            displayPrice: "$3.99",
+            price: 3.99,
+            subscriptionPeriod: .init(value: 1, unit: .month)
+        )
+        await controller.configureSimulatedCatalog(
+            configuration: controller.simulatedConfigurationSnapshot,
+            products: [editedMonthly]
+        )
+        await controller.purchase(editedMonthly)
+
+        XCTAssertEqual(controller.activity, .failed(failure))
+        XCTAssertFalse(controller.isEntitled)
+    }
+
+    func testCatalogEditPreservesCatalogAndRestoreFailureSimulation() async {
+        let controller = makeController()
+        await controller.prepare()
+        let restoreFailure = PurchaseFailure(
+            code: .networkUnavailable,
+            message: "Simulated restore failure."
+        )
+        await controller.setSimulatedProductLoadingFailure(.noProductsAvailable)
+        controller.setSimulatedRestoreFailure(restoreFailure)
+
+        await controller.configureSimulatedCatalog(
+            configuration: controller.simulatedConfigurationSnapshot,
+            products: [Self.monthly]
+        )
+
+        XCTAssertEqual(controller.productLoadingState, .failed(.noProductsAvailable))
+        let outcome = await controller.restorePurchases()
+        XCTAssertEqual(outcome, .failed(restoreFailure))
+    }
+
     func testDeveloperCanForceSimulatedEntitlement() async {
         let controller = makeController()
         await controller.prepare()

@@ -37,12 +37,45 @@ public struct StoreProduct: Identifiable, Sendable, Equatable {
         }
     }
 
+    public struct IntroductoryOffer: Sendable, Equatable {
+        public enum PaymentMode: String, Sendable, Equatable {
+            case freeTrial
+            case payAsYouGo
+            case payUpFront
+            case unknown
+        }
+
+        public let paymentMode: PaymentMode
+        public let period: SubscriptionPeriod
+        public let periodCount: Int
+        public let displayPrice: String
+        public let price: Double
+        public let isEligible: Bool
+
+        public init(
+            paymentMode: PaymentMode,
+            period: SubscriptionPeriod,
+            periodCount: Int = 1,
+            displayPrice: String,
+            price: Double,
+            isEligible: Bool
+        ) {
+            self.paymentMode = paymentMode
+            self.period = period
+            self.periodCount = max(1, periodCount)
+            self.displayPrice = paymentMode == .freeTrial ? "Free" : displayPrice
+            self.price = paymentMode == .freeTrial ? 0 : price
+            self.isEligible = isEligible
+        }
+    }
+
     public let id: String
     public let displayName: String
     public let description: String
     public let displayPrice: String
     public let price: Double
     public let subscriptionPeriod: SubscriptionPeriod?
+    public let introductoryOffer: IntroductoryOffer?
 
     public init(
         id: String,
@@ -50,7 +83,8 @@ public struct StoreProduct: Identifiable, Sendable, Equatable {
         description: String,
         displayPrice: String,
         price: Double,
-        subscriptionPeriod: SubscriptionPeriod? = nil
+        subscriptionPeriod: SubscriptionPeriod? = nil,
+        introductoryOffer: IntroductoryOffer? = nil
     ) {
         self.id = id
         self.displayName = displayName
@@ -58,6 +92,7 @@ public struct StoreProduct: Identifiable, Sendable, Equatable {
         self.displayPrice = displayPrice
         self.price = price
         self.subscriptionPeriod = subscriptionPeriod
+        self.introductoryOffer = introductoryOffer
     }
 }
 

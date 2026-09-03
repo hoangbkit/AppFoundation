@@ -466,28 +466,22 @@ public final class PurchaseController {
     /// Replaces the Debug simulator's catalog without changing the live StoreKit configuration.
     ///
     /// Disabled products may remain in `products`; only `configuration.productIDs` are loaded by
-    /// simulated paywalls. If the simulator is active, its current entitlement is preserved when
-    /// that product still exists in the replacement catalog.
+    /// simulated paywalls. If the simulator is active, its current entitlement and failure
+    /// simulation are preserved for products that still exist in the replacement catalog.
     public func configureSimulatedCatalog(
         configuration: PurchaseConfiguration,
         products: [StoreProduct]
     ) async {
-        let purchasedProductIDs = simulatedPurchasedProductIDs
         simulatedConfiguration = configuration
         simulatedProducts = products
 
-        guard isUsingSimulatedPurchases else {
+        guard let simulatedService = service as? SimulatedPurchaseService else {
             return
         }
 
         updateTask?.cancel()
         updateTask = nil
-        service = SimulatedPurchaseService(
-            products: products,
-            initiallyPurchasedProductIDs: purchasedProductIDs,
-            persistenceKey: simulatedPersistenceKey,
-            operationDelay: simulatedOperationDelay
-        )
+        simulatedService.replaceProducts(products)
         resetObservableStateForServiceChange()
         await prepare()
     }

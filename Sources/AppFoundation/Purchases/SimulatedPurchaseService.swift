@@ -17,8 +17,8 @@ public enum SimulatedPurchaseResult: Sendable, Equatable {
 public final class SimulatedPurchaseService: PurchaseServing {
     public private(set) var purchasedProductIDs: Set<String>
 
-    private let products: [StoreProduct]
-    private let productsByID: [String: StoreProduct]
+    private var products: [StoreProduct]
+    private var productsByID: [String: StoreProduct]
     private let persistenceKey: String?
     private let userDefaults: UserDefaults
     private var operationDelay: Duration
@@ -38,10 +38,7 @@ public final class SimulatedPurchaseService: PurchaseServing {
         operationDelay: Duration = .milliseconds(250)
     ) {
         self.products = products
-        self.productsByID = Dictionary(
-            products.map { ($0.id, $0) },
-            uniquingKeysWith: { first, _ in first }
-        )
+        self.productsByID = Self.indexProducts(products)
         self.purchaseResults = purchaseResults
         self.persistenceKey = persistenceKey
         self.userDefaults = userDefaults
@@ -124,6 +121,19 @@ public final class SimulatedPurchaseService: PurchaseServing {
         }
     }
 
+    /// Replaces the simulated product catalog while retaining current failure injection,
+    /// latency, and any entitlement that still exists in the new catalog.
+    public func replaceProducts(_ products: [StoreProduct]) {
+        self.products = products
+        self.productsByID = Self.indexProducts(products)
+
+        let validProductIDs = Set(products.map(\.id))
+        purchasedProductIDs.formIntersection(validProductIDs)
+        purchaseDates = purchaseDates.filter { validProductIDs.contains($0.key) }
+        purchaseResults = purchaseResults.filter { validProductIDs.contains($0.key) }
+        persistPurchasedProductIDs()
+    }
+
     /// Changes the behavior for future purchases of a product.
     public func setPurchaseResult(
         _ result: SimulatedPurchaseResult,
@@ -191,6 +201,13 @@ public final class SimulatedPurchaseService: PurchaseServing {
         for continuation in updateContinuations.values {
             continuation.yield()
         }
+    }
+
+    private static func indexProducts(_ products: [StoreProduct]) -> [String: StoreProduct] {
+        Dictionary(
+            products.map { ($0.id, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
     }
 }
 #endif

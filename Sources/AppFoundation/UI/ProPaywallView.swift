@@ -212,10 +212,24 @@ public struct ProPaywallView: View {
                     Text(product.planLabel)
                         .font(.headline)
                         .foregroundStyle(theme.primaryForeground)
-                    Text(product.isLifetime ? "Pay once" : product.billingDescription)
-                        .font(.caption)
-                        .foregroundStyle(theme.secondaryForeground)
-                        .fixedSize(horizontal: false, vertical: true)
+
+                    if let introductoryOfferHeadline = product.introductoryOfferHeadline {
+                        Text(introductoryOfferHeadline)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(theme.accent)
+
+                        if let billingDescription = product.postIntroductoryOfferBillingDescription {
+                            Text(billingDescription)
+                                .font(.caption2)
+                                .foregroundStyle(theme.secondaryForeground)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    } else {
+                        Text(product.isLifetime ? "Pay once" : product.billingDescription)
+                            .font(.caption)
+                            .foregroundStyle(theme.secondaryForeground)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
 
                 Spacer(minLength: 10)
@@ -276,25 +290,35 @@ public struct ProPaywallView: View {
     }
 
     private var purchaseButton: some View {
-        Button {
-            guard let selectedProduct else { return }
-            Task {
-                await purchases.purchase(selectedProduct)
-                if purchases.isEntitled { dismiss() }
+        VStack(spacing: 8) {
+            Button {
+                guard let selectedProduct else { return }
+                Task {
+                    await purchases.purchase(selectedProduct)
+                    if purchases.isEntitled { dismiss() }
+                }
+            } label: {
+                HStack {
+                    if purchases.isPurchasing { ProgressView().tint(.black) }
+                    Text(purchaseButtonTitle).font(.headline)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
             }
-        } label: {
-            HStack {
-                if purchases.isPurchasing { ProgressView().tint(.black) }
-                Text(purchaseButtonTitle).font(.headline)
+            .background(Color.white, in: Capsule())
+            .foregroundStyle(.black)
+            .shadow(color: .black.opacity(0.16), radius: 12, y: 6)
+            .opacity(purchases.isRestoring ? 0.55 : 1)
+            .disabled(selectedProduct == nil || purchases.isBusy)
+
+            if let introductoryOfferDisclosure = selectedProduct?.introductoryOfferDisclosure {
+                Text(introductoryOfferDisclosure)
+                    .font(.caption2)
+                    .foregroundStyle(theme.secondaryForeground)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
         }
-        .background(Color.white, in: Capsule())
-        .foregroundStyle(.black)
-        .shadow(color: .black.opacity(0.16), radius: 12, y: 6)
-        .opacity(purchases.isRestoring ? 0.55 : 1)
-        .disabled(selectedProduct == nil || purchases.isBusy)
     }
 
     private var featureList: some View {
@@ -435,7 +459,9 @@ public struct ProPaywallView: View {
 
     private var purchaseButtonTitle: String {
         guard let selectedProduct else { return configuration.purchaseButtonTitle }
-        return "\(configuration.purchaseButtonTitle) with \(selectedProduct.planLabel)"
+        return selectedProduct.purchaseActionTitle(
+            defaultTitle: configuration.purchaseButtonTitle
+        )
     }
 
     private func select(_ product: StoreProduct) {

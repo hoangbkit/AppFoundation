@@ -26,7 +26,13 @@ public final class LiveStoreKitService: PurchaseServing {
     public func products(for identifiers: [String]) async throws -> [StoreProduct] {
         let products = try await Product.products(for: identifiers)
         productsByID = Dictionary(uniqueKeysWithValues: products.map { ($0.id, $0) })
-        return products.map(Self.makeStoreProduct)
+
+        var storeProducts: [StoreProduct] = []
+        storeProducts.reserveCapacity(products.count)
+        for product in products {
+            storeProducts.append(await Self.makeStoreProduct(product))
+        }
+        return storeProducts
     }
 
     public func purchase(productID: String) async throws -> PurchaseOutcome {
@@ -122,21 +128,57 @@ public final class LiveStoreKitService: PurchaseServing {
         )
     }
 
-    private static func makeStoreProduct(_ product: Product) -> StoreProduct {
-        StoreProduct(
+    private static func makeStoreProduct(_ product: Product) async -> StoreProduct {
+        let subscription = product.subscription
+        let introductoryOffer = await makeIntroductoryOffer(subscription)
+
+        return StoreProduct(
             id: product.id,
             displayName: product.displayName,
             description: product.description,
             displayPrice: product.displayPrice,
             price: NSDecimalNumber(decimal: product.price).doubleValue,
-            subscriptionPeriod: product.subscription.map { subscription in
-                let period = subscription.subscriptionPeriod
-                return StoreProduct.SubscriptionPeriod(
-                    value: period.value,
-                    unit: makePeriodUnit(period.unit)
-                )
-            }
+            subscriptionPeriod: subscription.map { subscription in
+                makeSubscriptionPeriod(subscription.subscriptionPeriod)
+            },
+            introductoryOffer: introductoryOffer
         )
+    }
+
+    private static func makeIntroductoryOffer(
+        _ subscription: Product.SubscriptionInfo?
+    ) async -> StoreProduct.IntroductoryOffer? {
+        guard let subscription,
+              let offer = subscription.introductoryOffer
+        else { return nil }
+
+        let isEligible = await subscription.isEligibleForIntroOffer
+        return StoreProduct.IntroductoryOffer(
+            paymentMode: makePaymentMode(offer.paymentMode),
+            period: makeSubscriptionPeriod(offer.period),
+            periodCount: offer.periodCount,
+            displayPrice: offer.displayPrice,
+            price: NSDecimalNumber(decimal: offer.price).doubleValue,
+            isEligible: isEligible
+        )
+    }
+
+    private static func makeSubscriptionPeriod(
+        _ period: Product.SubscriptionPeriod
+    ) -> StoreProduct.SubscriptionPeriod {
+        StoreProduct.SubscriptionPeriod(
+            value: period.value,
+            unit: makePeriodUnit(period.unit)
+        )
+    }
+
+    private static func makePaymentMode(
+        _ paymentMode: Product.SubscriptionOffer.PaymentMode
+    ) -> StoreProduct.IntroductoryOffer.PaymentMode {
+        if paymentMode == .freeTrial { return .freeTrial }
+        if paymentMode == .payAsYouGo { return .payAsYouGo }
+        if paymentMode == .payUpFront { return .payUpFront }
+        return .unknown
     }
 
     private static func makePeriodUnit(_ unit: Product.SubscriptionPeriod.Unit) -> StoreProduct.SubscriptionPeriod.Unit {

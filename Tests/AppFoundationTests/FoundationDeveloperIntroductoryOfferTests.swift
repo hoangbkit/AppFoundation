@@ -102,6 +102,32 @@ final class FoundationDeveloperIntroductoryOfferTests: XCTestCase {
         )
     }
 
+    func testSwitchingPaidOfferToFreeTrialClearsPaidPrice() {
+        let product = StoreProduct(
+            id: "pro.yearly",
+            displayName: "Yearly",
+            description: "Yearly access",
+            displayPrice: "$7.99",
+            price: 7.99,
+            subscriptionPeriod: .init(value: 1, unit: .year)
+        )
+        var draft = DeveloperPlanDraft(
+            product: product,
+            enabled: true,
+            unlocksEntitlement: true
+        )
+        draft.introductoryOfferMode = .payAsYouGo
+        draft.introductoryOfferDisplayPrice = "$0.99"
+        draft.introductoryOfferPrice = 0.99
+
+        draft.introductoryOfferMode = .freeTrial
+        let offer = draft.product.introductoryOffer
+
+        XCTAssertEqual(offer?.paymentMode, .freeTrial)
+        XCTAssertEqual(offer?.displayPrice, "Free")
+        XCTAssertEqual(offer?.price, 0)
+    }
+
     func testLifetimePlanCannotRetainIntroductoryOffer() {
         let product = StoreProduct(
             id: "pro.yearly",

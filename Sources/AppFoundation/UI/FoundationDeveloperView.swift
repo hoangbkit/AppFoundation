@@ -549,7 +549,14 @@ public struct FoundationDeveloperView: View {
     private var diagnosticText: String {
         let info = AppInfo.current()
         let products = purchaseManager.products
-            .map { "\($0.id) = \($0.displayPrice)" }
+            .map { product in
+                var value = "\(product.id) = \(product.displayPrice)"
+                if let offer = product.introductoryOffer {
+                    let eligibility = offer.isEligible ? "eligible" : "ineligible"
+                    value += " · \(offer.headline) · \(eligibility)"
+                }
+                return value
+            }
             .joined(separator: "\n")
         return """
         App: \(info.displayName) \(info.versionAndBuild)
@@ -594,6 +601,11 @@ private struct FoundationDeveloperProductCatalogView: View {
                         Text(product.subscriptionPeriod?.shortLabel ?? "lifetime")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                        if let offer = product.introductoryOffer {
+                            Text("\(offer.headline) · \(offer.isEligible ? "Eligible" : "Ineligible")")
+                                .font(.caption)
+                                .foregroundStyle(offer.isEligible ? .green : .secondary)
+                        }
                     }
                     .padding(.vertical, 3)
                 }
@@ -700,6 +712,11 @@ private struct FoundationDeveloperPlansView: View {
                                 Text("\(plan.displayPrice) · \(plan.period.title)")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
+                                if let offerSummary = plan.introductoryOfferSummary {
+                                    Text(offerSummary)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                             Spacer()
                             if plan.enabled {
@@ -718,7 +735,7 @@ private struct FoundationDeveloperPlansView: View {
             } header: {
                 Text("Plans")
             } footer: {
-                Text("Only enabled products appear in simulated paywalls. Pricing changes never affect App Store Connect.")
+                Text("Only enabled products appear in simulated paywalls. Pricing and introductory-offer changes never affect App Store Connect.")
             }
 
             Section("Default Selection") {
@@ -801,6 +818,10 @@ private struct FoundationDeveloperPlansView: View {
             validationMessage = "Plan prices cannot be negative."
             return
         }
+        guard plans.allSatisfy({ $0.introductoryOfferPrice >= 0 }) else {
+            validationMessage = "Introductory-offer prices cannot be negative."
+            return
+        }
 
         let preferred = normalizedIDs.contains(preferredProductID)
             ? preferredProductID
@@ -828,7 +849,7 @@ private struct FoundationDeveloperPlansView: View {
     }
 }
 
-private struct DeveloperPlanDraft: Identifiable {
+struct DeveloperPlanDraft: Identifiable {
     let id: UUID
     var productID: String
     var displayName: String
@@ -838,6 +859,13 @@ private struct DeveloperPlanDraft: Identifiable {
     var period: DeveloperPlanPeriod
     var enabled: Bool
     var unlocksEntitlement: Bool
+    var introductoryOfferMode: DeveloperIntroductoryOfferMode
+    var introductoryOfferEligible: Bool
+    var introductoryOfferPeriodValue: Int
+    var introductoryOfferPeriodUnit: DeveloperIntroductoryOfferPeriodUnit
+    var introductoryOfferPeriodCount: Int
+    var introductoryOfferDisplayPrice: String
+    var introductoryOfferPrice: Double
 
     init(
         id: UUID = UUID(),
@@ -845,6 +873,7 @@ private struct DeveloperPlanDraft: Identifiable {
         enabled: Bool,
         unlocksEntitlement: Bool
     ) {
+        let offer = product.introductoryOffer
         self.id = id
         self.productID = product.id
         self.displayName = product.displayName
@@ -854,6 +883,15 @@ private struct DeveloperPlanDraft: Identifiable {
         self.period = DeveloperPlanPeriod(product.subscriptionPeriod)
         self.enabled = enabled
         self.unlocksEntitlement = unlocksEntitlement
+        self.introductoryOfferMode = DeveloperIntroductoryOfferMode(offer?.paymentMode)
+        self.introductoryOfferEligible = offer?.isEligible ?? true
+        self.introductoryOfferPeriodValue = max(1, offer?.period.value ?? 7)
+        self.introductoryOfferPeriodUnit = DeveloperIntroductoryOfferPeriodUnit(
+            offer?.period.unit ?? .day
+        )
+        self.introductoryOfferPeriodCount = max(1, offer?.periodCount ?? 1)
+        self.introductoryOfferDisplayPrice = offer?.displayPrice ?? "$0.00"
+        self.introductoryOfferPrice = max(0, offer?.price ?? 0)
     }
 
     private init(
@@ -865,7 +903,14 @@ private struct DeveloperPlanDraft: Identifiable {
         price: Double,
         period: DeveloperPlanPeriod,
         enabled: Bool,
-        unlocksEntitlement: Bool
+        unlocksEntitlement: Bool,
+        introductoryOfferMode: DeveloperIntroductoryOfferMode = .none,
+        introductoryOfferEligible: Bool = true,
+        introductoryOfferPeriodValue: Int = 7,
+        introductoryOfferPeriodUnit: DeveloperIntroductoryOfferPeriodUnit = .day,
+        introductoryOfferPeriodCount: Int = 1,
+        introductoryOfferDisplayPrice: String = "$0.00",
+        introductoryOfferPrice: Double = 0
     ) {
         self.id = id
         self.productID = productID
@@ -876,6 +921,13 @@ private struct DeveloperPlanDraft: Identifiable {
         self.period = period
         self.enabled = enabled
         self.unlocksEntitlement = unlocksEntitlement
+        self.introductoryOfferMode = introductoryOfferMode
+        self.introductoryOfferEligible = introductoryOfferEligible
+        self.introductoryOfferPeriodValue = max(1, introductoryOfferPeriodValue)
+        self.introductoryOfferPeriodUnit = introductoryOfferPeriodUnit
+        self.introductoryOfferPeriodCount = max(1, introductoryOfferPeriodCount)
+        self.introductoryOfferDisplayPrice = introductoryOfferDisplayPrice
+        self.introductoryOfferPrice = max(0, introductoryOfferPrice)
     }
 
     static func new(index: Int) -> DeveloperPlanDraft {
@@ -891,6 +943,11 @@ private struct DeveloperPlanDraft: Identifiable {
         )
     }
 
+    var introductoryOfferSummary: String? {
+        guard let offer = product.introductoryOffer else { return nil }
+        return "\(offer.headline) · \(offer.isEligible ? "Eligible" : "Ineligible")"
+    }
+
     var product: StoreProduct {
         StoreProduct(
             id: productID.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -898,7 +955,26 @@ private struct DeveloperPlanDraft: Identifiable {
             description: productDescription.trimmingCharacters(in: .whitespacesAndNewlines),
             displayPrice: displayPrice.trimmingCharacters(in: .whitespacesAndNewlines),
             price: max(0, price),
-            subscriptionPeriod: period.subscriptionPeriod
+            subscriptionPeriod: period.subscriptionPeriod,
+            introductoryOffer: introductoryOffer
+        )
+    }
+
+    private var introductoryOffer: StoreProduct.IntroductoryOffer? {
+        guard period != .lifetime,
+              let paymentMode = introductoryOfferMode.paymentMode
+        else { return nil }
+
+        return StoreProduct.IntroductoryOffer(
+            paymentMode: paymentMode,
+            period: .init(
+                value: max(1, introductoryOfferPeriodValue),
+                unit: introductoryOfferPeriodUnit.storeUnit
+            ),
+            periodCount: max(1, introductoryOfferPeriodCount),
+            displayPrice: introductoryOfferDisplayPrice.trimmingCharacters(in: .whitespacesAndNewlines),
+            price: max(0, introductoryOfferPrice),
+            isEligible: introductoryOfferEligible
         )
     }
 }
@@ -934,13 +1010,64 @@ private struct DeveloperPlanDetailView: View {
                     }
                 }
             }
+
+            if plan.period != .lifetime {
+                Section {
+                    Picker("Offer", selection: $plan.introductoryOfferMode) {
+                        ForEach(DeveloperIntroductoryOfferMode.allCases) { mode in
+                            Text(mode.title).tag(mode)
+                        }
+                    }
+
+                    if plan.introductoryOfferMode != .none {
+                        Toggle("Eligible", isOn: $plan.introductoryOfferEligible)
+
+                        Stepper(
+                            "Period length: \(plan.introductoryOfferPeriodValue)",
+                            value: $plan.introductoryOfferPeriodValue,
+                            in: 1...365
+                        )
+
+                        Picker("Period unit", selection: $plan.introductoryOfferPeriodUnit) {
+                            ForEach(DeveloperIntroductoryOfferPeriodUnit.allCases) { unit in
+                                Text(unit.title).tag(unit)
+                            }
+                        }
+
+                        Stepper(
+                            "Number of periods: \(plan.introductoryOfferPeriodCount)",
+                            value: $plan.introductoryOfferPeriodCount,
+                            in: 1...52
+                        )
+
+                        if plan.introductoryOfferMode == .freeTrial {
+                            LabeledContent("Offer price", value: "Free")
+                        } else {
+                            TextField(
+                                "Displayed offer price",
+                                text: $plan.introductoryOfferDisplayPrice
+                            )
+                            TextField(
+                                "Numeric offer price",
+                                value: $plan.introductoryOfferPrice,
+                                format: .number
+                            )
+                            .keyboardType(.decimalPad)
+                        }
+                    }
+                } header: {
+                    Text("Introductory Offer")
+                } footer: {
+                    Text("Eligibility controls whether trial or introductory-offer copy appears in ProPaywallView. These settings affect the in-process simulator only.")
+                }
+            }
         }
         .navigationTitle(plan.displayName.isEmpty ? "Plan" : plan.displayName)
         .navigationBarTitleDisplayMode(.inline)
     }
 }
 
-private enum DeveloperPlanPeriod: String, CaseIterable, Identifiable {
+enum DeveloperPlanPeriod: String, CaseIterable, Identifiable {
     case daily
     case weekly
     case monthly
@@ -980,6 +1107,86 @@ private enum DeveloperPlanPeriod: String, CaseIterable, Identifiable {
         case .monthly: .init(value: 1, unit: .month)
         case .yearly: .init(value: 1, unit: .year)
         case .lifetime: nil
+        }
+    }
+}
+
+enum DeveloperIntroductoryOfferMode: String, CaseIterable, Identifiable {
+    case none
+    case freeTrial
+    case payAsYouGo
+    case payUpFront
+    case unknown
+
+    var id: String { rawValue }
+
+    init(_ mode: StoreProduct.IntroductoryOffer.PaymentMode?) {
+        switch mode {
+        case .freeTrial: self = .freeTrial
+        case .payAsYouGo: self = .payAsYouGo
+        case .payUpFront: self = .payUpFront
+        case .unknown: self = .unknown
+        case nil: self = .none
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .none: "None"
+        case .freeTrial: "Free Trial"
+        case .payAsYouGo: "Pay As You Go"
+        case .payUpFront: "Pay Up Front"
+        case .unknown: "Unknown"
+        }
+    }
+
+    var paymentMode: StoreProduct.IntroductoryOffer.PaymentMode? {
+        switch self {
+        case .none: nil
+        case .freeTrial: .freeTrial
+        case .payAsYouGo: .payAsYouGo
+        case .payUpFront: .payUpFront
+        case .unknown: .unknown
+        }
+    }
+}
+
+enum DeveloperIntroductoryOfferPeriodUnit: String, CaseIterable, Identifiable {
+    case day
+    case week
+    case month
+    case year
+    case unknown
+
+    var id: String { rawValue }
+
+    init(_ unit: StoreProduct.SubscriptionPeriod.Unit) {
+        switch unit {
+        case .day: self = .day
+        case .week: self = .week
+        case .month: self = .month
+        case .year: self = .year
+        case .unknown: self = .unknown
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .day: "Days"
+        case .week: "Weeks"
+        case .month: "Months"
+        case .year: "Years"
+        case .unknown: "Unknown"
+        }
+    }
+
+    var storeUnit: StoreProduct.SubscriptionPeriod.Unit {
+        switch self {
+        case .day: .day
+        case .week: .week
+        case .month: .month
+        case .year: .year
+        case .unknown: .unknown
         }
     }
 }

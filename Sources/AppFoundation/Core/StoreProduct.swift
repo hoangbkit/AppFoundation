@@ -63,8 +63,8 @@ public struct StoreProduct: Identifiable, Sendable, Equatable {
             self.paymentMode = paymentMode
             self.period = period
             self.periodCount = max(1, periodCount)
-            self.displayPrice = displayPrice
-            self.price = price
+            self.displayPrice = paymentMode == .freeTrial ? "Free" : displayPrice
+            self.price = paymentMode == .freeTrial ? 0 : price
             self.isEligible = isEligible
         }
     }

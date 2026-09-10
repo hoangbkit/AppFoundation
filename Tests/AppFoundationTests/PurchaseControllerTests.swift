@@ -96,7 +96,8 @@ final class PurchaseControllerTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(500))
 
         XCTAssertEqual(controller.activity, .failed(.timeout))
-        XCTAssertEqual(await task.value, .failed(.timeout))
+        let taskValue = await task.value
+        XCTAssertEqual(taskValue, .failed(.timeout))
         XCTAssertEqual(service.syncCount, 1)
 
         // The abandoned sync drains in the background; settle it so the test ends

@@ -143,7 +143,7 @@ final class RestorePurchasesModelTests: XCTestCase {
         let model = RestorePurchasesRowModel()
 
         Task { await manager.restorePurchases() }
-        guard spinUntil(manager.isBusy) else {
+        guard spinUntil({ manager.isBusy }) else {
             return XCTFail("Restore never became busy")
         }
 

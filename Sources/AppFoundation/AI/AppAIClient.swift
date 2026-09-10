@@ -164,18 +164,6 @@ public actor AppAIClient {
         )
     }
 
-    func submitAnalyticsBatch(
-        _ batch: AppAnalyticsBatch
-    ) async throws -> AppAnalyticsSubmissionResponse {
-        let body = try encoder.encode(batch)
-        return try await protectedPost(
-            path: "/v1/analytics/batch",
-            requestID: batch.requestId,
-            body: body,
-            as: AppAnalyticsSubmissionResponse.self
-        )
-    }
-
     public func resetInstallationIdentity() async throws {
         let attestationKey = attestationGateKey
         let identityKey = installationGateKey

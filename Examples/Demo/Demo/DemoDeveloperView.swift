@@ -110,7 +110,44 @@ struct DemoDeveloperView: View {
                             }
                         ),
                     ]
-                )
+                ),
+                FoundationDeveloperSection(
+                    id: "analytics",
+                    title: "Analytics",
+                    items: [
+                        .action(
+                            FoundationDeveloperAction(
+                                id: "analytics-track",
+                                title: "Track Demo Event",
+                                systemImage: "chart.bar.xaxis"
+                            ) {
+                                try await DemoConfiguration.analytics.track(
+                                    "demo_action",
+                                    dimension: "developer_tools"
+                                )
+                            }
+                        ),
+                        .action(
+                            FoundationDeveloperAction(
+                                id: "analytics-flush",
+                                title: "Flush Analytics",
+                                systemImage: "arrow.up.circle"
+                            ) {
+                                try await DemoConfiguration.analytics.flush()
+                            }
+                        ),
+                        .action(
+                            FoundationDeveloperAction(
+                                id: "analytics-reset",
+                                title: "Reset Analytics State",
+                                systemImage: "trash",
+                                role: .destructive
+                            ) {
+                                try await DemoConfiguration.analytics.resetLocalState()
+                            }
+                        ),
+                    ]
+                ),
             ]
         )
     }

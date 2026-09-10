@@ -8,7 +8,7 @@ The package centralizes behavior that is expensive to reimplement correctly whil
 
 | Product | Purpose |
 | --- | --- |
-| `AppFoundation` | Commerce, themes, onboarding, settings, exports, backups, startup resilience, Debug developer tools, App Group storage, notifications, and shared utilities. It also re-exports the Studio and Showcase products. |
+| `AppFoundation` | Commerce, first-party analytics, themes, onboarding, settings, exports, backups, startup resilience, Debug developer tools, App Group storage, notifications, and shared utilities. It also re-exports the Studio and Showcase products. |
 | `AppFoundationScreenshotStudio` | Exact-size SwiftUI screenshot composition, preview, templates, and export on iOS. |
 | `AppFoundationPromoVideoStudio` | Deterministic SwiftUI promo-video editing and silent H.264 MP4 export on iOS. |
 | `AppFoundationWidgetShowcase` | In-app widget catalogs, previews, detail screens, installation guidance, and Free/Pro presentation. |
@@ -94,6 +94,20 @@ Verified StoreKit transactions remain the source of truth. Do not mirror `hasPro
 - Access policy that can keep existing user-created content available after entitlement expiry
 
 AppFoundation presents configured entitlement products in `PurchaseConfiguration.productIDs` order. Subscription prices and periods come from StoreKit. A configured entitlement product without a subscription period is treated as lifetime access and uses one-time-purchase disclosure instead of renewal wording.
+
+### Analytics
+
+- Explicit first-party product event counters with optional bounded dimensions
+- Cumulative UTC-day session and active-duration snapshots
+- 30-minute inactivity sessions with UTC-midnight duration splitting
+- Six-hour opportunistic uploads with persisted `429 Retry-After` backoff
+- Retry-safe cumulative resends, cancellation/failure persistence, and bounded multi-batch uploads
+- Server-v1 limits for retention, counter counts, session totals, token formats, and request body size
+- Keychain-backed installation identity and `UserDefaults` daily state
+- iOS application lifecycle integration through `.managesAnalytics(_:)`
+- No App Attest requirement for analytics; use an analytics endpoint configured with `attestMode: disabled`
+
+See [Analytics](Documentation/Analytics.md) for setup, server requirements, privacy boundaries, limits, retry behavior, and parity with MacAppFoundation.
 
 ### Themes
 

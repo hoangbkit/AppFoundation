@@ -7,32 +7,9 @@ permissions:
   contents: read
 
 jobs:
-  package-tests:
-    name: Swift 6.2 portable tests
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v5
-
-      - name: Install Swift 6.2
-        uses: swift-actions/setup-swift@v2
-        with:
-          swift-version: "6.2"
-
-      - name: Show toolchain
-        run: swift --version
-
-      - name: Validate package manifest
-        run: swift package dump-package >/dev/null
-
-      - name: Run package tests
-        run: swift test
-
-  ios-demo:
-    name: Build iOS Demo
+  build-and-test:
+    name: Build and test on iOS
     runs-on: macos-26
-    needs: package-tests
 
     steps:
       - name: Check out repository
@@ -46,6 +23,17 @@ jobs:
           sw_vers
           xcodebuild -version
           swift --version
+
+      - name: Validate package manifest
+        run: swift package dump-package >/dev/null
+
+      - name: Run package tests on iOS Simulator
+        run: |
+          xcodebuild test \
+            -scheme AppFoundation-Package \
+            -destination "platform=iOS Simulator,name=iPhone 17 Pro,OS=latest" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
 
       - name: Install XcodeGen
         run: brew install xcodegen

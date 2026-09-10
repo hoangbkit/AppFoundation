@@ -28,6 +28,7 @@ jobs:
         run: swift package dump-package >/dev/null
 
       - name: Run package tests on iOS Simulator
+        timeout-minutes: 10
         run: |
           xcodebuild test \
             -scheme AppFoundation-Package \

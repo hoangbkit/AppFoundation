@@ -1,30 +1,50 @@
-name: Swift Package
+name: Fast CI
 
 on:
   push:
-    branches:
-      - master
-      - develop
-  pull_request:
 
 permissions:
   contents: read
 
 jobs:
-  portable-tests:
-    name: Swift 6.2 portable tests
-    runs-on: ubuntu-latest
+  build-and-test:
+    name: Build and test
+    runs-on: macos-26
+
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Install Swift
-        uses: swift-actions/setup-swift@v2
-        with:
-          swift-version: "6.2"
+      - name: Select Xcode 26.3
+        run: sudo xcode-select -s /Applications/Xcode_26.3.app/Contents/Developer
+
+      - name: Show toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
 
       - name: Validate package manifest
         run: swift package dump-package >/dev/null
 
       - name: Run package tests
         run: swift test
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Demo project
+        working-directory: Examples/Demo
+        run: xcodegen generate --spec project.yml
+
+      - name: Build iOS Demo
+        working-directory: Examples/Demo
+        run: |
+          xcodebuild \
+            -project Demo.xcodeproj \
+            -scheme Demo \
+            -configuration Debug \
+            -destination "generic/platform=iOS Simulator" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build

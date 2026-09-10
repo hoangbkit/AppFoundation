@@ -31,9 +31,7 @@ jobs:
         run: |
           xcodebuild test \
             -scheme AppFoundation-Package \
-            -destination "platform=iOS Simulator,name=iPhone 17 Pro,OS=latest" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO
+            -destination "platform=iOS Simulator,name=iPhone 17 Pro,OS=latest"
 
       - name: Install XcodeGen
         run: brew install xcodegen

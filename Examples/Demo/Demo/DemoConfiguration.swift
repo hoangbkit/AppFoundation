@@ -1,5 +1,30 @@
 import AppFoundation
+import Foundation
 import SwiftUI
+
+private struct DemoAnalyticsTransport: AppAnalyticsTransport {
+    func data(for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        guard let body = request.httpBody,
+              let object = try JSONSerialization.jsonObject(with: body) as? [String: Any],
+              let requestID = object["requestId"] as? String,
+              let days = object["days"] as? [[String: Any]] else {
+            throw AppAnalyticsError.invalidResponse
+        }
+
+        let payload: [String: Any] = [
+            "ok": true,
+            "requestId": requestID,
+            "acceptedDays": days.compactMap { $0["day"] as? String },
+        ]
+        let response = HTTPURLResponse(
+            url: request.url!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )!
+        return (try JSONSerialization.data(withJSONObject: payload), response)
+    }
+}
 
 @MainActor
 enum DemoConfiguration {
@@ -45,6 +70,17 @@ enum DemoConfiguration {
 
     static let purchaseServiceMode = PurchaseServiceFactory.effectiveMode(
         for: PurchaseServiceMode.fromEnvironment(fallback: .simulated)
+    )
+
+    static let analytics = AppAnalyticsClient(
+        configuration: AppAnalyticsConfiguration(
+            appID: "appfoundation-demo",
+            appKey: "demo-analytics-key",
+            baseURL: URL(string: "https://example.com")!,
+            stateStorageKey: "appfoundation.demo.analytics-state",
+            appVersion: "demo"
+        ),
+        transport: DemoAnalyticsTransport()
     )
 
     static let premiumExportFeature = PremiumFeature(

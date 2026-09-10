@@ -13,9 +13,10 @@ private actor AnthropicModelTransport: AppAITransport {
     ) async throws -> (Data, HTTPURLResponse) {
         requests.append(request)
 
+        let url = try #require(request.url)
         let components = try #require(
             URLComponents(
-                url: try #require(request.url),
+                url: url,
                 resolvingAgainstBaseURL: false
             )
         )

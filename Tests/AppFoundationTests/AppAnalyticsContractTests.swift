@@ -241,7 +241,8 @@ private func eventCounters(_ count: Int, prefix: String) -> [(String, String?, I
     }
 
     try await client.flush()
-    let day = try #require(contractDays(try #require(await transport.capturedRequests().last)).first)
+    let request = try #require(await transport.capturedRequests().last)
+    let day = try #require(contractDays(request).first)
     #expect(try contractEvents(day).count == 50)
 }
 
@@ -257,7 +258,8 @@ private func eventCounters(_ count: Int, prefix: String) -> [(String, String?, I
     try await client.track("generation_completed", count: 99_999)
     try await client.track("generation_completed", count: 10)
     try await client.flush()
-    let day = try #require(contractDays(try #require(await transport.capturedRequests().last)).first)
+    let request = try #require(await transport.capturedRequests().last)
+    let day = try #require(contractDays(request).first)
     let event = try #require(contractEvents(day).first)
     #expect(event["count"] as? Int == 100_000)
 
@@ -272,7 +274,8 @@ private func eventCounters(_ count: Int, prefix: String) -> [(String, String?, I
         now: { timestamp }
     )
     try await boundedClient.flush()
-    let boundedDay = try #require(contractDays(try #require(await boundedTransport.capturedRequests().first)).first)
+    let boundedRequest = try #require(await boundedTransport.capturedRequests().first)
+    let boundedDay = try #require(contractDays(boundedRequest).first)
     #expect(boundedDay["sessions"] as? Int == 1_000)
     #expect(boundedDay["sessionSeconds"] as? Int == 86_400)
 }

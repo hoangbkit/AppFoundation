@@ -127,9 +127,10 @@ func geminiModelDiscoveryPaginatesAndFiltersUnsupportedModels() async throws {
         credentials: [.gemini: "gemini-key"]
     )
     let transport = RegressionTransport { request, call in
+        let url = try #require(request.url)
         let components = try #require(
             URLComponents(
-                url: try #require(request.url),
+                url: url,
                 resolvingAgainstBaseURL: false
             )
         )

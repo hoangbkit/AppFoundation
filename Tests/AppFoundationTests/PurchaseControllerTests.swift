@@ -194,6 +194,7 @@ final class PurchaseControllerTests: XCTestCase {
         )
 
         await controller.prepare()
+        await Task.yield()
 
         let task = Task { await controller.restorePurchases(timeout: .seconds(5)) }
         try await Task.sleep(for: .milliseconds(100))
@@ -219,6 +220,7 @@ final class PurchaseControllerTests: XCTestCase {
         )
 
         await controller.prepare()
+        await Task.yield()
 
         await controller.purchase(Self.monthly)
         XCTAssertEqual(controller.activity, .pending(productID: Self.monthly.id))

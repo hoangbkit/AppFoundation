@@ -82,9 +82,11 @@ private func requestBody(_ request: URLRequest) throws -> [String: Any] {
     try await client.track("generation_completed", dimension: "nano", count: 2)
     try await client.flush()
 
+    // A fresh client automatically uploads its first tracked event. The explicit
+    // flush then resends the current day's cumulative snapshot by design.
     let requests = await transport.capturedRequests()
-    #expect(requests.count == 1)
-    let request = try #require(requests.first)
+    #expect(requests.count == 2)
+    let request = try #require(requests.last)
     #expect(request.url?.path == "/v1/analytics/batch")
     #expect(request.value(forHTTPHeaderField: "X-App-ID") == configuration.appID)
     #expect(request.value(forHTTPHeaderField: "X-App-Key") == configuration.appKey)

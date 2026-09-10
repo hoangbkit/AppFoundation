@@ -31,7 +31,7 @@ mycli deploy SE2 --billing live
 
 - Deployment target: iOS 26.0
 - Development team: `J458WW3452`
-- Bundle identifier (iOS and macOS): `com.hoangbkit.afdemo`
-- Display name (iOS and macOS): `AF`
+- Bundle identifier: `com.hoangbkit.afdemo`
+- Display name: `AF`
 
 The generated `.xcodeproj` is intentionally ignored. Treat `project.yml` as the source of truth.

@@ -6,6 +6,10 @@ AppFoundation follows semantic versioning.
 
 ## Unreleased
 
+### Removed
+
+- Removed the unsupported macOS implementations, tests, documentation, and Demo target; AppFoundation now contains only its declared iOS support surface.
+
 ## 1.4.0 - 2026-09-01
 
 ### Added

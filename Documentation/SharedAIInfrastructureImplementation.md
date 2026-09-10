@@ -149,13 +149,13 @@ The execution environment cannot clone the GitHub repository because outbound DN
 
 ### Before merge
 
-Run on an Apple development machine:
+Run portable package tests on Linux:
 
 ```bash
 swift test
 ```
 
-Then build the AppFoundation Demo for iOS and macOS to validate the reusable SwiftUI components and actor isolation in the supported deployment targets.
+Then build the AppFoundation Demo for iOS to validate the reusable SwiftUI components and actor isolation on the supported deployment target.
 
 ## Example catalog
 

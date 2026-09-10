@@ -304,7 +304,7 @@ NavigationLink("Developer") {
 
 ## Validation
 
-Run portable package validation:
+Run portable package validation on Linux:
 
 ```bash
 swift test

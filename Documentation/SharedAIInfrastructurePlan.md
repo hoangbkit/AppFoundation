@@ -840,7 +840,7 @@ Exit criteria:
 - Add complete public documentation and examples for DraftX-style text generation and MenuLens-style structured extraction.
 - Add migration notes.
 - Review Sendable and actor isolation under Swift 6.
-- Run package tests on supported iOS and macOS configurations.
+- Run package tests and build the Demo on the supported iOS configuration.
 - Mark the public API experimental while AppFoundation remains pre-1.0.
 - Adopt the implementation in both consumers before declaring the API stable.
 

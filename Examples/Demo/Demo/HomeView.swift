@@ -111,14 +111,7 @@ struct HomeView: View {
                             .lineSpacing(3)
                     }
 
-                    ScrollView(.horizontal) {
-                        HStack(spacing: 8) {
-                            platformTag("iOS 26.0+")
-                            platformTag("macOS 15.0+")
-                        }
-                        .padding(.horizontal, 1)
-                    }
-                    .scrollIndicators(.hidden)
+                    platformTag("iOS 26.0+")
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }

@@ -301,7 +301,7 @@ private enum BackupPathValidator {
     }
 }
 
-#if os(iOS) || os(macOS) || os(tvOS) || os(visionOS)
+#if os(iOS)
 public enum SecurityScopedURLAccess {
     public static func withAccess<Result>(
         to url: URL,

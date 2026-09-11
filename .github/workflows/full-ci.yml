@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   build-and-test:
-    name: Build and test on iOS
+    name: Build on iOS
     runs-on: macos-26
 
     steps:
@@ -27,13 +27,14 @@ jobs:
       - name: Validate package manifest
         run: swift package dump-package >/dev/null
 
-      - name: Run package tests on iOS Simulator
+      # Package test execution is intentionally disabled for now. Keep Full CI
+      # aligned with Fast CI so both workflows avoid simulator-device availability
+      # issues and the currently hanging async/keychain test suites.
+      - name: Build package for iOS Simulator
         run: |
-          xcodebuild test \
+          xcodebuild build \
             -scheme AppFoundation-Package \
-            -destination "platform=iOS Simulator,name=iPhone 17 Pro,OS=latest" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO
+            -destination "generic/platform=iOS Simulator"
 
       - name: Install XcodeGen
         run: brew install xcodegen

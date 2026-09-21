@@ -218,6 +218,16 @@ struct HomeView: View {
             }
 
             NavigationLink {
+                AnalyticsDemoView()
+            } label: {
+                demoRow(
+                    title: "Analytics",
+                    subtitle: "Test native events and errors against analytics-server",
+                    systemImage: "chart.xyaxis.line"
+                )
+            }
+
+            NavigationLink {
                 InfrastructureDemoView()
             } label: {
                 demoRow(

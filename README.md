@@ -98,14 +98,17 @@ AppFoundation presents configured entitlement products in `PurchaseConfiguration
 ### Analytics
 
 - Explicit first-party product event counters with optional bounded dimensions
+- Bounded cumulative error counters with stable code/component/severity
+- Automatic iOS OS/build/device-family/architecture context
+- Optional native app-key header for keyed or keyless ingestion
 - Cumulative UTC-day session and active-duration snapshots
 - 30-minute inactivity sessions with UTC-midnight duration splitting
 - Six-hour opportunistic uploads with persisted `429 Retry-After` backoff
 - Retry-safe cumulative resends, cancellation/failure persistence, and bounded multi-batch uploads
-- Server-v1 limits for retention, counter counts, session totals, token formats, and request body size
+- Analytics-server limits for retention, event/error counts, session totals, token formats, and request body size
 - Keychain-backed installation identity and `UserDefaults` daily state
 - iOS application lifecycle integration through `.managesAnalytics(_:)`
-- No App Attest requirement for analytics; use an analytics endpoint configured with `attestMode: disabled`
+- No App Attest assertion is sent with analytics
 
 See [Analytics](Documentation/Analytics.md) for setup, server requirements, privacy boundaries, limits, retry behavior, and parity with MacAppFoundation.
 

@@ -65,7 +65,10 @@ struct AppAnalyticsClientContext: Sendable {
             sysctlbyname("hw.machine", bytes.baseAddress, &size, nil, 0)
         }
         guard status == 0 else { return nil }
-        return String(cString: buffer)
+        return buffer.withUnsafeBufferPointer { pointer in
+            guard let baseAddress = pointer.baseAddress else { return nil }
+            return String(cString: baseAddress)
+        }
         #else
         return nil
         #endif

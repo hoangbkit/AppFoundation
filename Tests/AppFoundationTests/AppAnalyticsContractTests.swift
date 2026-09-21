@@ -255,13 +255,13 @@ private func eventCounters(_ count: Int, prefix: String) -> [(String, String?, I
         stateStore: ContractMemoryAnalyticsStateStore(),
         now: { timestamp }
     )
-    try await client.track("generation_completed", count: 99_999)
+    try await client.track("generation_completed", count: 499)
     try await client.track("generation_completed", count: 10)
     try await client.flush()
     let request = try #require(await transport.capturedRequests().last)
     let day = try #require(contractDays(request).first)
     let event = try #require(contractEvents(day).first)
-    #expect(event["count"] as? Int == 100_000)
+    #expect(event["count"] as? Int == 500)
 
     let boundedState = try persistedState(days: [
         "2026-09-08": persistedDay(sessions: 1_500, sessionSeconds: 100_000),
@@ -278,6 +278,25 @@ private func eventCounters(_ count: Int, prefix: String) -> [(String, String?, I
     let boundedDay = try #require(contractDays(boundedRequest).first)
     #expect(boundedDay["sessions"] as? Int == 1_000)
     #expect(boundedDay["sessionSeconds"] as? Int == 86_400)
+}
+
+@Test func analyticsRejectsMoreThanTwoThousandTotalEventsPerDay() async throws {
+    let timestamp = contractDate("2026-09-08T12:00:00Z")
+    let client = AppAnalyticsClient(
+        configuration: contractConfiguration(uploadInterval: 86_400),
+        transport: ContractAnalyticsTransport(),
+        stateStore: ContractMemoryAnalyticsStateStore(),
+        now: { timestamp }
+    )
+
+    try await client.track("event_one", count: 500)
+    try await client.track("event_two", count: 500)
+    try await client.track("event_three", count: 500)
+    try await client.track("event_four", count: 500)
+
+    await #expect(throws: AppAnalyticsError.self) {
+        try await client.track("event_five")
+    }
 }
 
 @Test func analyticsTokenAndAppVersionBoundariesMatchServerContract() async throws {

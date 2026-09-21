@@ -35,3 +35,7 @@ mycli deploy SE2 --billing live
 - Display name: `AF`
 
 The generated `.xcodeproj` is intentionally ignored. Treat `project.yml` as the source of truth.
+
+## Analytics tester
+
+The Demo home screen includes an **Analytics** destination that exercises the real `AppAnalyticsClient`. Enter the server URL, App ID, and optional App Key at runtime, then send a custom event or bounded error signal. The Demo does not hardcode or persist an analytics App ID or App Key.

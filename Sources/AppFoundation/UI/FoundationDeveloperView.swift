@@ -597,7 +597,7 @@ private struct FoundationDeveloperProductCatalogView: View {
                         if let offer = product.introductoryOffer {
                             Text("\(offer.headline) · \(offer.isEligible ? "Eligible" : "Ineligible")")
                                 .font(.caption)
-                                .foregroundStyle(offer.isEligible ? Color.green : Color.secondary)
+                                .foregroundStyle(offer.isEligible ? Color.green : Color.gray)
                         }
                     }
                     .padding(.vertical, 3)

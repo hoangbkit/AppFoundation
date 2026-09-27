@@ -2,9 +2,9 @@
 
 ## Entitlements
 
-`PurchaseController` is the UI-facing purchase state owner. It never persists a trusted `isPro` Boolean. Instead it asks `PurchaseServing` for current verified transactions and passes normalized `EntitlementRecord` values into the pure `EntitlementEvaluator`.
+`PurchaseController` is the UI-facing purchase state owner. It never persists a trusted `isPro` Boolean. Instead it asks `PurchaseServing` for current verified transactions, normalizes them into `EntitlementRecord` values, and keeps live `EntitlementState` separate from binary app-facing `PurchaseAccessState`.
 
-This separation keeps StoreKit-specific types inside `LiveStoreKitService`, entitlement rules deterministic, and SwiftUI purchase state compact.
+Live verified StoreKit remains authoritative. When the app opts into verified offline entitlements, the package may persist account-scoped verified entitlement evidence—not a Boolean—to preserve only access that can still be justified safely while StoreKit is temporarily unavailable. Normal feature gates should read `hasPro`.
 
 ## Theme boundary
 
@@ -40,7 +40,7 @@ The fallback is normalized to free access. This guarantees a renderable theme wh
 
 `UserDefaultsThemeStateStore` writes one Codable state object. Supplying an app-group suite makes the same state available to widgets.
 
-The cached `lastKnownHasPro` flag is for extension presentation only. Purchase authorization remains owned by verified StoreKit state in the containing app.
+The cached `lastKnownHasPro` flag is for extension presentation only. Purchase authorization remains owned by the containing app's `PurchaseManager.hasPro`, which resolves live StoreKit plus any configured safe verified-offline evidence.
 
 ## Dependency injection
 
@@ -56,7 +56,7 @@ Themes can inject any `ThemeStateStoring` implementation and a deterministic clo
 
 ## Lifecycle
 
-Attach `.managesPurchases(controller)` near the app root. Attach `.synchronizesThemeAccess(themeManager, hasPro: controller.isEntitled)` beside it.
+Attach `.managesPurchases(controller)` near the app root. Attach `.synchronizesThemeAccess(themeManager, hasPro: controller.hasPro)` beside it.
 
 When a theme preview is active, the manager schedules local expiry. Apps should also call `refresh()` after lifecycle transitions when they manage the lifecycle manually. Widgets use `ThemeResolution.nextAutomaticChangeDate` to schedule their own fallback timeline entry.
 

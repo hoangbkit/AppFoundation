@@ -12,6 +12,8 @@ AppFoundation follows semantic versioning.
 - Added opt-in verified offline entitlement persistence with account-scoped Keychain storage, lifetime continuity, bounded subscription and Family Sharing access, clock-rollback protection, and background verification retries.
 - Added StoreKit account/environment, ownership, transaction, grace-period, and subscription-state metadata needed for safe entitlement reconciliation.
 - Added optional app-scoped analytics environment sharing so AppFoundation-owned purchase views can reuse the client installed by `.managesAnalytics(...)`.
+- Added native offer-code redemption and optional purchase/restore/close callbacks to the canonical `ProPaywallView`.
+- Added introductory-offer editing and eligibility simulation to Debug Developer Tools.
 
 ### Changed
 

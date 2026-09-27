@@ -256,7 +256,7 @@ public struct PaywallView: View {
                 Button("Restore Purchases") { restore() }
                     .disabled(purchaseManager.isBusy || purchaseManager.isPurchasePending)
 
-                if purchaseManager.products.contains(where: \.isRecurring) {
+                if purchaseManager.activeSubscriptionProduct != nil {
                     Button("Manage Subscription") {
                         if let url = URL(string: "https://apps.apple.com/account/subscriptions") {
                             openURL(url)

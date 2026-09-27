@@ -23,6 +23,7 @@ AppFoundation follows semantic versioning.
 - Added entitlement-only product helpers, Lifetime-first active plan selection, separate active-subscription lookup, and explicit pending-purchase blocking.
 - Updated `ProPaywallView` to use entitlement-only plans, stale-while-revalidate metadata, introductory-offer copy, pending-purchase UI, and bounded automatic commerce analytics when configured.
 - Updated `ProPlanSettingsSection` to prepare commerce state itself, block restore during pending purchases, and keep Manage subscription available when Lifetime and a recurring entitlement coexist.
+- Kept deprecated paywall/settings compatibility surfaces aligned with the new model: they now filter to supported entitlement products, respect pending purchases, and expose subscription management only for an active recurring entitlement.
 
 
 ### Removed

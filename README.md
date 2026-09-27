@@ -89,7 +89,7 @@ struct MyApp: App {
 - Debug-only in-process purchase simulation
 - `PurchaseManager` and simple `hasPro` entitlement access
 - Weekly, monthly, yearly, and non-consumable lifetime plans
-- Theme-aware `ProPaywallView` as the canonical paywall, including introductory offers, native offer-code redemption, purchase/restore callbacks, and optional bounded commerce analytics; deprecated `PaywallView` and `FoundationPaywallView` remain available for source compatibility
+- Theme-aware `ProPaywallView` as the canonical paywall, including introductory offers, purchase/restore callbacks, and optional bounded commerce analytics; deprecated `PaywallView` and `FoundationPaywallView` remain available for source compatibility
 - Premium gates, badges, locked overlays, settings sections, and limit-reached upsells
 - Access policy that can keep existing user-created content available after entitlement expiry
 

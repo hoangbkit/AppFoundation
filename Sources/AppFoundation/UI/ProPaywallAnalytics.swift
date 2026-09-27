@@ -17,8 +17,6 @@ enum ProPaywallAnalytics {
     static let restoreStarted = ProPaywallAnalyticsEvent("restore_started")
     static let restoreSucceeded = ProPaywallAnalyticsEvent("restore_succeeded")
     static let restoreNothingToRestore = ProPaywallAnalyticsEvent("restore_nothing_to_restore")
-    static let offerCodeOpened = ProPaywallAnalyticsEvent("offer_code_opened")
-    static let offerCodeSucceeded = ProPaywallAnalyticsEvent("offer_code_succeeded")
 
     static func planSelected(_ product: StoreProduct) -> ProPaywallAnalyticsEvent {
         ProPaywallAnalyticsEvent(
@@ -69,14 +67,6 @@ enum ProPaywallAnalytics {
         ProPaywallAnalyticsEvent(
             "restore_failed",
             dimension: failure.code.rawValue
-        )
-    }
-
-    static func offerCodeFailed(_ error: Error) -> ProPaywallAnalyticsEvent {
-        let failureCode = (error as? PurchaseFailure)?.code.rawValue ?? "unknown"
-        return ProPaywallAnalyticsEvent(
-            "offer_code_failed",
-            dimension: failureCode
         )
     }
 

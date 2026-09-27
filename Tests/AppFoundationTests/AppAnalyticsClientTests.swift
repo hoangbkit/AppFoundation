@@ -58,6 +58,15 @@ private func analyticsConfiguration(
     )
 }
 
+@Test func analyticsConfigurationDefaultsToFiveMinuteUploadInterval() {
+    let configuration = AppAnalyticsConfiguration(
+        appID: "analytics-test",
+        baseURL: URL(string: "https://example.com")!
+    )
+
+    #expect(configuration.uploadInterval == 5 * 60)
+}
+
 private func isoDate(_ value: String) -> Date {
     ISO8601DateFormatter().date(from: value)!
 }

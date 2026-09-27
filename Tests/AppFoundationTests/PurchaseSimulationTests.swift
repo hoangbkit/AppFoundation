@@ -1,4 +1,4 @@
-#if DEBUG
+#if DEBUG && canImport(StoreKit)
 import XCTest
 @testable import AppFoundation
 

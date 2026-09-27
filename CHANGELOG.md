@@ -17,6 +17,9 @@ AppFoundation follows semantic versioning.
 - `hasPro` and the compatibility `isEntitled` alias now follow effective authorization rather than raw live StoreKit state.
 - Purchase authorization is independent from product-catalog availability, and subscription-status changes can refresh entitlement state without requiring a new transaction.
 - StoreKit transaction observation is scoped to configured entitlement products when using AppFoundation's built-in service, while custom `PurchaseServing` implementations retain their existing integration path.
+- Store products now retain their real StoreKit type and introductory-offer eligibility, preventing unsupported products from being treated as Lifetime Pro plans.
+- Purchase surfaces can refresh product metadata stale-while-revalidate: existing plans remain usable if a metadata refresh fails.
+- Added entitlement-only product helpers, Lifetime-first active plan selection, separate active-subscription lookup, and explicit pending-purchase blocking.
 
 
 ### Removed

@@ -41,6 +41,7 @@ final class PurchasePresentationCatalogTests: XCTestCase {
 
         XCTAssertTrue(modern.features.isEmpty)
         XCTAssertTrue(legacy.features.isEmpty)
+        XCTAssertTrue(legacy.showsRedeemCode)
         XCTAssertTrue(upsell.rows.isEmpty)
         XCTAssertTrue(celebration.rows.isEmpty)
         XCTAssertTrue(celebration.planTitle.isEmpty)

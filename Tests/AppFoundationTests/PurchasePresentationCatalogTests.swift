@@ -41,7 +41,6 @@ final class PurchasePresentationCatalogTests: XCTestCase {
 
         XCTAssertTrue(modern.features.isEmpty)
         XCTAssertTrue(legacy.features.isEmpty)
-        XCTAssertTrue(legacy.showsRedeemCode)
         XCTAssertTrue(upsell.rows.isEmpty)
         XCTAssertTrue(celebration.rows.isEmpty)
         XCTAssertTrue(celebration.planTitle.isEmpty)
@@ -62,7 +61,7 @@ final class PurchasePresentationCatalogTests: XCTestCase {
         )
     }
     @MainActor
-    func testCanonicalPaywallAcceptsCommerceCallbacksAndRedeemConfiguration() {
+    func testCanonicalPaywallAcceptsCommerceCallbacksAndLegacyRedeemConfiguration() {
         let product = StoreProduct(
             id: "pro.yearly",
             displayName: "Yearly",

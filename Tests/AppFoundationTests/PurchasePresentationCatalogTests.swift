@@ -61,5 +61,38 @@ final class PurchasePresentationCatalogTests: XCTestCase {
             "Unlock all Pro features,\nchoose the plan that fits you."
         )
     }
+    @MainActor
+    func testCanonicalPaywallAcceptsCommerceCallbacksAndRedeemConfiguration() {
+        let product = StoreProduct(
+            id: "pro.yearly",
+            displayName: "Yearly",
+            description: "Yearly Pro",
+            displayPrice: "$39.99",
+            price: 39.99,
+            subscriptionPeriod: .init(value: 1, unit: .year)
+        )
+        let manager = PurchaseManager(
+            configuration: PurchaseConfiguration(productIDs: [product.id]),
+            simulated: true,
+            simulatedProducts: [product],
+            simulatedOperationDelay: .milliseconds(0)
+        )
+        let configuration = FoundationPaywallConfiguration(
+            privacyURL: URL(string: "https://example.com/privacy")!,
+            termsURL: URL(string: "https://example.com/terms")!,
+            showsRedeemCode: false
+        )
+
+        _ = ProPaywallView(
+            purchases: manager,
+            configuration: configuration,
+            onPurchased: { _ in },
+            onRestored: {},
+            onClose: {}
+        )
+
+        XCTAssertFalse(configuration.showsRedeemCode)
+    }
+
 }
 #endif

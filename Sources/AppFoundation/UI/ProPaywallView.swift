@@ -12,19 +12,30 @@ public struct ProPaywallView: View {
     private let purchaseManagerOverride: PurchaseController?
     private let configuration: FoundationPaywallConfiguration
     private let rendersForScreenshot: Bool
+    private let onPurchased: ((StoreProduct) -> Void)?
+    private let onRestored: (() -> Void)?
+    private let onClose: (() -> Void)?
 
     @State private var selectedProductID: String?
     @State private var restoreModel = RestorePurchasesRowModel()
     @State private var didTrackPaywallView = false
     @State private var didCompleteCommerce = false
+    @State private var isOfferCodeRedemptionPresented = false
+    @State private var offerCodeErrorMessage: String?
 
     public init(
         configuration: FoundationPaywallConfiguration,
-        initialSelectedProductID: String? = nil
+        initialSelectedProductID: String? = nil,
+        onPurchased: ((StoreProduct) -> Void)? = nil,
+        onRestored: (() -> Void)? = nil,
+        onClose: (() -> Void)? = nil
     ) {
         self.purchaseManagerOverride = nil
         self.configuration = configuration
         self.rendersForScreenshot = false
+        self.onPurchased = onPurchased
+        self.onRestored = onRestored
+        self.onClose = onClose
         _selectedProductID = State(
             initialValue: initialSelectedProductID ?? configuration.highlightedProductID
         )
@@ -33,13 +44,19 @@ public struct ProPaywallView: View {
     public init(
         purchases: PurchaseController,
         configuration: FoundationPaywallConfiguration,
-        initialSelectedProductID: String? = nil
+        initialSelectedProductID: String? = nil,
+        onPurchased: ((StoreProduct) -> Void)? = nil,
+        onRestored: (() -> Void)? = nil,
+        onClose: (() -> Void)? = nil
     ) {
         self.init(
             purchases: purchases,
             configuration: configuration,
             initialSelectedProductID: initialSelectedProductID,
-            rendersForScreenshot: false
+            rendersForScreenshot: false,
+            onPurchased: onPurchased,
+            onRestored: onRestored,
+            onClose: onClose
         )
     }
 
@@ -47,11 +64,17 @@ public struct ProPaywallView: View {
         purchases: PurchaseController,
         configuration: FoundationPaywallConfiguration,
         initialSelectedProductID: String?,
-        rendersForScreenshot: Bool
+        rendersForScreenshot: Bool,
+        onPurchased: ((StoreProduct) -> Void)? = nil,
+        onRestored: (() -> Void)? = nil,
+        onClose: (() -> Void)? = nil
     ) {
         self.purchaseManagerOverride = purchases
         self.configuration = configuration
         self.rendersForScreenshot = rendersForScreenshot
+        self.onPurchased = onPurchased
+        self.onRestored = onRestored
+        self.onClose = onClose
         _selectedProductID = State(
             initialValue: initialSelectedProductID
                 ?? purchases.configuration.preferredProductID
@@ -84,7 +107,7 @@ public struct ProPaywallView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close", systemImage: "xmark") { dismiss() }
+                    Button("Close", systemImage: "xmark") { close() }
                         .labelStyle(.iconOnly)
                 }
             }
@@ -118,10 +141,27 @@ public struct ProPaywallView: View {
                     track(ProPaywallAnalytics.paywallClosed)
                 }
             }
+            .offerCodeRedemption(isPresented: $isOfferCodeRedemptionPresented) { result in
+                switch result {
+                case .success:
+                    track(ProPaywallAnalytics.offerCodeSucceeded)
+                    Task {
+                        await purchases.refreshEntitlements()
+                    }
+                case .failure(let error):
+                    track(ProPaywallAnalytics.offerCodeFailed(error))
+                    offerCodeErrorMessage = error.localizedDescription
+                }
+            }
             .alert("Purchase", isPresented: purchaseErrorBinding) {
                 Button("OK", role: .cancel) { purchases.clearActivity() }
             } message: {
                 Text(purchaseFailure?.message ?? PurchaseFailure.unknown.message)
+            }
+            .alert("Redeem Code", isPresented: offerCodeErrorBinding) {
+                Button("OK", role: .cancel) { offerCodeErrorMessage = nil }
+            } message: {
+                Text(offerCodeErrorMessage ?? "Unable to redeem this offer code.")
             }
         }
     }
@@ -347,6 +387,7 @@ public struct ProPaywallView: View {
                 case .success:
                     didCompleteCommerce = true
                     track(ProPaywallAnalytics.purchaseSucceeded(selectedProduct))
+                    onPurchased?(selectedProduct)
                     dismiss()
                 case .pending:
                     track(ProPaywallAnalytics.purchasePending(selectedProduct))
@@ -405,6 +446,14 @@ public struct ProPaywallView: View {
             HStack(spacing: 16) {
                 Link("Terms of Use", destination: configuration.termsURL)
                 Link("Privacy Policy", destination: configuration.privacyURL)
+                if configuration.showsRedeemCode {
+                    Button("Redeem Code") {
+                        track(ProPaywallAnalytics.offerCodeOpened)
+                        isOfferCodeRedemptionPresented = true
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(purchases.isBusy || purchases.isPurchasePending)
+                }
                 restoreFooterAction
             }
             .font(.caption)
@@ -626,6 +675,8 @@ public struct ProPaywallView: View {
         case .result(.restored):
             didCompleteCommerce = true
             track(ProPaywallAnalytics.restoreSucceeded)
+            onRestored?()
+            dismiss()
         case .result(.nothingToRestore):
             track(ProPaywallAnalytics.restoreNothingToRestore)
         case .result(.failure(let failure)):
@@ -642,6 +693,21 @@ public struct ProPaywallView: View {
                 dimension: event.dimension
             )
         }
+    }
+
+    private func close() {
+        if let onClose {
+            onClose()
+        } else {
+            dismiss()
+        }
+    }
+
+    private var offerCodeErrorBinding: Binding<Bool> {
+        Binding(
+            get: { offerCodeErrorMessage != nil },
+            set: { if !$0 { offerCodeErrorMessage = nil } }
+        )
     }
 
     private var purchaseFailure: PurchaseFailure? {

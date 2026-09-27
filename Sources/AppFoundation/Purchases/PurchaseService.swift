@@ -284,38 +284,15 @@ public final class LiveStoreKitService: PurchaseServing, PurchaseEntitlementServ
     }
 
     private static func makeStoreProduct(_ product: Product) async -> StoreProduct {
-        let subscription = product.subscription
-        let introductoryOffer = await makeIntroductoryOffer(subscription)
-
-        return StoreProduct(
+        StoreProduct(
             id: product.id,
             displayName: product.displayName,
             description: product.description,
             displayPrice: product.displayPrice,
             price: NSDecimalNumber(decimal: product.price).doubleValue,
-            type: makeProductType(product.type),
-            subscriptionPeriod: subscription.map { subscription in
+            subscriptionPeriod: product.subscription.map { subscription in
                 makeSubscriptionPeriod(subscription.subscriptionPeriod)
-            },
-            introductoryOffer: introductoryOffer
-        )
-    }
-
-    private static func makeIntroductoryOffer(
-        _ subscription: Product.SubscriptionInfo?
-    ) async -> StoreProduct.IntroductoryOffer? {
-        guard let subscription,
-              let offer = subscription.introductoryOffer
-        else { return nil }
-
-        let isEligible = await subscription.isEligibleForIntroOffer
-        return StoreProduct.IntroductoryOffer(
-            paymentMode: makePaymentMode(offer.paymentMode),
-            period: makeSubscriptionPeriod(offer.period),
-            periodCount: offer.periodCount,
-            displayPrice: offer.displayPrice,
-            price: NSDecimalNumber(decimal: offer.price).doubleValue,
-            isEligible: isEligible
+            }
         )
     }
 
@@ -326,14 +303,6 @@ public final class LiveStoreKitService: PurchaseServing, PurchaseEntitlementServ
             value: period.value,
             unit: makePeriodUnit(period.unit)
         )
-    }
-
-    private static func makeProductType(_ type: Product.ProductType) -> StoreProduct.ProductType {
-        if type == .autoRenewable { return .autoRenewable }
-        if type == .nonConsumable { return .nonConsumable }
-        if type == .consumable { return .consumable }
-        if type == .nonRenewable { return .nonRenewable }
-        return .unknown
     }
 
     private static func makeEntitlementProductKind(
@@ -370,15 +339,6 @@ public final class LiveStoreKitService: PurchaseServing, PurchaseEntitlementServ
         if state == .inBillingRetryPeriod { return .inBillingRetryPeriod }
         if state == .expired { return .expired }
         if state == .revoked { return .revoked }
-        return .unknown
-    }
-
-    private static func makePaymentMode(
-        _ paymentMode: Product.SubscriptionOffer.PaymentMode
-    ) -> StoreProduct.IntroductoryOffer.PaymentMode {
-        if paymentMode == .freeTrial { return .freeTrial }
-        if paymentMode == .payAsYouGo { return .payAsYouGo }
-        if paymentMode == .payUpFront { return .payUpFront }
         return .unknown
     }
 

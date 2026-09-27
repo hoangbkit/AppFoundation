@@ -20,8 +20,6 @@ public struct ProPaywallView: View {
     @State private var restoreModel = RestorePurchasesRowModel()
     @State private var didTrackPaywallView = false
     @State private var didCompleteCommerce = false
-    @State private var isOfferCodeRedemptionPresented = false
-    @State private var offerCodeErrorMessage: String?
 
     public init(
         configuration: FoundationPaywallConfiguration,
@@ -142,27 +140,10 @@ public struct ProPaywallView: View {
                     track(ProPaywallAnalytics.paywallClosed)
                 }
             }
-            .offerCodeRedemption(isPresented: $isOfferCodeRedemptionPresented) { result in
-                switch result {
-                case .success:
-                    track(ProPaywallAnalytics.offerCodeSucceeded)
-                    Task {
-                        await purchases.refreshEntitlements()
-                    }
-                case .failure(let error):
-                    track(ProPaywallAnalytics.offerCodeFailed(error))
-                    offerCodeErrorMessage = error.localizedDescription
-                }
-            }
             .alert("Purchase", isPresented: purchaseErrorBinding) {
                 Button("OK", role: .cancel) { purchases.clearActivity() }
             } message: {
                 Text(purchaseFailure?.message ?? PurchaseFailure.unknown.message)
-            }
-            .alert("Redeem Code", isPresented: offerCodeErrorBinding) {
-                Button("OK", role: .cancel) { offerCodeErrorMessage = nil }
-            } message: {
-                Text(offerCodeErrorMessage ?? "Unable to redeem this offer code.")
             }
         }
     }
@@ -447,14 +428,6 @@ public struct ProPaywallView: View {
             HStack(spacing: 16) {
                 Link("Terms of Use", destination: configuration.termsURL)
                 Link("Privacy Policy", destination: configuration.privacyURL)
-                if configuration.showsRedeemCode {
-                    Button("Redeem Code") {
-                        track(ProPaywallAnalytics.offerCodeOpened)
-                        isOfferCodeRedemptionPresented = true
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(purchases.isBusy || purchases.isPurchasePending)
-                }
                 restoreFooterAction
             }
             .font(.caption)
@@ -702,13 +675,6 @@ public struct ProPaywallView: View {
         } else {
             dismiss()
         }
-    }
-
-    private var offerCodeErrorBinding: Binding<Bool> {
-        Binding(
-            get: { offerCodeErrorMessage != nil },
-            set: { if !$0 { offerCodeErrorMessage = nil } }
-        )
     }
 
     private var purchaseFailure: PurchaseFailure? {

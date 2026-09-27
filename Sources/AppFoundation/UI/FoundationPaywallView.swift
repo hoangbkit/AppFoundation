@@ -38,6 +38,9 @@ public struct FoundationPaywallConfiguration {
     /// Required so every paywall ships usable legal links; there is no fallback.
     public let termsURL: URL
 
+    /// Shows native App Store offer-code redemption from the canonical Pro paywall.
+    public let showsRedeemCode: Bool
+
     /// Retained for source compatibility with configurations that explicitly
     /// supplied a `FoundationTheme`.
     public let theme: FoundationTheme
@@ -61,7 +64,8 @@ public struct FoundationPaywallConfiguration {
         highlightedProductBadge: String = "BEST VALUE",
         privacyURL: URL,
         termsURL: URL,
-        themeOverride: AppTheme? = nil
+        themeOverride: AppTheme? = nil,
+        showsRedeemCode: Bool = true
     ) {
         self.badge = badge
         self.title = title
@@ -72,6 +76,7 @@ public struct FoundationPaywallConfiguration {
         self.highlightedProductBadge = highlightedProductBadge
         self.privacyURL = privacyURL
         self.termsURL = termsURL
+        self.showsRedeemCode = showsRedeemCode
         self.theme = .indigo
         self.themeOverride = themeOverride
         self.followsActiveTheme = true
@@ -88,7 +93,8 @@ public struct FoundationPaywallConfiguration {
         highlightedProductBadge: String = "BEST VALUE",
         privacyURL: URL,
         termsURL: URL,
-        theme: FoundationTheme
+        theme: FoundationTheme,
+        showsRedeemCode: Bool = true
     ) {
         self.badge = badge
         self.title = title
@@ -99,6 +105,7 @@ public struct FoundationPaywallConfiguration {
         self.highlightedProductBadge = highlightedProductBadge
         self.privacyURL = privacyURL
         self.termsURL = termsURL
+        self.showsRedeemCode = showsRedeemCode
         self.theme = theme
         self.themeOverride = nil
         self.followsActiveTheme = false
@@ -162,9 +169,8 @@ public struct FoundationPaywallView: View {
             }
             .toolbarBackground(.hidden, for: .navigationBar)
             .task {
-                if purchases.products.isEmpty {
-                    await purchases.loadProducts()
-                }
+                await purchases.refreshProductsForPresentation()
+                await purchases.refreshEntitlements()
                 selectDefaultProductIfNeeded()
             }
             .onChange(of: purchases.products) { _, _ in
@@ -280,7 +286,7 @@ public struct FoundationPaywallView: View {
             }
         case .loaded:
             VStack(spacing: 12) {
-                ForEach(purchases.products) { product in
+                ForEach(paywallProducts) { product in
                     productRow(product)
                 }
             }
@@ -358,7 +364,7 @@ public struct FoundationPaywallView: View {
             guard let selectedProduct else { return }
             Task {
                 await purchases.purchase(selectedProduct)
-                if purchases.isEntitled { dismiss() }
+                if purchases.hasPro { dismiss() }
             }
         } label: {
             HStack(spacing: 10) {
@@ -368,7 +374,7 @@ public struct FoundationPaywallView: View {
             }
         }
         .buttonStyle(FoundationPrimaryButtonStyle(theme: theme.foundationTheme))
-        .disabled(selectedProduct == nil || purchases.isBusy)
+        .disabled(selectedProduct == nil || purchases.isBusy || purchases.isPurchasePending)
         .opacity(selectedProduct == nil ? 0.55 : 1)
     }
 
@@ -377,7 +383,7 @@ public struct FoundationPaywallView: View {
             Button("Restore Purchases") { restore() }
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(theme.accent)
-                .disabled(purchases.isBusy)
+                .disabled(purchases.isBusy || purchases.isPurchasePending)
 
             HStack(spacing: 18) {
                 Link("Privacy", destination: configuration.privacyURL)
@@ -386,7 +392,7 @@ public struct FoundationPaywallView: View {
             .font(.caption)
             .foregroundStyle(theme.accent)
 
-            Text(PurchasePlanDisclosure.text(for: purchases.products))
+            Text(PurchasePlanDisclosure.text(for: paywallProducts))
                 .font(.caption2)
                 .foregroundStyle(theme.secondaryForeground)
                 .multilineTextAlignment(.center)
@@ -427,11 +433,15 @@ public struct FoundationPaywallView: View {
         )
     }
 
+    private var paywallProducts: [StoreProduct] {
+        purchases.entitlementProducts
+    }
+
     private var selectedProduct: StoreProduct? {
-        if let selectedProductID {
-            return purchases.product(withID: selectedProductID)
+        guard let selectedProductID else {
+            return purchases.preferredEntitlementProduct
         }
-        return purchases.preferredProduct
+        return paywallProducts.first(where: { $0.id == selectedProductID })
     }
 
     private var buttonTitle: String {
@@ -473,10 +483,19 @@ public struct FoundationPaywallView: View {
     }
 
     private func selectDefaultProductIfNeeded() {
-        guard selectedProductID == nil
-            || purchases.product(withID: selectedProductID ?? "") == nil
-        else { return }
-        selectedProductID = purchases.preferredProduct?.id
+        if let selectedProductID,
+           paywallProducts.contains(where: { $0.id == selectedProductID }) {
+            return
+        }
+
+        if let highlightedProductID = configuration.highlightedProductID,
+           paywallProducts.contains(where: { $0.id == highlightedProductID }) {
+            selectedProductID = highlightedProductID
+            return
+        }
+
+        selectedProductID = purchases.preferredEntitlementProduct?.id
+            ?? paywallProducts.first?.id
     }
 }
 #endif

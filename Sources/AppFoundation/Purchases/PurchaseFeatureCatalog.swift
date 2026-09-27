@@ -3,7 +3,7 @@ import Observation
 import StoreKit
 
 
-public public extension PurchaseController {
+public extension PurchaseController {
     /// Registered capabilities used by premium purchase surfaces.
     var features: [PurchaseFeature] {
         configuration.features

@@ -38,6 +38,9 @@ public struct FoundationPaywallConfiguration {
     /// Required so every paywall ships usable legal links; there is no fallback.
     public let termsURL: URL
 
+    /// Shows native App Store offer-code redemption from the canonical Pro paywall.
+    public let showsRedeemCode: Bool
+
     /// Retained for source compatibility with configurations that explicitly
     /// supplied a `FoundationTheme`.
     public let theme: FoundationTheme
@@ -61,7 +64,8 @@ public struct FoundationPaywallConfiguration {
         highlightedProductBadge: String = "BEST VALUE",
         privacyURL: URL,
         termsURL: URL,
-        themeOverride: AppTheme? = nil
+        themeOverride: AppTheme? = nil,
+        showsRedeemCode: Bool = true
     ) {
         self.badge = badge
         self.title = title
@@ -72,6 +76,7 @@ public struct FoundationPaywallConfiguration {
         self.highlightedProductBadge = highlightedProductBadge
         self.privacyURL = privacyURL
         self.termsURL = termsURL
+        self.showsRedeemCode = showsRedeemCode
         self.theme = .indigo
         self.themeOverride = themeOverride
         self.followsActiveTheme = true
@@ -88,7 +93,8 @@ public struct FoundationPaywallConfiguration {
         highlightedProductBadge: String = "BEST VALUE",
         privacyURL: URL,
         termsURL: URL,
-        theme: FoundationTheme
+        theme: FoundationTheme,
+        showsRedeemCode: Bool = true
     ) {
         self.badge = badge
         self.title = title
@@ -99,6 +105,7 @@ public struct FoundationPaywallConfiguration {
         self.highlightedProductBadge = highlightedProductBadge
         self.privacyURL = privacyURL
         self.termsURL = termsURL
+        self.showsRedeemCode = showsRedeemCode
         self.theme = theme
         self.themeOverride = nil
         self.followsActiveTheme = false

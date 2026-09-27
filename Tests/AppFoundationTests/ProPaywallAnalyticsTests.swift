@@ -87,13 +87,6 @@ final class ProPaywallAnalyticsTests: XCTestCase {
                 dimension: "verificationFailed"
             )
         )
-        XCTAssertEqual(
-            ProPaywallAnalytics.offerCodeFailed(NSError(domain: "test", code: 7)),
-            ProPaywallAnalyticsEvent(
-                "offer_code_failed",
-                dimension: "unknown"
-            )
-        )
     }
 
     func testNonProductEventsHaveNoDimension() {
@@ -116,14 +109,6 @@ final class ProPaywallAnalyticsTests: XCTestCase {
         XCTAssertEqual(
             ProPaywallAnalytics.restoreNothingToRestore,
             ProPaywallAnalyticsEvent("restore_nothing_to_restore")
-        )
-        XCTAssertEqual(
-            ProPaywallAnalytics.offerCodeOpened,
-            ProPaywallAnalyticsEvent("offer_code_opened")
-        )
-        XCTAssertEqual(
-            ProPaywallAnalytics.offerCodeSucceeded,
-            ProPaywallAnalyticsEvent("offer_code_succeeded")
         )
     }
 

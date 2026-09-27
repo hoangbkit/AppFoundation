@@ -1466,7 +1466,7 @@ public final class PurchaseController {
                 await self.refreshEntitlements()
                 guard generation == self.serviceGeneration else { return }
                 if case .pending(let pendingProductID) = self.activity,
-                   pendingProductID == updatedProductID {
+                   updatedProductID.isEmpty || pendingProductID == updatedProductID {
                     self.activity = .idle
                 }
             }

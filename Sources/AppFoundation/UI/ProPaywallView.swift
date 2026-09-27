@@ -7,6 +7,7 @@ public struct ProPaywallView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appFoundationTheme) private var environmentTheme
     @Environment(PurchaseManager.self) private var environmentPurchaseManager
+    @Environment(\.appAnalytics) private var analytics
 
     private let purchaseManagerOverride: PurchaseController?
     private let configuration: FoundationPaywallConfiguration
@@ -14,6 +15,8 @@ public struct ProPaywallView: View {
 
     @State private var selectedProductID: String?
     @State private var restoreModel = RestorePurchasesRowModel()
+    @State private var didTrackPaywallView = false
+    @State private var didCompleteCommerce = false
 
     public init(
         configuration: FoundationPaywallConfiguration,
@@ -88,9 +91,13 @@ public struct ProPaywallView: View {
             .toolbarBackground(.hidden, for: .navigationBar)
             .navigationBarTitleDisplayMode(.inline)
             .task {
-                if purchases.products.isEmpty {
-                    await purchases.loadProducts(force: true)
+                if !didTrackPaywallView {
+                    didTrackPaywallView = true
+                    track(ProPaywallAnalytics.paywallViewed)
                 }
+
+                await purchases.refreshProductsForPresentation()
+                await purchases.refreshEntitlements()
                 selectDefaultPlanIfNeeded()
                 restoreModel.reconcile(using: purchases)
             }
@@ -100,9 +107,15 @@ public struct ProPaywallView: View {
             .onChange(of: purchases.activity) { _, _ in
                 restoreModel.reconcile(using: purchases)
             }
+            .onChange(of: restoreModel.phase) { oldPhase, newPhase in
+                trackRestoreTransition(from: oldPhase, to: newPhase)
+            }
             .onDisappear {
                 if restoreModel.hasLocalAttemptInFlight {
                     restoreModel.cancel(using: purchases)
+                }
+                if !didCompleteCommerce {
+                    track(ProPaywallAnalytics.paywallClosed)
                 }
             }
             .alert("Purchase", isPresented: purchaseErrorBinding) {
@@ -160,8 +173,17 @@ public struct ProPaywallView: View {
 
             productContent
 
-            if !purchases.products.isEmpty {
+            if !paywallProducts.isEmpty {
                 purchaseButton
+
+                if let disclosure = selectedProduct?.introductoryOfferDisclosure {
+                    Text(disclosure)
+                        .font(.caption2)
+                        .foregroundStyle(theme.secondaryForeground)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity)
+                }
             }
 
             if !resolvedFeatures.isEmpty {
@@ -192,9 +214,18 @@ public struct ProPaywallView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 24)
         case .loaded:
-            VStack(spacing: 10) {
-                ForEach(purchases.products) { product in
-                    stackedPlanOption(for: product, badge: badge(for: product))
+            if paywallProducts.isEmpty {
+                Text("No Pro purchase options are available right now.")
+                    .font(.subheadline)
+                    .foregroundStyle(theme.secondaryForeground)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 24)
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(paywallProducts) { product in
+                        stackedPlanOption(for: product, badge: badge(for: product))
+                    }
                 }
             }
         }
@@ -212,10 +243,23 @@ public struct ProPaywallView: View {
                     Text(product.planLabel)
                         .font(.headline)
                         .foregroundStyle(theme.primaryForeground)
-                    Text(product.isLifetime ? "Pay once" : product.billingDescription)
-                        .font(.caption)
-                        .foregroundStyle(theme.secondaryForeground)
-                        .fixedSize(horizontal: false, vertical: true)
+                    if let headline = product.introductoryOfferHeadline {
+                        Text(headline)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(theme.accent)
+
+                        if let postOffer = product.postIntroductoryOfferBillingDescription {
+                            Text(postOffer)
+                                .font(.caption2)
+                                .foregroundStyle(theme.secondaryForeground)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    } else {
+                        Text(product.isLifetime ? "Pay once" : product.billingDescription)
+                            .font(.caption)
+                            .foregroundStyle(theme.secondaryForeground)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
 
                 Spacer(minLength: 10)
@@ -277,14 +321,44 @@ public struct ProPaywallView: View {
 
     private var purchaseButton: some View {
         Button {
-            guard let selectedProduct else { return }
+            guard let selectedProduct,
+                  !purchases.isBusy,
+                  !purchases.isPurchasePending
+            else { return }
+
+            track(ProPaywallAnalytics.purchaseStarted(selectedProduct))
+
             Task {
-                await purchases.purchase(selectedProduct)
-                if purchases.isEntitled { dismiss() }
+                let outcome = await purchases.purchase(selectedProduct)
+
+                if case .failed(let failure) = purchases.activity {
+                    track(
+                        ProPaywallAnalytics.purchaseFailed(
+                            selectedProduct,
+                            failure: failure
+                        )
+                    )
+                    return
+                }
+
+                guard let outcome else { return }
+
+                switch outcome {
+                case .success:
+                    didCompleteCommerce = true
+                    track(ProPaywallAnalytics.purchaseSucceeded(selectedProduct))
+                    dismiss()
+                case .pending:
+                    track(ProPaywallAnalytics.purchasePending(selectedProduct))
+                case .userCancelled:
+                    track(ProPaywallAnalytics.purchaseCancelled(selectedProduct))
+                }
             }
         } label: {
             HStack {
-                if purchases.isPurchasing { ProgressView().tint(.black) }
+                if purchases.isPurchasing {
+                    ProgressView().tint(.black)
+                }
                 Text(purchaseButtonTitle).font(.headline)
             }
             .frame(maxWidth: .infinity)
@@ -294,7 +368,11 @@ public struct ProPaywallView: View {
         .foregroundStyle(.black)
         .shadow(color: .black.opacity(0.16), radius: 12, y: 6)
         .opacity(purchases.isRestoring ? 0.55 : 1)
-        .disabled(selectedProduct == nil || purchases.isBusy)
+        .disabled(
+            selectedProduct == nil
+                || purchases.isBusy
+                || purchases.isPurchasePending
+        )
     }
 
     private var featureList: some View {
@@ -319,7 +397,7 @@ public struct ProPaywallView: View {
 
     private var legalFooter: some View {
         VStack(spacing: 10) {
-            Text(PurchasePlanDisclosure.text(for: purchases.products))
+            Text(PurchasePlanDisclosure.text(for: paywallProducts))
                 .font(.caption2)
                 .foregroundStyle(theme.secondaryForeground)
                 .multilineTextAlignment(.center)
@@ -343,6 +421,8 @@ public struct ProPaywallView: View {
             case .restoring:
                 restoreModel.cancel(using: purchases)
             case .idle, .result(.nothingToRestore), .result(.failure):
+                guard !purchases.isPurchasePending else { return }
+                track(ProPaywallAnalytics.restoreStarted)
                 restoreModel.start(using: purchases, configuration: restoreConfiguration)
             case .result(.restored):
                 break
@@ -359,9 +439,15 @@ public struct ProPaywallView: View {
         .buttonStyle(.plain)
         .disabled(
             (purchases.isBusy && restoreModel.phase != .restoring)
+                || purchases.isPurchasePending
                 || restoreModel.phase == .result(.restored)
         )
-        .opacity(purchases.isBusy && restoreModel.phase != .restoring ? 0.5 : 1)
+        .opacity(
+            (purchases.isBusy && restoreModel.phase != .restoring)
+                || purchases.isPurchasePending
+                ? 0.5
+                : 1
+        )
         .accessibilityLabel(restoreFooterAccessibilityLabel)
     }
 
@@ -428,26 +514,52 @@ public struct ProPaywallView: View {
         )
     }
 
+    private var paywallProducts: [StoreProduct] {
+        purchases.entitlementProducts
+    }
+
     private var selectedProduct: StoreProduct? {
-        selectedProductID.flatMap(purchases.product(withID:))
-            ?? purchases.preferredProduct
+        guard let selectedProductID else { return nil }
+        return paywallProducts.first(where: { $0.id == selectedProductID })
     }
 
     private var purchaseButtonTitle: String {
-        guard let selectedProduct else { return configuration.purchaseButtonTitle }
-        return "\(configuration.purchaseButtonTitle) with \(selectedProduct.planLabel)"
+        if purchases.isPurchasing {
+            return "Purchasing…"
+        }
+        if purchases.isPurchasePending {
+            return "Pending Approval"
+        }
+        guard let selectedProduct else {
+            return configuration.purchaseButtonTitle
+        }
+        return selectedProduct.purchaseActionTitle(
+            defaultTitle: configuration.purchaseButtonTitle
+        )
     }
 
     private func select(_ product: StoreProduct) {
+        guard !purchases.isBusy, !purchases.isPurchasePending else { return }
+        if selectedProductID != product.id {
+            track(ProPaywallAnalytics.planSelected(product))
+        }
         withAnimation(.snappy) { selectedProductID = product.id }
     }
 
     private func selectDefaultPlanIfNeeded() {
-        guard selectedProductID == nil
-            || purchases.product(withID: selectedProductID ?? "") == nil
-        else { return }
-        selectedProductID = purchases.preferredProduct?.id
-            ?? purchases.product(withID: configuration.highlightedProductID ?? "")?.id
+        if let selectedProductID,
+           paywallProducts.contains(where: { $0.id == selectedProductID }) {
+            return
+        }
+
+        if let highlightedProductID = configuration.highlightedProductID,
+           paywallProducts.contains(where: { $0.id == highlightedProductID }) {
+            selectedProductID = highlightedProductID
+            return
+        }
+
+        selectedProductID = purchases.preferredEntitlementProduct?.id
+            ?? paywallProducts.first?.id
     }
 
     private func badge(for product: StoreProduct) -> String? {
@@ -460,7 +572,7 @@ public struct ProPaywallView: View {
         }
 
         if isYearlyPlan(product),
-           let monthlyProduct = purchases.products.first(where: isMonthlyPlan),
+           let monthlyProduct = paywallProducts.first(where: isMonthlyPlan),
            let savingsPercentage = yearlySavingsPercentage(
                monthlyPrice: monthlyProduct.price,
                yearlyPrice: product.price
@@ -500,6 +612,36 @@ public struct ProPaywallView: View {
         let normalizedBadge = badge.lowercased()
         return badge.contains("%")
             && (normalizedBadge.contains("save") || normalizedBadge.contains("off"))
+    }
+
+    private func trackRestoreTransition(
+        from oldPhase: RestorePurchasesRowModel.Phase,
+        to newPhase: RestorePurchasesRowModel.Phase
+    ) {
+        guard oldPhase != newPhase else { return }
+
+        switch newPhase {
+        case .idle, .restoring:
+            break
+        case .result(.restored):
+            didCompleteCommerce = true
+            track(ProPaywallAnalytics.restoreSucceeded)
+        case .result(.nothingToRestore):
+            track(ProPaywallAnalytics.restoreNothingToRestore)
+        case .result(.failure(let failure)):
+            track(ProPaywallAnalytics.restoreFailed(failure))
+        }
+    }
+
+    private func track(_ event: ProPaywallAnalyticsEvent) {
+        guard let analytics else { return }
+
+        Task {
+            try? await analytics.track(
+                event.name,
+                dimension: event.dimension
+            )
+        }
     }
 
     private var purchaseFailure: PurchaseFailure? {

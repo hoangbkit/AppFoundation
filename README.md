@@ -78,7 +78,7 @@ struct MyApp: App {
 
 `PurchaseManager` is the preferred source-compatible name for the existing `PurchaseController`. Existing apps do not need an immediate migration.
 
-Verified StoreKit transactions remain the source of truth. Do not mirror `hasPro` into `UserDefaults` as an authorization source.
+`hasPro` is the app-facing authorization source. Live verified StoreKit remains authoritative, while the optional verified entitlement cache may preserve only previously verified safe access during temporary StoreKit unavailability. Do not mirror `hasPro` into `UserDefaults` as an authorization source.
 
 ## Included infrastructure
 
@@ -93,7 +93,7 @@ Verified StoreKit transactions remain the source of truth. Do not mirror `hasPro
 - Premium gates, badges, locked overlays, settings sections, and limit-reached upsells
 - Access policy that can keep existing user-created content available after entitlement expiry
 
-AppFoundation presents configured entitlement products in `PurchaseConfiguration.productIDs` order. Subscription prices and periods come from StoreKit. A configured entitlement product without a subscription period is treated as lifetime access and uses one-time-purchase disclosure instead of renewal wording.
+AppFoundation presents supported entitlement products in `PurchaseConfiguration.productIDs` order. Auto-renewable subscriptions use StoreKit prices, periods, and introductory-offer eligibility. Non-consumables are treated as Lifetime. Consumables, non-renewing subscriptions, and unknown product types are not treated as Pro entitlement plans.
 
 ### Analytics
 

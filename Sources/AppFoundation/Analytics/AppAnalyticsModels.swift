@@ -20,7 +20,7 @@ public struct AppAnalyticsConfiguration: Sendable {
         keychainService: String = "com.hoangbkit.AppFoundation.AppAI",
         stateStorageKey: String? = nil,
         appVersion: String? = nil,
-        uploadInterval: TimeInterval = 6 * 60 * 60,
+        uploadInterval: TimeInterval = 5 * 60,
         transportRetryCount: Int = 1
     ) {
         self.appID = appID

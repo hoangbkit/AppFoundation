@@ -61,7 +61,6 @@ The canonical `ProPaywallView` records only this bounded commerce funnel when th
 - `purchase_started`, `purchase_succeeded`, `purchase_pending`, or `purchase_cancelled` with the same bounded plan dimension
 - `purchase_failed` using `<plan>:<PurchaseFailure.Code>`
 - `restore_started`, `restore_succeeded`, `restore_nothing_to_restore`, or `restore_failed`
-- `offer_code_opened`, `offer_code_succeeded`, or `offer_code_failed`
 
 The paywall never sends product identifiers, StoreKit transaction identifiers, prices, receipts, localized error messages, or user content.
 
@@ -124,7 +123,7 @@ Only active application time contributes to `sessionSeconds`. Time while the app
 
 The client stores cumulative UTC-day snapshots locally and uploads opportunistically. Defaults are aligned with the server contract:
 
-- 6-hour upload interval
+- 5-minute upload interval
 - 7 UTC days per batch
 - 6-day offline age plus the current day
 - 50 event/dimension counters per day

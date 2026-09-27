@@ -38,7 +38,7 @@ public struct FoundationPaywallConfiguration {
     /// Required so every paywall ships usable legal links; there is no fallback.
     public let termsURL: URL
 
-    /// Shows native App Store offer-code redemption from the canonical Pro paywall.
+    /// Retained for source compatibility. The canonical Pro paywall no longer shows a redeem-code action.
     public let showsRedeemCode: Bool
 
     /// Retained for source compatibility with configurations that explicitly

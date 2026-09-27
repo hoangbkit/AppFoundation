@@ -46,7 +46,7 @@ Supplying only a `PurchaseManager` provides the common baseline.
 - Force product reload
 - Reset simulated purchases
 
-The simulated plan editor can add, remove, reorder, enable, and disable products; edit product IDs, names, descriptions, displayed prices, numeric prices, and billing periods; choose which products unlock Pro; and select the preferred plan.
+The simulated plan editor can add, remove, reorder, enable, and disable products; edit product IDs, names, descriptions, displayed prices, numeric prices, billing periods, introductory-offer mode, eligibility, duration, and price; choose which products unlock Pro; and select the preferred plan.
 
 Editing simulated pricing never changes App Store Connect pricing. The controller keeps its original live `PurchaseConfiguration` separate from the Debug simulated configuration.
 

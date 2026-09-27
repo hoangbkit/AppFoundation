@@ -61,7 +61,6 @@ The canonical `ProPaywallView` records only this bounded commerce funnel when th
 - `purchase_started`, `purchase_succeeded`, `purchase_pending`, or `purchase_cancelled` with the same bounded plan dimension
 - `purchase_failed` using `<plan>:<PurchaseFailure.Code>`
 - `restore_started`, `restore_succeeded`, `restore_nothing_to_restore`, or `restore_failed`
-- `offer_code_opened`, `offer_code_succeeded`, or `offer_code_failed`
 
 The paywall never sends product identifiers, StoreKit transaction identifiers, prices, receipts, localized error messages, or user content.
 

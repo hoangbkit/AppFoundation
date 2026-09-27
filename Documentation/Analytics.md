@@ -2,7 +2,7 @@
 
 `AppFoundation` includes a lightweight first-party analytics client for the native `/v1/analytics/batch` contract in `analytics-server`.
 
-It is intentionally small: apps explicitly record product events while the foundation handles stable installation identity, foreground session accounting, local cumulative counters, bounded offline storage, and batched uploads.
+It is intentionally small: apps explicitly record their own product events while the foundation handles stable installation identity, foreground session accounting, local cumulative counters, bounded offline storage, and batched uploads. When `.managesAnalytics(...)` is installed, AppFoundation-owned purchase surfaces may also reuse that same optional client for a small bounded commerce funnel.
 
 ## Server requirements
 
@@ -48,6 +48,21 @@ Attach lifecycle management to the main app content:
 ContentView()
     .managesAnalytics(analytics)
 ```
+
+The modifier also places that same optional app-scoped client into AppFoundation's SwiftUI environment. If analytics is not configured, package-owned views remain silent and fully functional.
+
+### Automatic Pro paywall events
+
+The canonical `ProPaywallView` records only this bounded commerce funnel when the shared analytics client is present:
+
+- `paywall_viewed`
+- `paywall_closed`
+- `paywall_plan_selected` with `monthly`, `yearly`, `recurring`, or `lifetime`
+- `purchase_started`, `purchase_succeeded`, `purchase_pending`, or `purchase_cancelled` with the same bounded plan dimension
+- `purchase_failed` using `<plan>:<PurchaseFailure.Code>`
+- `restore_started`, `restore_succeeded`, `restore_nothing_to_restore`, or `restore_failed`
+
+The paywall never sends product identifiers, StoreKit transaction identifiers, prices, receipts, localized error messages, or user content.
 
 On iOS, lifecycle tracking uses `UIApplication.didBecomeActiveNotification` and `UIApplication.willResignActiveNotification`. It is application-level rather than view-level, so navigation and scene content changes inside the active app do not end a session.
 

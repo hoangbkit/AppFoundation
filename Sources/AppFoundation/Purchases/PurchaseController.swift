@@ -216,9 +216,11 @@ public final class PurchaseController {
         activeConfiguration.entitledProductIDs
     }
 
-    /// Loaded products that currently grant Pro.
+    /// Loaded products that both grant Pro and use a supported entitlement product type.
     public var entitlementProducts: [StoreProduct] {
-        products.filter { entitledProductIDs.contains($0.id) }
+        products.filter {
+            entitledProductIDs.contains($0.id) && $0.isSupportedProProduct
+        }
     }
 
     public var preferredProduct: StoreProduct? {
@@ -1083,7 +1085,9 @@ public final class PurchaseController {
             return nil
         }
 
-        guard activeConfiguration.productIDs.contains(product.id) else {
+        guard activeConfiguration.productIDs.contains(product.id),
+              (self.product(withID: product.id) ?? product).isSupportedProProduct
+        else {
             activity = .failed(.productUnavailable)
             return nil
         }

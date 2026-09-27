@@ -6,6 +6,19 @@ AppFoundation follows semantic versioning.
 
 ## Unreleased
 
+### Added
+
+- Added binary effective purchase access with `PurchaseAccessState`: app-facing authorization is always Free or Pro while live StoreKit verification remains available separately through `entitlementState`.
+- Added opt-in verified offline entitlement persistence with account-scoped Keychain storage, lifetime continuity, bounded subscription and Family Sharing access, clock-rollback protection, and background verification retries.
+- Added StoreKit account/environment, ownership, transaction, grace-period, and subscription-state metadata needed for safe entitlement reconciliation.
+
+### Changed
+
+- `hasPro` and the compatibility `isEntitled` alias now follow effective authorization rather than raw live StoreKit state.
+- Purchase authorization is independent from product-catalog availability, and subscription-status changes can refresh entitlement state without requiring a new transaction.
+- StoreKit transaction observation is scoped to configured entitlement products when using AppFoundation's built-in service, while custom `PurchaseServing` implementations retain their existing integration path.
+
+
 ### Removed
 
 - Removed the unsupported macOS implementations, tests, documentation, and Demo target; AppFoundation now contains only its declared iOS support surface.

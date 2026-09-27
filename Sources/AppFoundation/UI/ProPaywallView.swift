@@ -109,6 +109,7 @@ public struct ProPaywallView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close", systemImage: "xmark") { close() }
                         .labelStyle(.iconOnly)
+                        .disabled(purchases.isBusy)
                 }
             }
             .toolbarBackground(.hidden, for: .navigationBar)

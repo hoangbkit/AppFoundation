@@ -89,7 +89,7 @@ struct MyApp: App {
 - Debug-only in-process purchase simulation
 - `PurchaseManager` and simple `hasPro` entitlement access
 - Weekly, monthly, yearly, and non-consumable lifetime plans
-- Theme-aware `ProPaywallView` as the canonical paywall; deprecated `PaywallView` and `FoundationPaywallView` remain available for source compatibility
+- Theme-aware `ProPaywallView` as the canonical paywall, including introductory offers, native offer-code redemption, purchase/restore callbacks, and optional bounded commerce analytics; deprecated `PaywallView` and `FoundationPaywallView` remain available for source compatibility
 - Premium gates, badges, locked overlays, settings sections, and limit-reached upsells
 - Access policy that can keep existing user-created content available after entitlement expiry
 
@@ -168,7 +168,7 @@ Built-in tools include:
 - Current entitlement and product loading state
 - Loaded product names and prices
 - Direct Free/Pro simulated entitlement selection
-- Editable simulated products, ordering, entitlement mapping, preferred plan, prices, and billing periods
+- Editable simulated products, ordering, entitlement mapping, preferred plan, prices, billing periods, and introductory-offer eligibility/copy
 - Success, pending, cancellation, network, unavailable-product, and system purchase outcomes
 - Product-loading and restore failure injection
 - Simulated StoreKit latency

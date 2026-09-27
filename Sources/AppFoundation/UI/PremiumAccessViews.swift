@@ -132,8 +132,8 @@ public struct SubscriptionSettingsSection: View {
                 Button("Upgrade to Pro", systemImage: "crown") { onUpgrade() }
             }
             Button("Restore Purchases", systemImage: "arrow.clockwise") { restore() }
-                .disabled(purchaseManager.isBusy)
-            if purchaseManager.products.contains(where: \.isRecurring) {
+                .disabled(purchaseManager.isBusy || purchaseManager.isPurchasePending)
+            if purchaseManager.activeSubscriptionProduct != nil {
                 Button("Manage Subscription", systemImage: "creditcard") {
                     if let url = URL(string: "https://apps.apple.com/account/subscriptions") {
                         openURL(url)

@@ -78,7 +78,7 @@ struct MyApp: App {
 
 `PurchaseManager` is the preferred source-compatible name for the existing `PurchaseController`. Existing apps do not need an immediate migration.
 
-Verified StoreKit transactions remain the source of truth. Do not mirror `hasPro` into `UserDefaults` as an authorization source.
+`hasPro` is the app-facing authorization source. Live verified StoreKit remains authoritative, while the optional verified entitlement cache may preserve only previously verified safe access during temporary StoreKit unavailability. Do not mirror `hasPro` into `UserDefaults` as an authorization source.
 
 ## Included infrastructure
 
@@ -89,11 +89,11 @@ Verified StoreKit transactions remain the source of truth. Do not mirror `hasPro
 - Debug-only in-process purchase simulation
 - `PurchaseManager` and simple `hasPro` entitlement access
 - Weekly, monthly, yearly, and non-consumable lifetime plans
-- Theme-aware `ProPaywallView` as the canonical paywall; deprecated `PaywallView` and `FoundationPaywallView` remain available for source compatibility
+- Theme-aware `ProPaywallView` as the canonical paywall, including introductory offers, native offer-code redemption, purchase/restore callbacks, and optional bounded commerce analytics; deprecated `PaywallView` and `FoundationPaywallView` remain available for source compatibility
 - Premium gates, badges, locked overlays, settings sections, and limit-reached upsells
 - Access policy that can keep existing user-created content available after entitlement expiry
 
-AppFoundation presents configured entitlement products in `PurchaseConfiguration.productIDs` order. Subscription prices and periods come from StoreKit. A configured entitlement product without a subscription period is treated as lifetime access and uses one-time-purchase disclosure instead of renewal wording.
+AppFoundation presents supported entitlement products in `PurchaseConfiguration.productIDs` order. Auto-renewable subscriptions use StoreKit prices, periods, and introductory-offer eligibility. Non-consumables are treated as Lifetime. Consumables, non-renewing subscriptions, and unknown product types are not treated as Pro entitlement plans.
 
 ### Analytics
 
@@ -168,7 +168,7 @@ Built-in tools include:
 - Current entitlement and product loading state
 - Loaded product names and prices
 - Direct Free/Pro simulated entitlement selection
-- Editable simulated products, ordering, entitlement mapping, preferred plan, prices, and billing periods
+- Editable simulated products, ordering, entitlement mapping, preferred plan, prices, billing periods, and introductory-offer eligibility/copy
 - Success, pending, cancellation, network, unavailable-product, and system purchase outcomes
 - Product-loading and restore failure injection
 - Simulated StoreKit latency

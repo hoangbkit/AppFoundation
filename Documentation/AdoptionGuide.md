@@ -14,7 +14,7 @@ Use AppFoundation for infrastructure whose behavior should remain consistent acr
 
 Create a `PurchaseConfiguration` per app. Product order is preserved and controls paywall order. The optional preferred product becomes the initial paywall selection.
 
-Recurring products use their StoreKit subscription period, including weekly, monthly, and yearly durations. A configured entitlement product without a subscription period is presented as lifetime access; in App Store Connect this should normally be a non-consumable in-app purchase.
+Auto-renewable products use their StoreKit subscription period, including weekly, monthly, and yearly durations. Verified non-consumables are presented as Lifetime. Consumables and non-renewing subscriptions are unsupported as Pro entitlement products and are excluded from AppFoundation purchase surfaces.
 
 All configured products belong in `productIDs`, and all should remain in `entitledProductIDs` unless an app intentionally sells a product that does not unlock Pro:
 
@@ -30,7 +30,7 @@ let purchases = PurchaseConfiguration(
 )
 ```
 
-Call `prepare()` through `.managesPurchases` or manually from the app lifecycle. Read `hasPro`, `entitlementState.isActive`, or `isEntitled` wherever premium access is required.
+Call `prepare()` through `.managesPurchases` or manually from the app lifecycle. Use `hasPro` for normal premium authorization. `isEntitled` remains a compatibility alias. `entitlementState` exposes live StoreKit verification state and may be inactive while safe verified offline access still keeps `hasPro` true.
 
 Lifetime does not require a separate entitlement flag. StoreKit returns the verified non-consumable in `Transaction.currentEntitlements` without an expiration date, and the existing evaluator keeps that entitlement active unless it is revoked.
 

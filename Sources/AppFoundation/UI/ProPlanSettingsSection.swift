@@ -95,6 +95,10 @@ public struct ProPlanSettingsSection: View {
                 restoreFeedback
             }
             .padding(.vertical, 4)
+            .task {
+                await purchaseManager.prepare()
+                restoreModel.reconcile(using: purchaseManager)
+            }
             .onAppear { restoreModel.reconcile(using: purchaseManager) }
             .onChange(of: purchaseManager.activity) { _, _ in
                 restoreModel.reconcile(using: purchaseManager)
@@ -164,7 +168,7 @@ public struct ProPlanSettingsSection: View {
                 }
 
                 if purchaseManager.hasPro,
-                   purchaseManager.activeProduct?.isRecurring == true,
+                   purchaseManager.activeSubscriptionProduct != nil,
                    let manageSubscriptionsURL = configuration.manageSubscriptionsURL {
                     actionPill(
                         configuration.manageSubscriptionTitle,
@@ -248,8 +252,16 @@ public struct ProPlanSettingsSection: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(theme.primaryForegroundColor)
-        .disabled(purchaseManager.isBusy && restoreModel.phase != .restoring)
-        .opacity(purchaseManager.isBusy && restoreModel.phase != .restoring ? 0.5 : 1)
+        .disabled(
+            (purchaseManager.isBusy && restoreModel.phase != .restoring)
+                || purchaseManager.isPurchasePending
+        )
+        .opacity(
+            (purchaseManager.isBusy && restoreModel.phase != .restoring)
+                || purchaseManager.isPurchasePending
+                ? 0.5
+                : 1
+        )
     }
 
     @ViewBuilder

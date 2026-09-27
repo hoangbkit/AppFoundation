@@ -59,9 +59,8 @@ public struct PaywallView: View {
             }
             .toolbarBackground(.hidden, for: .navigationBar)
             .task {
-                if purchaseManager.products.isEmpty {
-                    await purchaseManager.loadProducts(force: true)
-                }
+                await purchaseManager.refreshProductsForPresentation()
+                await purchaseManager.refreshEntitlements()
                 selectDefaultProduct()
             }
             .onChange(of: purchaseManager.products) { _, _ in
@@ -145,7 +144,7 @@ public struct PaywallView: View {
             .padding(.vertical, 16)
         case .loaded:
             LazyVGrid(columns: planColumns, spacing: 12) {
-                ForEach(purchaseManager.products) { product in
+                ForEach(paywallProducts) { product in
                     planOption(product)
                 }
             }
@@ -227,7 +226,7 @@ public struct PaywallView: View {
         .buttonStyle(.borderedProminent)
         .tint(theme.accent)
         .clipShape(Capsule())
-        .disabled(selectedProduct == nil || purchaseManager.isBusy)
+        .disabled(selectedProduct == nil || purchaseManager.isBusy || purchaseManager.isPurchasePending)
         .accessibilityIdentifier("paywall.purchase")
     }
 
@@ -255,8 +254,9 @@ public struct PaywallView: View {
         VStack(spacing: 10) {
             HStack(spacing: 16) {
                 Button("Restore Purchases") { restore() }
+                    .disabled(purchaseManager.isBusy || purchaseManager.isPurchasePending)
 
-                if purchaseManager.products.contains(where: \.isRecurring) {
+                if purchaseManager.activeSubscriptionProduct != nil {
                     Button("Manage Subscription") {
                         if let url = URL(string: "https://apps.apple.com/account/subscriptions") {
                             openURL(url)
@@ -270,7 +270,7 @@ public struct PaywallView: View {
                 if let privacyURL = configuration.privacyURL { Link("Privacy", destination: privacyURL) }
             }
 
-            Text(PurchasePlanDisclosure.text(for: purchaseManager.products))
+            Text(PurchasePlanDisclosure.text(for: paywallProducts))
                 .font(.caption2)
                 .foregroundStyle(theme.secondaryForeground)
                 .multilineTextAlignment(.center)
@@ -289,7 +289,7 @@ public struct PaywallView: View {
     }
 
     private var planColumns: [GridItem] {
-        if purchaseManager.products.count <= 1 || dynamicTypeSize.isAccessibilitySize {
+        if paywallProducts.count <= 1 || dynamicTypeSize.isAccessibilitySize {
             return [GridItem(.flexible())]
         }
         return [GridItem(.flexible()), GridItem(.flexible())]
@@ -302,19 +302,31 @@ public struct PaywallView: View {
         )
     }
 
+    private var paywallProducts: [PurchaseProduct] {
+        purchaseManager.entitlementProducts
+    }
+
     private var selectedProduct: PurchaseProduct? {
-        selectedProductID.flatMap(purchaseManager.product(withID:))
-            ?? purchaseManager.preferredProduct
+        guard let selectedProductID else {
+            return purchaseManager.preferredEntitlementProduct
+        }
+        return paywallProducts.first(where: { $0.id == selectedProductID })
     }
 
     private func selectDefaultProduct() {
-        guard selectedProductID == nil
-            || purchaseManager.product(withID: selectedProductID ?? "") == nil
-        else { return }
+        if let selectedProductID,
+           paywallProducts.contains(where: { $0.id == selectedProductID }) {
+            return
+        }
 
-        selectedProductID = configuration.preferredProductID
-            .flatMap(purchaseManager.product(withID:))?.id
-            ?? purchaseManager.preferredProduct?.id
+        if let preferredProductID = configuration.preferredProductID,
+           paywallProducts.contains(where: { $0.id == preferredProductID }) {
+            selectedProductID = preferredProductID
+            return
+        }
+
+        selectedProductID = purchaseManager.preferredEntitlementProduct?.id
+            ?? paywallProducts.first?.id
     }
 
     private func restore() {

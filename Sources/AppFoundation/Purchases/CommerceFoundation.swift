@@ -62,9 +62,4 @@ public typealias PurchaseManager = PurchaseController
 
 /// The preferred neutral name for a StoreKit product exposed by AppFoundation.
 public typealias PurchaseProduct = StoreProduct
-
-extension PurchaseController {
-    /// The simple entitlement property apps should use for normal feature gating.
-    public var hasPro: Bool { isEntitled }
-}
 #endif

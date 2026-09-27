@@ -22,6 +22,13 @@ public enum PurchaseActivity: Sendable, Equatable {
             false
         }
     }
+
+    public var isPending: Bool {
+        if case .pending = self {
+            return true
+        }
+        return false
+    }
 }
 
 public enum PurchaseOutcome: Sendable, Equatable {
@@ -45,6 +52,7 @@ public struct PurchaseFailure: Error, LocalizedError, Sendable, Equatable, Hasha
         case verificationFailed
         case storefrontUnavailable
         case notEntitled
+        case operationInProgress
         case system
         case timeout
         case userCancelled
@@ -59,9 +67,7 @@ public struct PurchaseFailure: Error, LocalizedError, Sendable, Equatable, Hasha
         self.message = message
     }
 
-    public var errorDescription: String? {
-        message
-    }
+    public var errorDescription: String? { message }
 
     public static let noProductsAvailable = PurchaseFailure(
         code: .noProductsAvailable,
@@ -78,20 +84,21 @@ public struct PurchaseFailure: Error, LocalizedError, Sendable, Equatable, Hasha
         message: "The App Store purchase could not be verified."
     )
 
+    public static let operationInProgress = PurchaseFailure(
+        code: .operationInProgress,
+        message: "Another purchase operation is already in progress."
+    )
+
     public static let unknown = PurchaseFailure(
         code: .unknown,
         message: "Something went wrong. Please try again."
     )
 
-    /// The App Store did not answer within the allotted timeout.
-    ///
-    /// The underlying request may still complete later; its result is discarded.
     public static let timeout = PurchaseFailure(
         code: .timeout,
         message: "The App Store isn't responding. Please try again."
     )
 
-    /// The user dismissed an App Store prompt or cancelled the operation.
     public static let userCancelled = PurchaseFailure(
         code: .userCancelled,
         message: "Canceled."

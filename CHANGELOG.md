@@ -6,6 +6,28 @@ AppFoundation follows semantic versioning.
 
 ## Unreleased
 
+### Added
+
+- Added binary effective purchase access with `PurchaseAccessState`: app-facing authorization is always Free or Pro while live StoreKit verification remains available separately through `entitlementState`.
+- Added opt-in verified offline entitlement persistence with account-scoped Keychain storage, lifetime continuity, bounded subscription and Family Sharing access, clock-rollback protection, and background verification retries.
+- Added StoreKit account/environment, ownership, transaction, grace-period, and subscription-state metadata needed for safe entitlement reconciliation.
+- Added optional app-scoped analytics environment sharing so AppFoundation-owned purchase views can reuse the client installed by `.managesAnalytics(...)`.
+- Added native offer-code redemption and optional purchase/restore/close callbacks to the canonical `ProPaywallView`.
+- Added introductory-offer editing and eligibility simulation to Debug Developer Tools.
+
+### Changed
+
+- `hasPro` and the compatibility `isEntitled` alias now follow effective authorization rather than raw live StoreKit state.
+- Purchase authorization is independent from product-catalog availability, and subscription-status changes can refresh entitlement state without requiring a new transaction.
+- StoreKit transaction observation is scoped to configured entitlement products when using AppFoundation's built-in service, while custom `PurchaseServing` implementations retain their existing integration path.
+- Store products now retain their real StoreKit type and introductory-offer eligibility, preventing unsupported products from being treated as Lifetime Pro plans.
+- Purchase surfaces can refresh product metadata stale-while-revalidate: existing plans remain usable if a metadata refresh fails.
+- Added entitlement-only product helpers, Lifetime-first active plan selection, separate active-subscription lookup, and explicit pending-purchase blocking.
+- Updated `ProPaywallView` to use entitlement-only plans, stale-while-revalidate metadata, introductory-offer copy, pending-purchase UI, and bounded automatic commerce analytics when configured.
+- Updated `ProPlanSettingsSection` to prepare commerce state itself, block restore during pending purchases, and keep Manage subscription available when Lifetime and a recurring entitlement coexist.
+- Kept deprecated paywall/settings compatibility surfaces aligned with the new model: they now filter to supported entitlement products, respect pending purchases, and expose subscription management only for an active recurring entitlement.
+
+
 ### Removed
 
 - Removed the unsupported macOS implementations, tests, documentation, and Demo target; AppFoundation now contains only its declared iOS support surface.

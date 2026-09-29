@@ -62,9 +62,10 @@ Create one `ThemeManager` near the app root and synchronize it with verified pur
 
 RootView()
     .environment(themes)
-    .appFoundationTheme(themes)
-    .synchronizesThemeAccess(themes, hasPro: purchases.hasPro)
+    .appFoundationTheme(themes, purchaseManager: purchases)
 ```
+
+Use the purchase-aware overload when themes include Pro access. While StoreKit is still checking entitlements, it keeps the persisted selection visible instead of briefly flashing through the Free fallback. Once checking resolves, normal Free/Pro gating applies.
 
 The default `.miLoveStyle` preview behavior gives free users five minutes to try Pro themes. Use `.disabled` when tapping a Pro theme should open the paywall immediately.
 

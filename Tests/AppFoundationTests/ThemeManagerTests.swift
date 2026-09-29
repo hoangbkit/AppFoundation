@@ -68,7 +68,7 @@ final class ThemeManagerTests: XCTestCase {
         XCTAssertEqual(manager.effectiveTheme.id, "rose")
     }
 
-    func testInitializationPreservesPersistedLastKnownProWhenAccessIsUnresolved() {
+    func testInitializationPreservesLastKnownProWithoutGrantingAccess() {
         let clock = TestClock(now: Date(timeIntervalSince1970: 1_000))
         let store = MemoryThemeStore()
         store.state = ThemeStoredState(
@@ -82,9 +82,13 @@ final class ThemeManagerTests: XCTestCase {
             now: { clock.now }
         )
 
-        XCTAssertTrue(manager.hasPro)
-        XCTAssertEqual(manager.effectiveTheme.id, "midnight")
+        XCTAssertFalse(manager.hasPro)
+        XCTAssertEqual(manager.effectiveTheme.id, "rose")
         XCTAssertTrue(store.state.lastKnownHasPro)
+        XCTAssertEqual(
+            manager.effectiveTheme(entitlementState: .checking, hasPro: false).id,
+            "midnight"
+        )
     }
 
     func testCheckingEntitlementPreservesPersistedProThemeUntilResolution() {
@@ -122,9 +126,12 @@ final class ThemeManagerTests: XCTestCase {
 
         manager.synchronizeProAccess(false, entitlementState: .checking)
 
-        XCTAssertTrue(manager.hasPro)
+        XCTAssertFalse(manager.hasPro)
         XCTAssertTrue(store.state.lastKnownHasPro)
-        XCTAssertEqual(manager.effectiveTheme.id, "midnight")
+        XCTAssertEqual(
+            manager.effectiveTheme(entitlementState: .checking, hasPro: false).id,
+            "midnight"
+        )
 
         manager.synchronizeProAccess(false, entitlementState: .inactive)
 

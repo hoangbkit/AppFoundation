@@ -51,20 +51,22 @@ public final class ThemeManager {
     public init(
         catalog: ThemeCatalog = .foundationDefaults,
         stateStore: any ThemeStateStoring = UserDefaultsThemeStateStore(),
-        hasPro: Bool = false,
+        hasPro: Bool? = nil,
         previewBehavior: ThemePreviewBehavior = .miLoveStyle,
         now: @escaping @MainActor () -> Date = { .now },
         stateDidChange: @escaping @MainActor (ThemeResolution) -> Void = { _ in }
     ) {
         self.catalog = catalog
         self.stateStore = stateStore
-        self.hasPro = hasPro
         self.previewBehavior = previewBehavior
         self.now = now
         self.stateDidChange = stateDidChange
 
         var loaded = stateStore.load()
-        loaded.lastKnownHasPro = hasPro
+        self.hasPro = hasPro ?? false
+        if let hasPro {
+            loaded.lastKnownHasPro = hasPro
+        }
         self.storedState = Self.normalized(loaded, catalog: catalog, now: now())
         stateStore.save(self.storedState)
         schedulePreviewExpirationIfNeeded()
@@ -80,6 +82,33 @@ public final class ThemeManager {
 
     public var selectedTheme: AppTheme { resolution.selectedTheme }
     public var effectiveTheme: AppTheme { resolution.effectiveTheme }
+
+    /// Resolves the visual theme against live purchase verification state.
+    ///
+    /// While StoreKit is still checking, preserve the persisted selection (or an
+    /// active preview) instead of temporarily treating the user as confirmed Free.
+    public func effectiveTheme(
+        entitlementState: EntitlementState,
+        hasPro: Bool
+    ) -> AppTheme {
+        if case .checking = entitlementState {
+            let checkingResolution = ThemeResolver.resolve(
+                catalog: catalog,
+                state: storedState,
+                hasPro: false,
+                now: now()
+            )
+            return checkingResolution.previewTheme ?? checkingResolution.selectedTheme
+        }
+
+        return ThemeResolver.resolve(
+            catalog: catalog,
+            state: storedState,
+            hasPro: hasPro,
+            now: now()
+        ).effectiveTheme
+    }
+
     public var previewTheme: AppTheme? { resolution.previewTheme }
     public var previewExpiresAt: Date? { resolution.previewExpiresAt }
     public var isPreviewActive: Bool { resolution.isPreviewActive }
@@ -146,6 +175,16 @@ public final class ThemeManager {
         guard storedState.previewThemeID != nil || storedState.previewExpiresAt != nil else { return }
         clearPreviewState()
         persistAndNotify()
+    }
+
+    public func synchronizeProAccess(
+        _ isUnlocked: Bool,
+        entitlementState: EntitlementState
+    ) {
+        guard case .checking = entitlementState else {
+            synchronizeProAccess(isUnlocked)
+            return
+        }
     }
 
     public func synchronizeProAccess(_ isUnlocked: Bool) {

@@ -51,6 +51,18 @@ ContentView()
 
 The modifier also places that same optional app-scoped client into AppFoundation's SwiftUI environment. If analytics is not configured, package-owned views remain silent and fully functional.
 
+To keep analytics integrated while disabling collection and uploads, set `enabled: false`:
+
+```swift
+AppAnalyticsConfiguration(
+    appID: "my-app",
+    baseURL: URL(string: "https://api.example.com")!,
+    enabled: false
+)
+```
+
+Disabled analytics is fully inert: event/error tracking, lifecycle accounting, opportunistic uploads, and explicit `flush()` calls are no-ops. No analytics state is read or written, and no installation identity is created while disabled. Previously persisted analytics state remains untouched and is not uploaded until analytics is enabled again; `resetLocalState()` remains available if the app wants to discard that state explicitly. The default is `enabled: true`.
+
 ### Automatic Pro paywall events
 
 The canonical `ProPaywallView` records only this bounded commerce funnel when the shared analytics client is present:

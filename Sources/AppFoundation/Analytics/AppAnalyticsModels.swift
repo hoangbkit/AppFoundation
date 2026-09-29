@@ -7,6 +7,7 @@ public struct AppAnalyticsConfiguration: Sendable {
     public var appID: String
     public var appKey: String?
     public var baseURL: URL
+    public var enabled: Bool
     public var keychainService: String
     public var stateStorageKey: String
     public var appVersion: String?
@@ -17,6 +18,7 @@ public struct AppAnalyticsConfiguration: Sendable {
         appID: String,
         appKey: String? = nil,
         baseURL: URL,
+        enabled: Bool = true,
         keychainService: String = "com.hoangbkit.AppFoundation.AppAI",
         stateStorageKey: String? = nil,
         appVersion: String? = nil,
@@ -26,6 +28,7 @@ public struct AppAnalyticsConfiguration: Sendable {
         self.appID = appID
         self.appKey = appKey
         self.baseURL = baseURL
+        self.enabled = enabled
         self.keychainService = keychainService
         self.stateStorageKey = stateStorageKey
             ?? "com.hoangbkit.AppFoundation.analytics.\(appID)"

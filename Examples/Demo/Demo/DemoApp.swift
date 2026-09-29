@@ -24,8 +24,7 @@ struct DemoApp: App {
                 .environment(purchases)
                 .environment(themes)
                 .managesPurchases(purchases)
-                .appFoundationTheme(themes)
-                .synchronizesThemeAccess(themes, hasPro: purchases.hasPro)
+                .appFoundationTheme(themes, purchaseManager: purchases)
         }
     }
 }

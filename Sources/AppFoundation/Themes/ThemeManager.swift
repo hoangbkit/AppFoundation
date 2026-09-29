@@ -63,9 +63,10 @@ public final class ThemeManager {
         self.stateDidChange = stateDidChange
 
         var loaded = stateStore.load()
-        let resolvedHasPro = hasPro ?? loaded.lastKnownHasPro
-        self.hasPro = resolvedHasPro
-        loaded.lastKnownHasPro = resolvedHasPro
+        self.hasPro = hasPro ?? false
+        if let hasPro {
+            loaded.lastKnownHasPro = hasPro
+        }
         self.storedState = Self.normalized(loaded, catalog: catalog, now: now())
         stateStore.save(self.storedState)
         schedulePreviewExpirationIfNeeded()

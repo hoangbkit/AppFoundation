@@ -68,6 +68,71 @@ final class ThemeManagerTests: XCTestCase {
         XCTAssertEqual(manager.effectiveTheme.id, "rose")
     }
 
+    func testInitializationPreservesPersistedLastKnownProWhenAccessIsUnresolved() {
+        let clock = TestClock(now: Date(timeIntervalSince1970: 1_000))
+        let store = MemoryThemeStore()
+        store.state = ThemeStoredState(
+            selectedThemeID: "midnight",
+            lastKnownHasPro: true
+        )
+
+        let manager = ThemeManager(
+            stateStore: store,
+            previewBehavior: ThemePreviewBehavior(schedulesAutomaticExpiration: false),
+            now: { clock.now }
+        )
+
+        XCTAssertTrue(manager.hasPro)
+        XCTAssertEqual(manager.effectiveTheme.id, "midnight")
+        XCTAssertTrue(store.state.lastKnownHasPro)
+    }
+
+    func testCheckingEntitlementPreservesPersistedProThemeUntilResolution() {
+        let clock = TestClock(now: Date(timeIntervalSince1970: 1_000))
+        let store = MemoryThemeStore()
+        store.state = ThemeStoredState(
+            selectedThemeID: "midnight",
+            lastKnownHasPro: false
+        )
+        let manager = makeManager(clock: clock, store: store, hasPro: false)
+
+        XCTAssertEqual(manager.effectiveTheme.id, "rose")
+        XCTAssertEqual(
+            manager.effectiveTheme(entitlementState: .checking, hasPro: false).id,
+            "midnight"
+        )
+        XCTAssertEqual(
+            manager.effectiveTheme(entitlementState: .inactive, hasPro: false).id,
+            "rose"
+        )
+    }
+
+    func testCheckingEntitlementDoesNotOverwriteLastKnownProAccess() {
+        let clock = TestClock(now: Date(timeIntervalSince1970: 1_000))
+        let store = MemoryThemeStore()
+        store.state = ThemeStoredState(
+            selectedThemeID: "midnight",
+            lastKnownHasPro: true
+        )
+        let manager = ThemeManager(
+            stateStore: store,
+            previewBehavior: ThemePreviewBehavior(schedulesAutomaticExpiration: false),
+            now: { clock.now }
+        )
+
+        manager.synchronizeProAccess(false, entitlementState: .checking)
+
+        XCTAssertTrue(manager.hasPro)
+        XCTAssertTrue(store.state.lastKnownHasPro)
+        XCTAssertEqual(manager.effectiveTheme.id, "midnight")
+
+        manager.synchronizeProAccess(false, entitlementState: .inactive)
+
+        XCTAssertFalse(manager.hasPro)
+        XCTAssertFalse(store.state.lastKnownHasPro)
+        XCTAssertEqual(manager.effectiveTheme.id, "rose")
+    }
+
     private func makeManager(
         clock: TestClock,
         store: MemoryThemeStore = MemoryThemeStore(),

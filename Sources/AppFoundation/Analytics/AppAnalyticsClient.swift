@@ -330,6 +330,7 @@ public actor AppAnalyticsClient {
         dimension: String? = nil,
         count: Int = 1
     ) async throws {
+        guard configuration.enabled else { return }
         try Self.validateEvent(name: name, dimension: dimension, count: count)
         let timestamp = now()
         var state = try await loadState()
@@ -377,6 +378,7 @@ public actor AppAnalyticsClient {
         severity: AppAnalyticsErrorSeverity = .error,
         count: Int = 1
     ) async throws {
+        guard configuration.enabled else { return }
         try Self.validateError(code: code, component: component, count: count)
 
         let timestamp = now()
@@ -423,6 +425,7 @@ public actor AppAnalyticsClient {
     }
 
     public func applicationDidBecomeActive(at timestamp: Date = Date()) async throws {
+        guard configuration.enabled else { return }
         var state = try await loadState()
         pruneExpiredDays(in: &state, relativeTo: timestamp)
 
@@ -460,6 +463,7 @@ public actor AppAnalyticsClient {
     }
 
     public func applicationWillResignActive(at timestamp: Date = Date()) async throws {
+        guard configuration.enabled else { return }
         var state = try await loadState()
         pruneExpiredDays(in: &state, relativeTo: timestamp)
         if state.session?.activeSince != nil {
@@ -475,6 +479,7 @@ public actor AppAnalyticsClient {
     }
 
     public func flush() async throws {
+        guard configuration.enabled else { return }
         try await flush(at: now(), force: true)
     }
 
@@ -489,10 +494,12 @@ public actor AppAnalyticsClient {
     }
 
     private func flushIfDue(at timestamp: Date) async throws {
+        guard configuration.enabled else { return }
         try await flush(at: timestamp, force: false)
     }
 
     private func flush(at timestamp: Date, force: Bool) async throws {
+        guard configuration.enabled else { return }
         var state = try await loadState()
         pruneExpiredDays(in: &state, relativeTo: timestamp)
         checkpointActiveSession(in: &state, at: timestamp)

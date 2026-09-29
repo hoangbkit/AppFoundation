@@ -48,55 +48,63 @@ jobs:
           echo "release_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "Build release: $tag"
 
-      - name: Archive unsigned iOS Demo
+      - name: Archive unsigned iOS Demo (Debug and Release)
         shell: bash
         working-directory: Examples/Demo
         run: |
-          IOS_DERIVED="$RUNNER_TEMP/AppFoundationDemo-iOS"
-          IOS_ARCHIVE="$RUNNER_TEMP/AppFoundationDemo.xcarchive"
           SOURCE_PACKAGES="$RUNNER_TEMP/AppFoundationDemo-SourcePackages"
           ARTIFACTS="$GITHUB_WORKSPACE/artifacts"
-
-          args=(
-            -project Demo.xcodeproj
-            -scheme Demo
-            -configuration Release
-            -sdk iphoneos
-            -destination "generic/platform=iOS"
-            -derivedDataPath "$IOS_DERIVED"
-            -clonedSourcePackagesDirPath "$SOURCE_PACKAGES"
-            -archivePath "$IOS_ARCHIVE"
-            CODE_SIGNING_ALLOWED=NO
-            CODE_SIGNING_REQUIRED=NO
-            archive
-          )
-          xcodebuild "${args[@]}"
-
-          test -d "$IOS_ARCHIVE"
-          IOS_APP_COUNT="$(find "$IOS_ARCHIVE/Products/Applications" -maxdepth 1 -type d -name '*.app' -print | wc -l | tr -d ' ')"
-          if [[ "$IOS_APP_COUNT" != "1" ]]; then
-            echo "error: expected exactly one iOS app in archive, found $IOS_APP_COUNT" >&2
-            exit 1
-          fi
-
           mkdir -p "$ARTIFACTS"
-          ditto -c -k --sequesterRsrc --keepParent             "$IOS_ARCHIVE"             "$ARTIFACTS/AppFoundationDemo-iOS-unsigned-${{ steps.release.outputs.tag }}.xcarchive.zip"
 
-          rm -rf "$IOS_DERIVED" "$IOS_ARCHIVE"
+          for CONFIGURATION in Debug Release; do
+            IOS_DERIVED="$RUNNER_TEMP/AppFoundationDemo-iOS-$CONFIGURATION"
+            IOS_ARCHIVE="$RUNNER_TEMP/AppFoundationDemo-$CONFIGURATION.xcarchive"
 
-      - name: Verify release archive
+            args=(
+              -project Demo.xcodeproj
+              -scheme Demo
+              -configuration "$CONFIGURATION"
+              -sdk iphoneos
+              -destination "generic/platform=iOS"
+              -derivedDataPath "$IOS_DERIVED"
+              -clonedSourcePackagesDirPath "$SOURCE_PACKAGES"
+              -archivePath "$IOS_ARCHIVE"
+              CODE_SIGNING_ALLOWED=NO
+              CODE_SIGNING_REQUIRED=NO
+              archive
+            )
+            xcodebuild "${args[@]}"
+
+            test -d "$IOS_ARCHIVE"
+            IOS_APP_COUNT="$(find "$IOS_ARCHIVE/Products/Applications" -maxdepth 1 -type d -name '*.app' -print | wc -l | tr -d ' ')"
+            if [[ "$IOS_APP_COUNT" != "1" ]]; then
+              echo "error: expected exactly one iOS app in $CONFIGURATION archive, found $IOS_APP_COUNT" >&2
+              exit 1
+            fi
+
+            CONFIGURATION_LOWER="$(echo "$CONFIGURATION" | tr '[:upper:]' '[:lower:]')"
+            ditto -c -k --sequesterRsrc --keepParent \
+              "$IOS_ARCHIVE" \
+              "$ARTIFACTS/AppFoundationDemo-iOS-$CONFIGURATION_LOWER-unsigned-${{ steps.release.outputs.tag }}.xcarchive.zip"
+
+            rm -rf "$IOS_DERIVED" "$IOS_ARCHIVE"
+          done
+
+      - name: Verify release archives
         shell: bash
         run: |
           ls -lh artifacts
 
-          archive="artifacts/AppFoundationDemo-iOS-unsigned-${{ steps.release.outputs.tag }}.xcarchive.zip"
-          test -f "$archive"
+          for configuration in debug release; do
+            archive="artifacts/AppFoundationDemo-iOS-$configuration-unsigned-${{ steps.release.outputs.tag }}.xcarchive.zip"
+            test -f "$archive"
 
-          bytes="$(stat -f%z "$archive")"
-          if (( bytes >= 2147483648 )); then
-            echo "error: $archive is too large for a GitHub Release asset" >&2
-            exit 1
-          fi
+            bytes="$(stat -f%z "$archive")"
+            if (( bytes >= 2147483648 )); then
+              echo "error: $archive is too large for a GitHub Release asset" >&2
+              exit 1
+            fi
+          done
 
       - name: Create GitHub prerelease
         env:

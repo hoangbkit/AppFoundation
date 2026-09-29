@@ -17,11 +17,7 @@ WindowGroup {
         .environment(purchaseManager)
         .environment(themes)
         .managesPurchases(purchaseManager)
-        .appFoundationTheme(themes)
-        .synchronizesThemeAccess(
-            themes,
-            hasPro: purchaseManager.hasPro
-        )
+        .appFoundationTheme(themes, purchaseManager: purchaseManager)
 }
 ```
 

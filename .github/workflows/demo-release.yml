@@ -2,6 +2,16 @@ name: Demo Release
 
 on:
   workflow_dispatch:
+    inputs:
+      configuration:
+        description: Build configuration
+        required: true
+        default: debug
+        type: choice
+        options:
+          - debug
+          - release
+          - both
 
 permissions:
   contents: write
@@ -48,15 +58,33 @@ jobs:
           echo "release_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "Build release: $tag"
 
-      - name: Archive unsigned iOS Demo (Debug and Release)
+      - name: Archive unsigned iOS Demo
         shell: bash
         working-directory: Examples/Demo
+        env:
+          BUILD_CONFIGURATION: ${{ inputs.configuration }}
         run: |
           SOURCE_PACKAGES="$RUNNER_TEMP/AppFoundationDemo-SourcePackages"
           ARTIFACTS="$GITHUB_WORKSPACE/artifacts"
           mkdir -p "$ARTIFACTS"
 
-          for CONFIGURATION in Debug Release; do
+          case "$BUILD_CONFIGURATION" in
+            debug)
+              CONFIGURATIONS=(Debug)
+              ;;
+            release)
+              CONFIGURATIONS=(Release)
+              ;;
+            both)
+              CONFIGURATIONS=(Debug Release)
+              ;;
+            *)
+              echo "error: unsupported configuration '$BUILD_CONFIGURATION'" >&2
+              exit 1
+              ;;
+          esac
+
+          for CONFIGURATION in "${CONFIGURATIONS[@]}"; do
             IOS_DERIVED="$RUNNER_TEMP/AppFoundationDemo-iOS-$CONFIGURATION"
             IOS_ARCHIVE="$RUNNER_TEMP/AppFoundationDemo-$CONFIGURATION.xcarchive"
 
@@ -92,10 +120,28 @@ jobs:
 
       - name: Verify release archives
         shell: bash
+        env:
+          BUILD_CONFIGURATION: ${{ inputs.configuration }}
         run: |
           ls -lh artifacts
 
-          for configuration in debug release; do
+          case "$BUILD_CONFIGURATION" in
+            debug)
+              CONFIGURATIONS=(debug)
+              ;;
+            release)
+              CONFIGURATIONS=(release)
+              ;;
+            both)
+              CONFIGURATIONS=(debug release)
+              ;;
+            *)
+              echo "error: unsupported configuration '$BUILD_CONFIGURATION'" >&2
+              exit 1
+              ;;
+          esac
+
+          for configuration in "${CONFIGURATIONS[@]}"; do
             archive="artifacts/AppFoundationDemo-iOS-$configuration-unsigned-${{ steps.release.outputs.tag }}.xcarchive.zip"
             test -f "$archive"
 

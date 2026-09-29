@@ -101,10 +101,64 @@ private struct ThemeAccessSynchronizationModifier: ViewModifier {
     }
 }
 
+#if canImport(Observation) && canImport(StoreKit)
+private struct ThemePurchaseAccessState: Equatable {
+    let entitlementState: EntitlementState
+    let hasPro: Bool
+}
+
+private struct AppFoundationEntitledThemeModifier: ViewModifier {
+    let manager: ThemeManager
+    let purchaseManager: PurchaseManager
+
+    func body(content: Content) -> some View {
+        let entitlementState = purchaseManager.entitlementState
+        let hasPro = purchaseManager.hasPro
+        let theme = manager.effectiveTheme(
+            entitlementState: entitlementState,
+            hasPro: hasPro
+        )
+        let synchronizationState = ThemePurchaseAccessState(
+            entitlementState: entitlementState,
+            hasPro: hasPro
+        )
+
+        content
+            .environment(\.appFoundationTheme, theme)
+            .tint(theme.accentColor)
+            .preferredColorScheme(theme.appearance.preferredColorScheme.colorScheme)
+            .task(id: synchronizationState) {
+                manager.synchronizeProAccess(
+                    hasPro,
+                    entitlementState: entitlementState
+                )
+            }
+    }
+}
+#endif
+
 public extension View {
     func appFoundationTheme(_ manager: ThemeManager) -> some View {
         modifier(AppFoundationThemeModifier(manager: manager))
     }
+
+    #if canImport(Observation) && canImport(StoreKit)
+    /// Injects the active theme using PurchaseManager-aware access resolution.
+    ///
+    /// During entitlement checking, the persisted theme remains visible so launch
+    /// does not flash through the Free fallback before StoreKit resolves.
+    func appFoundationTheme(
+        _ manager: ThemeManager,
+        purchaseManager: PurchaseManager
+    ) -> some View {
+        modifier(
+            AppFoundationEntitledThemeModifier(
+                manager: manager,
+                purchaseManager: purchaseManager
+            )
+        )
+    }
+    #endif
 
     func synchronizesThemeAccess(_ manager: ThemeManager, hasPro: Bool) -> some View {
         modifier(ThemeAccessSynchronizationModifier(manager: manager, hasPro: hasPro))

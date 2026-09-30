@@ -63,7 +63,7 @@ public final class ThemeManager {
         self.stateDidChange = stateDidChange
 
         var loaded = stateStore.load()
-        self.hasPro = hasPro ?? false
+        self.hasPro = hasPro ?? loaded.lastKnownHasPro
         if let hasPro {
             loaded.lastKnownHasPro = hasPro
         }
@@ -92,13 +92,25 @@ public final class ThemeManager {
         hasPro: Bool
     ) -> AppTheme {
         if case .checking = entitlementState {
-            let checkingResolution = ThemeResolver.resolve(
+            return ThemeResolver.resolve(
                 catalog: catalog,
                 state: storedState,
-                hasPro: false,
                 now: now()
-            )
-            return checkingResolution.previewTheme ?? checkingResolution.selectedTheme
+            ).effectiveTheme
+        }
+
+        // Preserve a valid Free-user preview across the brief transition where
+        // purchase access becomes Pro but synchronization has not promoted the
+        // preview to the committed selection yet.
+        if hasPro,
+           !self.hasPro,
+           let previewTheme = ThemeResolver.resolve(
+               catalog: catalog,
+               state: storedState,
+               hasPro: false,
+               now: now()
+           ).previewTheme {
+            return previewTheme
         }
 
         return ThemeResolver.resolve(
@@ -205,7 +217,7 @@ public final class ThemeManager {
 
     public func refreshFromPersistence() {
         var loaded = stateStore.load()
-        loaded.lastKnownHasPro = hasPro
+        loaded.lastKnownHasPro = storedState.lastKnownHasPro
         storedState = Self.normalized(loaded, catalog: catalog, now: now())
         persistAndNotify()
         schedulePreviewExpirationIfNeeded()
@@ -222,7 +234,7 @@ public final class ThemeManager {
     public func reset() {
         storedState = ThemeStoredState(
             selectedThemeID: catalog.fallbackThemeID,
-            lastKnownHasPro: hasPro
+            lastKnownHasPro: storedState.lastKnownHasPro
         )
         persistAndNotify()
     }
@@ -236,7 +248,6 @@ public final class ThemeManager {
     }
 
     private func persistAndNotify() {
-        storedState.lastKnownHasPro = hasPro
         stateStore.save(storedState)
         stateDidChange(resolution)
     }

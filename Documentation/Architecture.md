@@ -26,7 +26,7 @@ Preserving the selected Pro ID lets the app restore the user's preferred appeara
 
 `ThemeManager` is an observable main-actor owner for SwiftUI apps. It persists selection, starts and expires previews, synchronizes verified Pro state, and emits state-change callbacks for widgets or app icons.
 
-The manager consumes verified access supplied by the app. The purchase-aware SwiftUI modifier also observes `EntitlementState` so a persisted Pro theme remains visually stable while StoreKit is still checking. Theme state never authorizes premium features itself.
+The manager consumes verified access supplied by the app. The purchase-aware SwiftUI modifier also observes `EntitlementState` and uses the last verified persisted access state only while StoreKit is checking, keeping theme presentation stable and internally consistent. Theme state never authorizes premium features itself.
 
 ## Default catalog
 
@@ -56,7 +56,7 @@ Themes can inject any `ThemeStateStoring` implementation and a deterministic clo
 
 ## Lifecycle
 
-Attach `.managesPurchases(controller)` near the app root and use `.appFoundationTheme(themeManager, purchaseManager: controller)` when the catalog contains Pro themes. During `.checking`, this keeps the persisted selection visible; after entitlement resolution it applies normal Free/Pro gating. The Boolean-only `.synchronizesThemeAccess(...)` overload remains available for apps that already have a resolved access value.
+Attach `.managesPurchases(controller)` near the app root and use `.appFoundationTheme(themeManager, purchaseManager: controller)` when the catalog contains Pro themes. During `.checking`, theme access is resolved from the last verified persisted state; after entitlement resolution the live Free/Pro result becomes authoritative. The Boolean-only `.synchronizesThemeAccess(...)` overload remains available for apps that already have a resolved access value.
 
 When a theme preview is active, the manager schedules local expiry. Apps should also call `refresh()` after lifecycle transitions when they manage the lifecycle manually. Widgets use `ThemeResolution.nextAutomaticChangeDate` to schedule their own fallback timeline entry.
 

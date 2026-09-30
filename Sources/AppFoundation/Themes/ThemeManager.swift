@@ -85,8 +85,8 @@ public final class ThemeManager {
 
     /// Resolves the visual theme against live purchase verification state.
     ///
-    /// While StoreKit is still checking, preserve the persisted selection (or an
-    /// active preview) instead of temporarily treating the user as confirmed Free.
+    /// While StoreKit is still checking, resolve against the last verified persisted
+    /// access state so the root theme and ThemeManager stay visually consistent.
     public func effectiveTheme(
         entitlementState: EntitlementState,
         hasPro: Bool

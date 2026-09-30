@@ -65,7 +65,7 @@ RootView()
     .appFoundationTheme(themes, purchaseManager: purchases)
 ```
 
-Use the purchase-aware overload when themes include Pro access. While StoreKit is still checking entitlements, it keeps the persisted selection visible instead of briefly flashing through the Free fallback. Once checking resolves, normal Free/Pro gating applies.
+Use the purchase-aware overload when themes include Pro access. While StoreKit is still checking entitlements, it resolves theme access from the last verified persisted access state. This keeps the root theme and theme picker consistent without treating an unresolved check as newly Free. Once checking resolves, the verified Free/Pro result replaces that cached presentation state.
 
 The default `.miLoveStyle` preview behavior gives free users five minutes to try Pro themes. Use `.disabled` when tapping a Pro theme should open the paywall immediately.
 

@@ -145,8 +145,8 @@ public extension View {
     #if canImport(Observation) && canImport(StoreKit)
     /// Injects the active theme using PurchaseManager-aware access resolution.
     ///
-    /// During entitlement checking, the persisted theme remains visible so launch
-    /// does not flash through the Free fallback before StoreKit resolves.
+    /// During entitlement checking, the theme resolves against the last verified
+    /// persisted access state until StoreKit provides a newer result.
     func appFoundationTheme(
         _ manager: ThemeManager,
         purchaseManager: PurchaseManager

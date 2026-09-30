@@ -40,7 +40,7 @@ The fallback is normalized to free access. This guarantees a renderable theme wh
 
 `UserDefaultsThemeStateStore` writes one Codable state object. Supplying an app-group suite makes the same state available to widgets.
 
-The cached `lastKnownHasPro` flag is for extension presentation only. Purchase authorization remains owned by the containing app's `PurchaseManager.hasPro`, which resolves live StoreKit plus any configured safe verified-offline evidence.
+The cached `lastKnownHasPro` flag is presentation state for extensions and the brief app-startup checking window. It records only the most recently resolved access result; purchase authorization remains owned by the containing app's `PurchaseManager.hasPro`, which resolves live StoreKit plus any configured safe verified-offline evidence.
 
 ## Dependency injection
 

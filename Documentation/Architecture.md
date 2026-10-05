@@ -16,9 +16,9 @@ The theme system is deliberately split into two layers.
 
 `ThemeResolver` is the source of truth for deciding which appearance should render:
 
-1. An active Pro preview wins for a free user.
-2. A selected free theme or any selected theme for a Pro user renders normally.
-3. A selected Pro theme for a free user remains selected but the catalog fallback renders.
+1. An active Pro preview wins for a free user without replacing the base theme.
+2. Startup and widgets restore `committedThemeID`, the last applied base theme.
+3. A newly resolved access result applies the remembered `selectedThemeID` when allowed, or commits the Free fallback when the preference requires unavailable Pro access.
 
 Preserving the selected Pro ID lets the app restore the user's preferred appearance when Pro becomes active again.
 
@@ -26,7 +26,11 @@ Preserving the selected Pro ID lets the app restore the user's preferred appeara
 
 `ThemeManager` is an observable main-actor owner for SwiftUI apps. It persists selection, starts and expires previews, synchronizes verified Pro state, and emits state-change callbacks for widgets or app icons.
 
-The manager consumes verified access supplied by the app. The purchase-aware SwiftUI modifier also observes `EntitlementState` and uses the last verified persisted access state only while StoreKit is checking, keeping theme presentation stable and internally consistent. Theme state never authorizes premium features itself.
+The manager consumes verified access supplied by the app. `ThemeManager.bind(to:)` subscribes to the purchase owner's effective access. Each resolved result commits the base, access presentation flag, and any preview promotion synchronously before entitlement refresh returns. The purchase-aware SwiftUI modifier establishes this lifetime binding and renders only the manager's effective theme, as the picker does. Theme state never authorizes premium features itself.
+
+While checking, the committed base and any valid preview remain visible. The Pro picker is temporarily disabled, and programmatic Pro selections return `requiresPro` without changing state; callers may retry after checking resolves. Free selections remain available and replace the remembered preference.
+
+See [Theme resolution cases](ThemeResolution.md) for launch, selection, preview, migration, and ownership behavior.
 
 ## Default catalog
 
@@ -40,7 +44,9 @@ The fallback is normalized to free access. This guarantees a renderable theme wh
 
 `UserDefaultsThemeStateStore` writes one Codable state object. Supplying an app-group suite makes the same state available to widgets.
 
-The cached `lastKnownHasPro` flag is presentation state for extensions and the brief app-startup checking window. It records only the most recently resolved access result; purchase authorization remains owned by the containing app's `PurchaseManager.hasPro`, which resolves live StoreKit plus any configured safe verified-offline evidence.
+`selectedThemeID` remains the source-compatible user preference. `committedThemeID` is the saved base appearance, and preview fields are a temporary override. Older JSON without a committed base is migrated from the old selection and access presentation flag. The cached `lastKnownHasPro` flag is retained for compatibility, preview presentation, and migration; it must not override an existing committed Free base merely because the preference is Pro. Purchase authorization remains owned by `PurchaseManager.hasPro`.
+
+Use one theme manager per storage key. Widgets should resolve snapshots without writing them. `refreshFromPersistence()` reads shared preference/preview state without writing an old access snapshot back to disk.
 
 ## Dependency injection
 
@@ -56,7 +62,7 @@ Themes can inject any `ThemeStateStoring` implementation and a deterministic clo
 
 ## Lifecycle
 
-Attach `.managesPurchases(controller)` near the app root and use `.appFoundationTheme(themeManager, purchaseManager: controller)` when the catalog contains Pro themes. During `.checking`, theme access is resolved from the last verified persisted state; after entitlement resolution the live Free/Pro result becomes authoritative. The Boolean-only `.synchronizesThemeAccess(...)` overload remains available for apps that already have a resolved access value.
+Attach `.managesPurchases(controller)` near the app root and use `.appFoundationTheme(themeManager, purchaseManager: controller)` when the catalog contains Pro themes. Apps may instead call `themeManager.bind(to: controller)` when constructing their owners, then use the plain theme modifier. The binding uses effective `hasPro`, including verified offline access when raw StoreKit state is inactive. It survives unmounting themed content; dead theme owners are weakly held and discarded. The Boolean-only `.synchronizesThemeAccess(...)` overload remains available for apps that already have a resolved access value.
 
 When a theme preview is active, the manager schedules local expiry. Apps should also call `refresh()` after lifecycle transitions when they manage the lifecycle manually. Widgets use `ThemeResolution.nextAutomaticChangeDate` to schedule their own fallback timeline entry.
 

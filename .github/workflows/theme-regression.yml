@@ -1,0 +1,71 @@
+name: Theme regression tests
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'Sources/AppFoundation/Themes/**'
+      - 'Sources/AppFoundation/UI/Theme*.swift'
+      - 'Sources/AppFoundation/Purchases/PurchaseController.swift'
+      - 'Tests/AppFoundationTests/Theme*.swift'
+      - 'Examples/Demo/DemoTests/DemoThemeLaunchTests.swift'
+      - '.github/workflows/theme-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: theme-regression-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  themes:
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.3.app/Contents/Developer
+      - name: Select an available iOS 26 simulator
+        run: |
+          xcrun simctl list devices available --json > /tmp/theme-simulators.json
+          python3 - <<'PY' >> "$GITHUB_ENV"
+          import json
+          with open('/tmp/theme-simulators.json') as source:
+              devices = json.load(source)['devices']
+          for runtime, candidates in devices.items():
+              if 'iOS-26-' not in runtime and not runtime.endswith('iOS-26-0'):
+                  continue
+              phone = next((device for device in candidates if device['name'].startswith('iPhone')), None)
+              if phone:
+                  print('THEME_SIMULATOR_ID=' + phone['udid'])
+                  break
+          else:
+              raise SystemExit('No available iOS 26 iPhone simulator')
+          PY
+      - name: Run focused package tests
+        run: |
+          xcodebuild test \
+            -scheme AppFoundation-Package \
+            -destination "platform=iOS Simulator,id=$THEME_SIMULATOR_ID" \
+            -parallel-testing-enabled NO \
+            -only-testing:AppFoundationTests/ThemeCatalogTests \
+            -only-testing:AppFoundationTests/ThemeResolverTests \
+            -only-testing:AppFoundationTests/ThemeManagerTests \
+            -only-testing:AppFoundationTests/ThemePurchaseBindingTests \
+            CODE_SIGNING_ALLOWED=NO
+      - name: Generate Demo project
+        run: |
+          brew install xcodegen
+          cd Examples/Demo
+          xcodegen generate --spec project.yml
+      - name: Run Demo theme launch integration tests
+        working-directory: Examples/Demo
+        run: |
+          xcodebuild test \
+            -project Demo.xcodeproj -scheme Demo \
+            -destination "platform=iOS Simulator,id=$THEME_SIMULATOR_ID" \
+            -parallel-testing-enabled NO \
+            -only-testing:DemoTests/DemoThemeLaunchTests \
+            CODE_SIGNING_ALLOWED=NO

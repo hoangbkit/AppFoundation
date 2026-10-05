@@ -42,11 +42,17 @@ public final class ThemeManager {
 
     public private(set) var storedState: ThemeStoredState
     public private(set) var hasPro: Bool
+    /// Cached appearance is not permission to commit a newly selected Pro theme.
+    public private(set) var isCheckingProAccess: Bool
 
     @ObservationIgnored private let stateStore: any ThemeStateStoring
     @ObservationIgnored private let now: @MainActor () -> Date
     @ObservationIgnored private let stateDidChange: @MainActor (ThemeResolution) -> Void
     @ObservationIgnored private var previewExpiryTask: Task<Void, Never>?
+    #if canImport(StoreKit)
+    @ObservationIgnored private weak var boundPurchases: PurchaseManager?
+    @ObservationIgnored private var purchaseObservationID: UUID?
+    #endif
 
     public init(
         catalog: ThemeCatalog = .foundationDefaults,
@@ -62,13 +68,27 @@ public final class ThemeManager {
         self.now = now
         self.stateDidChange = stateDidChange
 
-        var loaded = stateStore.load()
+        let persisted = stateStore.load()
+        var loaded = persisted
         self.hasPro = hasPro ?? loaded.lastKnownHasPro
+        self.isCheckingProAccess = hasPro == nil
+        loaded = Self.normalized(
+            loaded, catalog: catalog, now: now(), previewsEnabled: previewBehavior.isEnabled
+        )
         if let hasPro {
-            loaded.lastKnownHasPro = hasPro
+            loaded = ThemeResolver.applyingAccess(
+                hasPro,
+                to: loaded,
+                catalog: catalog,
+                now: now(),
+                promotesPreviewOnProUnlock: previewBehavior.promotesPreviewOnProUnlock
+            )
         }
-        self.storedState = Self.normalized(loaded, catalog: catalog, now: now())
-        stateStore.save(self.storedState)
+        self.storedState = loaded
+        // Do not rewrite unchanged state every time SwiftUI constructs an owner.
+        if self.storedState != persisted {
+            stateStore.save(self.storedState)
+        }
         schedulePreviewExpirationIfNeeded()
     }
 
@@ -77,46 +97,38 @@ public final class ThemeManager {
     }
 
     public var resolution: ThemeResolution {
-        ThemeResolver.resolve(catalog: catalog, state: storedState, hasPro: hasPro, now: now())
+        ThemeResolver.resolve(catalog: catalog, state: storedState, now: now())
     }
 
     public var selectedTheme: AppTheme { resolution.selectedTheme }
+    public var committedTheme: AppTheme {
+        storedState.committedThemeID.flatMap(catalog.theme(id:)) ?? catalog.fallbackTheme
+    }
     public var effectiveTheme: AppTheme { resolution.effectiveTheme }
 
     /// Resolves the visual theme against live purchase verification state.
     ///
-    /// While StoreKit is still checking, resolve against the last verified persisted
-    /// access state so the root theme and ThemeManager stay visually consistent.
+    /// While checking, restore the committed base plus any unexpired preview.
+    /// Resolved access uses the same transition that synchronization persists.
     public func effectiveTheme(
         entitlementState: EntitlementState,
         hasPro: Bool
     ) -> AppTheme {
         if case .checking = entitlementState {
-            return ThemeResolver.resolve(
-                catalog: catalog,
-                state: storedState,
-                now: now()
-            ).effectiveTheme
+            return effectiveTheme
         }
-
-        // Preserve a valid Free-user preview across the brief transition where
-        // purchase access becomes Pro but synchronization has not promoted the
-        // preview to the committed selection yet.
-        if hasPro,
-           !self.hasPro,
-           let previewTheme = ThemeResolver.resolve(
-               catalog: catalog,
-               state: storedState,
-               hasPro: false,
-               now: now()
-           ).previewTheme {
-            return previewTheme
-        }
-
+        let projected = ThemeResolver.applyingAccess(
+            hasPro,
+            to: Self.normalized(
+                storedState, catalog: catalog, now: now(), previewsEnabled: previewBehavior.isEnabled
+            ),
+            catalog: catalog,
+            now: now(),
+            promotesPreviewOnProUnlock: previewBehavior.promotesPreviewOnProUnlock
+        )
         return ThemeResolver.resolve(
             catalog: catalog,
-            state: storedState,
-            hasPro: hasPro,
+            state: projected,
             now: now()
         ).effectiveTheme
     }
@@ -130,7 +142,9 @@ public final class ThemeManager {
     }
 
     public func canPreview(_ theme: AppTheme) -> Bool {
-        guard theme.isPro, !hasPro, previewBehavior.isEnabled else { return false }
+        guard theme.isPro, !hasPro, !isCheckingProAccess, previewBehavior.isEnabled else {
+            return false
+        }
         return (theme.previewDuration ?? previewBehavior.defaultDuration) > 0
     }
 
@@ -145,8 +159,11 @@ public final class ThemeManager {
             return .unavailable(themeID: themeID)
         }
 
+        guard !theme.isPro || !isCheckingProAccess else { return .requiresPro(theme) }
+
         if theme.access == .free || hasPro {
             storedState.selectedThemeID = theme.id
+            storedState.committedThemeID = theme.id
             clearPreviewState()
             persistAndNotify()
             return .selected(theme)
@@ -164,8 +181,9 @@ public final class ThemeManager {
         let currentResolution = resolution
         let expiry: Date
         if previewBehavior.preservesExpiryWhenSwitchingThemes,
-           currentResolution.isPreviewActive,
-           let existingExpiry = currentResolution.previewExpiresAt {
+            currentResolution.isPreviewActive,
+            let existingExpiry = currentResolution.previewExpiresAt
+        {
             expiry = existingExpiry
         } else {
             expiry = now().addingTimeInterval(duration)
@@ -193,38 +211,55 @@ public final class ThemeManager {
         _ isUnlocked: Bool,
         entitlementState: EntitlementState
     ) {
-        guard case .checking = entitlementState else {
-            synchronizeProAccess(isUnlocked)
+        if case .checking = entitlementState {
+            isCheckingProAccess = true
             return
         }
+        synchronizeProAccess(isUnlocked)
     }
 
     public func synchronizeProAccess(_ isUnlocked: Bool) {
-        let activePreview = resolution.previewTheme
+        let next = ThemeResolver.applyingAccess(
+            isUnlocked,
+            to: Self.normalized(
+                storedState, catalog: catalog, now: now(), previewsEnabled: previewBehavior.isEnabled
+            ),
+            catalog: catalog,
+            now: now(),
+            promotesPreviewOnProUnlock: previewBehavior.promotesPreviewOnProUnlock
+        )
         hasPro = isUnlocked
-        storedState.lastKnownHasPro = isUnlocked
-
-        if isUnlocked {
-            if previewBehavior.promotesPreviewOnProUnlock, let activePreview {
-                storedState.selectedThemeID = activePreview.id
-            }
-            clearPreviewState()
-        }
-
+        isCheckingProAccess = false
+        storedState = next
         persistAndNotify()
         schedulePreviewExpirationIfNeeded()
     }
 
     public func refreshFromPersistence() {
-        var loaded = stateStore.load()
-        loaded.lastKnownHasPro = storedState.lastKnownHasPro
-        storedState = Self.normalized(loaded, catalog: catalog, now: now())
-        persistAndNotify()
+        let loaded = Self.normalized(
+            stateStore.load(), catalog: catalog, now: now(), previewsEnabled: previewBehavior.isEnabled
+        )
+        if isCheckingProAccess {
+            storedState = loaded
+            hasPro = loaded.lastKnownHasPro
+        } else {
+            storedState = ThemeResolver.applyingAccess(
+                hasPro,
+                to: loaded,
+                catalog: catalog,
+                now: now(),
+                promotesPreviewOnProUnlock: previewBehavior.promotesPreviewOnProUnlock
+            )
+        }
+        // Reading shared state must not overwrite a newer access commit on disk.
+        stateDidChange(resolution)
         schedulePreviewExpirationIfNeeded()
     }
 
     public func refresh() {
-        let normalized = Self.normalized(storedState, catalog: catalog, now: now())
+        let normalized = Self.normalized(
+            storedState, catalog: catalog, now: now(), previewsEnabled: previewBehavior.isEnabled
+        )
         guard normalized != storedState else { return }
         storedState = normalized
         persistAndNotify()
@@ -234,7 +269,8 @@ public final class ThemeManager {
     public func reset() {
         storedState = ThemeStoredState(
             selectedThemeID: catalog.fallbackThemeID,
-            lastKnownHasPro: storedState.lastKnownHasPro
+            lastKnownHasPro: storedState.lastKnownHasPro,
+            committedThemeID: catalog.fallbackThemeID
         )
         persistAndNotify()
     }
@@ -276,7 +312,8 @@ public final class ThemeManager {
     private static func normalized(
         _ state: ThemeStoredState,
         catalog: ThemeCatalog,
-        now: Date
+        now: Date,
+        previewsEnabled: Bool = true
     ) -> ThemeStoredState {
         var normalized = state
 
@@ -287,9 +324,27 @@ public final class ThemeManager {
             normalized.selectedThemeID = catalog.fallbackThemeID
         }
 
+        if normalized.committedThemeID == nil {
+            let selected =
+                normalized.selectedThemeID.flatMap(catalog.theme(id:))
+                ?? catalog.fallbackTheme
+            normalized.committedThemeID =
+                selected.access == .free || normalized.lastKnownHasPro
+                ? selected.id : catalog.fallbackThemeID
+        } else if let committed = normalized.committedThemeID.flatMap(catalog.theme(id:)),
+            committed.access == .free || normalized.lastKnownHasPro
+        {
+            // A valid committed base is independent of the remembered preference.
+        } else {
+            normalized.committedThemeID = catalog.fallbackThemeID
+        }
+
         let previewIsValid: Bool = {
+            guard previewsEnabled else { return false }
             guard let previewID = normalized.previewThemeID else { return false }
-            guard let previewTheme = catalog.theme(id: previewID), previewTheme.isPro else { return false }
+            guard let previewTheme = catalog.theme(id: previewID), previewTheme.isPro else {
+                return false
+            }
             guard let expiry = normalized.previewExpiresAt, expiry > now else { return false }
             return true
         }()
@@ -301,6 +356,23 @@ public final class ThemeManager {
 
         return normalized
     }
+
+    #if canImport(StoreKit)
+    /// Binds for the manager's lifetime. Resolved access is saved synchronously
+    /// inside purchase resolution, including when no themed view is mounted.
+    public func bind(to purchases: PurchaseManager) {
+        guard boundPurchases !== purchases else { return }
+        if let boundPurchases, let purchaseObservationID {
+            boundPurchases.removeThemeAccessObserver(purchaseObservationID)
+        }
+        boundPurchases = purchases
+        purchaseObservationID = purchases.addThemeAccessObserver { [weak self] state, hasPro in
+            guard let self else { return false }
+            self.synchronizeProAccess(hasPro, entitlementState: state)
+            return true
+        }
+    }
+    #endif
 }
 
 #endif

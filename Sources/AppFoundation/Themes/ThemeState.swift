@@ -1,7 +1,10 @@
 import Foundation
 
 public struct ThemeStoredState: Codable, Equatable, Sendable {
+    /// The user's committed preference, retained when Pro access expires.
     public var selectedThemeID: String?
+    /// The last applied base theme. Previews never replace this value.
+    public var committedThemeID: String?
     public var previewThemeID: String?
     public var previewExpiresAt: Date?
     public var lastKnownHasPro: Bool
@@ -10,12 +13,31 @@ public struct ThemeStoredState: Codable, Equatable, Sendable {
         selectedThemeID: String? = nil,
         previewThemeID: String? = nil,
         previewExpiresAt: Date? = nil,
-        lastKnownHasPro: Bool = false
+        lastKnownHasPro: Bool = false,
+        committedThemeID: String? = nil
     ) {
         self.selectedThemeID = selectedThemeID
+        self.committedThemeID = committedThemeID
         self.previewThemeID = previewThemeID
         self.previewExpiresAt = previewExpiresAt
         self.lastKnownHasPro = lastKnownHasPro
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case selectedThemeID
+        case committedThemeID
+        case previewThemeID
+        case previewExpiresAt
+        case lastKnownHasPro
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        selectedThemeID = try values.decodeIfPresent(String.self, forKey: .selectedThemeID)
+        committedThemeID = try values.decodeIfPresent(String.self, forKey: .committedThemeID)
+        previewThemeID = try values.decodeIfPresent(String.self, forKey: .previewThemeID)
+        previewExpiresAt = try values.decodeIfPresent(Date.self, forKey: .previewExpiresAt)
+        lastKnownHasPro = try values.decodeIfPresent(Bool.self, forKey: .lastKnownHasPro) ?? false
     }
 }
 
@@ -75,6 +97,23 @@ public enum ThemeResolver {
     ) -> ThemeResolution {
         let resolvedHasPro = hasPro ?? state.lastKnownHasPro
         let selectedTheme = state.selectedThemeID.flatMap(catalog.theme(id:)) ?? catalog.fallbackTheme
+        let selectedBase =
+            selectedTheme.access == .free || resolvedHasPro
+            ? selectedTheme : catalog.fallbackTheme
+        // Explicit access resolves the preference. Startup and widgets restore
+        // the committed base, rather than resurrecting a remembered Pro choice.
+        let committedTheme = state.committedThemeID.flatMap(catalog.theme(id:))
+        let baseTheme: AppTheme
+        if hasPro == nil, state.committedThemeID != nil {
+            if let committedTheme, committedTheme.access == .free || resolvedHasPro {
+                baseTheme = committedTheme
+            } else {
+                baseTheme = catalog.fallbackTheme
+            }
+        } else {
+            // Also migrates legacy states without a committed base.
+            baseTheme = selectedBase
+        }
 
         let activePreview: AppTheme? = {
             guard !resolvedHasPro else { return nil }
@@ -89,12 +128,9 @@ public enum ThemeResolver {
         if let activePreview {
             effectiveTheme = activePreview
             usesFallback = false
-        } else if selectedTheme.access == .free || resolvedHasPro {
-            effectiveTheme = selectedTheme
-            usesFallback = false
         } else {
-            effectiveTheme = catalog.fallbackTheme
-            usesFallback = true
+            effectiveTheme = baseTheme
+            usesFallback = selectedTheme.isPro && !resolvedHasPro
         }
 
         return ThemeResolution(
@@ -106,5 +142,31 @@ public enum ThemeResolver {
             isPreviewActive: activePreview != nil,
             isUsingFallbackForAccess: usesFallback
         )
+    }
+
+    /// Applies one resolved access result to preference, base, and preview together.
+    /// Shared by live theme projection and persistence so purchase transitions agree.
+    static func applyingAccess(
+        _ hasPro: Bool,
+        to state: ThemeStoredState,
+        catalog: ThemeCatalog,
+        now: Date,
+        promotesPreviewOnProUnlock: Bool
+    ) -> ThemeStoredState {
+        var next = state
+        let preview = resolve(catalog: catalog, state: state, now: now).previewTheme
+        if hasPro {
+            if promotesPreviewOnProUnlock, let preview {
+                next.selectedThemeID = preview.id
+            }
+            next.previewThemeID = nil
+            next.previewExpiresAt = nil
+        }
+        next.lastKnownHasPro = hasPro
+        let selected = next.selectedThemeID.flatMap(catalog.theme(id:)) ?? catalog.fallbackTheme
+        next.committedThemeID =
+            selected.access == .free || hasPro
+            ? selected.id : catalog.fallbackThemeID
+        return next
     }
 }

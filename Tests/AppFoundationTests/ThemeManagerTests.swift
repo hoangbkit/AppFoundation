@@ -18,6 +18,8 @@ final class ThemeManagerTests: XCTestCase {
         XCTAssertEqual(expiry, clock.now.addingTimeInterval(300))
         XCTAssertEqual(manager.effectiveTheme.id, "midnight")
         XCTAssertEqual(store.state.previewThemeID, "midnight")
+        XCTAssertEqual(store.state.selectedThemeID, "rose")
+        XCTAssertEqual(store.state.committedThemeID, "rose")
     }
 
     func testSwitchingProThemesPreservesPreviewExpiry() {
@@ -163,6 +165,7 @@ final class ThemeManagerTests: XCTestCase {
         manager.synchronizeProAccess(false, entitlementState: .inactive)
 
         XCTAssertEqual(store.state.selectedThemeID, "champagne")
+        XCTAssertEqual(store.state.committedThemeID, "rose")
         XCTAssertFalse(store.state.lastKnownHasPro)
         XCTAssertEqual(manager.effectiveTheme.id, "rose")
 
@@ -200,7 +203,7 @@ final class ThemeManagerTests: XCTestCase {
         XCTAssertFalse(manager.isPreviewActive)
     }
 
-    func testRefreshFromPersistenceCannotRewriteResolvedAccessHistory() {
+    func testCheckingReaderAdoptsNewerCommittedStateWithoutRewritingAccessHistory() {
         let clock = TestClock(now: Date(timeIntervalSince1970: 1_000))
         let store = MemoryThemeStore()
         store.state = ThemeStoredState(
@@ -215,10 +218,182 @@ final class ThemeManagerTests: XCTestCase {
         )
         manager.refreshFromPersistence()
 
-        XCTAssertTrue(manager.hasPro)
-        XCTAssertTrue(manager.storedState.lastKnownHasPro)
-        XCTAssertTrue(store.state.lastKnownHasPro)
+        XCTAssertFalse(manager.hasPro)
+        XCTAssertFalse(manager.storedState.lastKnownHasPro)
+        XCTAssertFalse(store.state.lastKnownHasPro)
         XCTAssertEqual(manager.selectedTheme.id, "rose")
+        XCTAssertEqual(manager.effectiveTheme.id, "rose")
+        XCTAssertNil(store.state.committedThemeID)
+    }
+
+    func testPreviewPromotionDisabledUsesTheSameThemeBeforeAndAfterSynchronization() {
+        let clock = TestClock(now: Date(timeIntervalSince1970: 1_000))
+        let manager = ThemeManager(
+            stateStore: MemoryThemeStore(),
+            hasPro: false,
+            previewBehavior: ThemePreviewBehavior(
+                promotesPreviewOnProUnlock: false, schedulesAutomaticExpiration: false
+            ),
+            now: { clock.now }
+        )
+        _ = manager.select(themeID: "paper")
+
+        let projected = manager.effectiveTheme(entitlementState: .inactive, hasPro: true)
+        manager.synchronizeProAccess(true, entitlementState: .inactive)
+
+        XCTAssertEqual(projected.id, "rose")
+        XCTAssertEqual(manager.effectiveTheme, projected)
+        XCTAssertEqual(manager.committedTheme.id, "rose")
+        XCTAssertFalse(manager.isPreviewActive)
+    }
+
+    func testProPreferenceDoesNotReplaceCommittedFreeBaseWhileChecking() {
+        let clock = TestClock(now: Date(timeIntervalSince1970: 1_000))
+        let store = MemoryThemeStore()
+        store.state = ThemeStoredState(
+            selectedThemeID: "midnight", lastKnownHasPro: true, committedThemeID: "rose"
+        )
+        let manager = makeManager(clock: clock, store: store, hasPro: nil)
+        XCTAssertEqual(manager.selectedTheme.id, "midnight")
+        XCTAssertEqual(manager.effectiveTheme.id, "rose")
+        XCTAssertTrue(manager.isCheckingProAccess)
+        XCTAssertFalse(manager.canPreview(FoundationThemes.paper))
+        XCTAssertEqual(manager.select(themeID: "paper"), .requiresPro(FoundationThemes.paper))
+        XCTAssertEqual(manager.selectedTheme.id, "midnight")
+    }
+
+    func testExplicitFreeChoiceWhileCheckingWinsOverOldProPreferenceOnRenewal() {
+        let clock = TestClock(now: Date(timeIntervalSince1970: 1_000))
+        let store = MemoryThemeStore()
+        store.state = ThemeStoredState(
+            selectedThemeID: "midnight", lastKnownHasPro: true, committedThemeID: "midnight"
+        )
+        let manager = makeManager(clock: clock, store: store, hasPro: nil)
+        _ = manager.select(themeID: "rose")
+        manager.synchronizeProAccess(true)
+        XCTAssertEqual(manager.selectedTheme.id, "rose")
+        XCTAssertEqual(manager.committedTheme.id, "rose")
+        XCTAssertEqual(manager.effectiveTheme.id, "rose")
+    }
+
+    func testDisabledPreviewsAreClearedOnRelaunch() {
+        let clock = TestClock(now: Date(timeIntervalSince1970: 1_000))
+        let store = MemoryThemeStore()
+        store.state = ThemeStoredState(
+            selectedThemeID: "rose", previewThemeID: "paper",
+            previewExpiresAt: clock.now.addingTimeInterval(50), committedThemeID: "rose"
+        )
+        let manager = ThemeManager(stateStore: store, previewBehavior: .disabled, now: { clock.now })
+        XCTAssertEqual(manager.effectiveTheme.id, "rose")
+        XCTAssertNil(store.state.previewThemeID)
+    }
+
+    func testEndingAndExpiringPreviewNeverCommitIt() {
+        let clock = TestClock(now: Date(timeIntervalSince1970: 1_000))
+        let store = MemoryThemeStore()
+        let manager = makeManager(clock: clock, store: store)
+        _ = manager.select(themeID: "paper")
+        manager.endPreview()
+        XCTAssertEqual(manager.committedTheme.id, "rose")
+        _ = manager.select(themeID: "midnight")
+        clock.now = clock.now.addingTimeInterval(300)
+        manager.refresh()
+        XCTAssertNil(store.state.previewThemeID)
+        XCTAssertEqual(store.state.committedThemeID, "rose")
+        XCTAssertEqual(store.state.selectedThemeID, "rose")
+    }
+
+    func testSwitchingPreviewCanRestartDurationWhenConfigured() {
+        let clock = TestClock(now: Date(timeIntervalSince1970: 1_000))
+        let manager = ThemeManager(
+            stateStore: MemoryThemeStore(),
+            hasPro: false,
+            previewBehavior: ThemePreviewBehavior(
+                preservesExpiryWhenSwitchingThemes: false, schedulesAutomaticExpiration: false
+            ),
+            now: { clock.now }
+        )
+        _ = manager.select(themeID: "paper")
+        clock.now = clock.now.addingTimeInterval(40)
+        _ = manager.select(themeID: "midnight")
+        XCTAssertEqual(manager.previewExpiresAt, clock.now.addingTimeInterval(300))
+        XCTAssertEqual(manager.committedTheme.id, "rose")
+    }
+
+    func testRemovedThemesAreNormalizedAndResetClearsPreferenceAndPreview() {
+        let clock = TestClock(now: Date(timeIntervalSince1970: 1_000))
+        let store = MemoryThemeStore()
+        store.state = ThemeStoredState(
+            selectedThemeID: "removed", previewThemeID: "removed",
+            previewExpiresAt: clock.now.addingTimeInterval(50), committedThemeID: "removed"
+        )
+        let manager = makeManager(clock: clock, store: store)
+        XCTAssertEqual(manager.selectedTheme.id, "rose")
+        XCTAssertEqual(manager.committedTheme.id, "rose")
+        XCTAssertFalse(manager.isPreviewActive)
+        manager.synchronizeProAccess(true)
+        _ = manager.select(themeID: "midnight")
+        manager.reset()
+        XCTAssertTrue(manager.hasPro)
+        XCTAssertEqual(store.state.selectedThemeID, "rose")
+        XCTAssertEqual(store.state.committedThemeID, "rose")
+        XCTAssertNil(store.state.previewThemeID)
+    }
+
+    func testPreviewReturnsToCustomFreeBaseAndUnlockRespectsPromotionSetting() {
+        let clock = TestClock(now: Date(timeIntervalSince1970: 1_000))
+        let customFree = FoundationThemes.paper.withAccess(.free)
+        let catalog = ThemeCatalog.foundationDefaults.replacing(customFree)
+        let manager = ThemeManager(
+            catalog: catalog, stateStore: MemoryThemeStore(), hasPro: false,
+            previewBehavior: ThemePreviewBehavior(schedulesAutomaticExpiration: false),
+            now: { clock.now }
+        )
+        _ = manager.select(customFree)
+        _ = manager.select(themeID: "midnight")
+        XCTAssertEqual(manager.committedTheme.id, "paper")
+        manager.endPreview()
+        XCTAssertEqual(manager.effectiveTheme.id, "paper")
+        _ = manager.select(themeID: "midnight")
+        clock.now = clock.now.addingTimeInterval(300)
+        manager.refresh()
+        XCTAssertEqual(manager.effectiveTheme.id, "paper")
+
+        for promotes in [false, true] {
+            let store = MemoryThemeStore()
+            store.state = ThemeStoredState(selectedThemeID: "midnight", committedThemeID: "rose")
+            let renewing = ThemeManager(
+                stateStore: store, hasPro: false,
+                previewBehavior: ThemePreviewBehavior(
+                    promotesPreviewOnProUnlock: promotes, schedulesAutomaticExpiration: false
+                ),
+                now: { clock.now }
+            )
+            _ = renewing.select(themeID: "paper")
+            renewing.synchronizeProAccess(true)
+            XCTAssertEqual(renewing.effectiveTheme.id, promotes ? "paper" : "midnight")
+            XCTAssertEqual(store.state.committedThemeID, store.state.selectedThemeID)
+            XCTAssertNil(store.state.previewThemeID)
+        }
+    }
+
+    func testZeroDurationAndInvalidPreviewCannotChangeCommittedBase() {
+        let clock = TestClock(now: Date(timeIntervalSince1970: 1_000))
+        let noPreview = FoundationThemes.paper.withPreviewDuration(0)
+        let store = MemoryThemeStore()
+        store.state = ThemeStoredState(
+            selectedThemeID: "rose", previewThemeID: "midnight", committedThemeID: "rose"
+        )
+        let manager = ThemeManager(
+            catalog: ThemeCatalog.foundationDefaults.replacing(noPreview),
+            stateStore: store, hasPro: false,
+            previewBehavior: ThemePreviewBehavior(schedulesAutomaticExpiration: false),
+            now: { clock.now }
+        )
+        XCTAssertFalse(manager.isPreviewActive)
+        XCTAssertNil(store.state.previewThemeID)
+        XCTAssertEqual(manager.select(noPreview), .requiresPro(noPreview))
+        XCTAssertEqual(manager.committedTheme.id, "rose")
     }
 
     private func makeManager(

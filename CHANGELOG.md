@@ -6,6 +6,14 @@ AppFoundation follows semantic versioning.
 
 ## Unreleased
 
+### Fixed
+
+- Persisted the committed base theme separately from the remembered selection, so confirmed subscription expiry stays on the Free theme across subsequent launches while renewal can restore the Pro preference.
+- Bound themes to effective purchase access synchronously, saving access, base theme, and preview promotion before entitlement refresh returns rather than relying on a later view task.
+- Unified preview promotion for rendering and persistence, including disabled promotion, original preview deadlines across relaunches, and foreground expiry cleanup.
+- Prevented new Pro theme commitments from cached presentation access during initial checking, and stopped persistence refreshes from overwriting newer saved access results.
+- Added migration, real-store relaunch, purchase-binding, and hosted Demo theme tests with focused iOS simulator validation.
+
 ### Added
 
 - Added binary effective purchase access with `PurchaseAccessState`: app-facing authorization is always Free or Pro while live StoreKit verification remains available separately through `entitlementState`.

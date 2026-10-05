@@ -9,6 +9,7 @@ on:
       - 'Sources/AppFoundation/Purchases/PurchaseController.swift'
       - 'Tests/AppFoundationTests/Theme*.swift'
       - 'Examples/Demo/DemoTests/DemoThemeLaunchTests.swift'
+      - 'Examples/Demo/project.yml'
       - '.github/workflows/theme-regression.yml'
   workflow_dispatch:
 

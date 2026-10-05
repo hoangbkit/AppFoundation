@@ -62,6 +62,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.hoangbkit.afdemo.tests
         GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/AF.app/AF"
+        BUNDLE_LOADER: "$(TEST_HOST)"
 
 schemes:
   Demo:

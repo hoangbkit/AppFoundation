@@ -99,6 +99,7 @@ public struct ThemePickerView<Preview: View>: View {
             }
         }
         .buttonStyle(.plain)
+        .disabled(theme.isPro && manager.isCheckingProAccess)
         .accessibilityLabel(accessibilityLabel(for: theme))
     }
 
@@ -128,7 +129,7 @@ public struct ThemePickerView<Preview: View>: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Previewing \(manager.effectiveTheme.title)")
                         .font(.subheadline.weight(.bold))
-                    Text("Returns to \(manager.catalog.fallbackTheme.title) in \(countdown)")
+                    Text("Returns to \(manager.committedTheme.title) in \(countdown)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -150,7 +151,7 @@ public struct ThemePickerView<Preview: View>: View {
             .padding(.vertical, 3)
             .accessibilityElement(children: .combine)
             .accessibilityLabel(
-                "Previewing \(manager.effectiveTheme.title). Returns to \(manager.catalog.fallbackTheme.title) in \(countdown)."
+                "Previewing \(manager.effectiveTheme.title). Returns to \(manager.committedTheme.title) in \(countdown)."
             )
         }
     }

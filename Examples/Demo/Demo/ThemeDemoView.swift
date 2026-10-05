@@ -102,6 +102,8 @@ struct ThemeDemoView: View {
                 Divider().overlay(theme.borderColor)
                 stateRow("Stored selection", value: themes.selectedTheme.title)
                 Divider().overlay(theme.borderColor)
+                stateRow("Committed base", value: themes.committedTheme.title)
+                Divider().overlay(theme.borderColor)
                 stateRow("Entitlement", value: themes.hasPro ? "Pro unlocked" : "Free")
 
                 Text(stateExplanation)

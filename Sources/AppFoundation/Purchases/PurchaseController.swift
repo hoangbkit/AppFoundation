@@ -59,6 +59,11 @@ public final class PurchaseController {
     @ObservationIgnored private let entitlementRetryDelays: [Duration]
     @ObservationIgnored private let entitlementRetryInterval: Duration
     @ObservationIgnored private let now: () -> Date
+    // Appearance observers run without an await when effective access resolves.
+    // Their weak-owner callbacks return false when they can be discarded.
+    @ObservationIgnored private var themeAccessObservers: [
+        UUID: @MainActor (EntitlementState, Bool) -> Bool
+    ] = [:]
 
     @ObservationIgnored private static let logger = Logger(
         subsystem: "com.appfoundation.purchases",
@@ -477,6 +482,7 @@ public final class PurchaseController {
         entitlementState = liveState
         entitlementContext = context
         accessState = resolution.state
+        notifyThemeAccessObservers()
         applyCacheMutation(resolution.cacheMutation)
         updateEntitlementRetry(shouldRetry: resolution.shouldRetry)
 
@@ -1444,8 +1450,31 @@ public final class PurchaseController {
         productLoadingState = .idle
         entitlementState = .checking
         accessState = .inactive
+        notifyThemeAccessObservers()
         activity = .idle
         entitlementContext = nil
+    }
+
+    func addThemeAccessObserver(
+        _ observer: @escaping @MainActor (EntitlementState, Bool) -> Bool
+    ) -> UUID {
+        let id = UUID()
+        if observer(entitlementState, hasPro) {
+            themeAccessObservers[id] = observer
+        }
+        return id
+    }
+
+    func removeThemeAccessObserver(_ id: UUID) {
+        themeAccessObservers.removeValue(forKey: id)
+    }
+
+    private func notifyThemeAccessObservers() {
+        for (id, observer) in themeAccessObservers {
+            if !observer(entitlementState, hasPro) {
+                themeAccessObservers.removeValue(forKey: id)
+            }
+        }
     }
 
     private func startObservingTransactions() {

@@ -65,7 +65,11 @@ RootView()
     .appFoundationTheme(themes, purchaseManager: purchases)
 ```
 
-Use the purchase-aware overload when themes include Pro access. While StoreKit is still checking entitlements, it resolves theme access from the last verified persisted access state. This keeps the root theme and theme picker consistent without treating an unresolved check as newly Free. Once checking resolves, the verified Free/Pro result replaces that cached presentation state.
+Use the purchase-aware overload when themes include Pro access. While checking, it restores the committed base plus any unexpired preview. It establishes a lifetime purchase binding that synchronously saves each resolved access transition. After expiry is confirmed, the base is Free on the next launch, while the remembered Pro preference remains available for renewal. A new explicit Free selection replaces that preference.
+
+For an app-owned lifecycle, call `themes.bind(to: purchases)` once when creating both managers, before `purchases.prepare()`. Then render and tint from `themes.effectiveTheme`. The purchase-aware modifier performs the binding automatically; no additional Boolean synchronization modifier is needed.
+
+`ThemeManager()` starts with unresolved theme access. New Pro selections are unavailable until purchase access resolves. For a standalone Free-only preview demo without purchases, explicitly construct `ThemeManager(hasPro: false)`.
 
 The default `.miLoveStyle` preview behavior gives free users five minutes to try Pro themes. Use `.disabled` when tapping a Pro theme should open the paywall immediately.
 
@@ -86,9 +90,9 @@ Use the default `ThemePickerView` for fast adoption, or supply a custom preview 
 
 Use `UserDefaultsThemeStateStore` with an app-group suite. Widgets should call `ThemeResolver.resolve` using the same catalog.
 
-`ThemeResolution.nextAutomaticChangeDate` is the premium-preview expiry. Add a widget timeline entry for that date so the widget returns to the fallback theme even if the app is closed.
+`ThemeResolution.nextAutomaticChangeDate` is the premium-preview expiry. Add a widget timeline entry for that date so the widget returns to the committed base even if the app is closed.
 
-`lastKnownHasPro` exists only for consistent rendering in extensions. Never use it as a trusted entitlement source.
+`committedThemeID` is the base to restore at startup; `selectedThemeID` is the retained preference. `lastKnownHasPro` is compatibility/presentation metadata, never a trusted entitlement source. Preview IDs must not be saved as the committed base unless a confirmed Pro purchase promotes them.
 
 ## App icons
 

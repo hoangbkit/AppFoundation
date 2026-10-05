@@ -95,43 +95,32 @@ private struct ThemeAccessSynchronizationModifier: ViewModifier {
     let hasPro: Bool
 
     func body(content: Content) -> some View {
-        content.task(id: hasPro) {
-            manager.synchronizeProAccess(hasPro)
+        content.onChange(of: hasPro, initial: true) { _, access in
+            manager.synchronizeProAccess(access)
         }
     }
 }
 
 #if canImport(Observation) && canImport(StoreKit)
-private struct ThemePurchaseAccessState: Equatable {
-    let entitlementState: EntitlementState
-    let hasPro: Bool
-}
-
 private struct AppFoundationEntitledThemeModifier: ViewModifier {
+    @Environment(\.scenePhase) private var scenePhase
     let manager: ThemeManager
     let purchaseManager: PurchaseManager
 
     func body(content: Content) -> some View {
-        let entitlementState = purchaseManager.entitlementState
-        let hasPro = purchaseManager.hasPro
-        let theme = manager.effectiveTheme(
-            entitlementState: entitlementState,
-            hasPro: hasPro
-        )
-        let synchronizationState = ThemePurchaseAccessState(
-            entitlementState: entitlementState,
-            hasPro: hasPro
-        )
+        let theme = manager.effectiveTheme
 
         content
             .environment(\.appFoundationTheme, theme)
             .tint(theme.accentColor)
             .preferredColorScheme(theme.appearance.preferredColorScheme.colorScheme)
-            .task(id: synchronizationState) {
-                manager.synchronizeProAccess(
-                    hasPro,
-                    entitlementState: entitlementState
-                )
+            .onChange(
+                of: [ObjectIdentifier(manager), ObjectIdentifier(purchaseManager)], initial: true
+            ) { _, _ in
+                manager.bind(to: purchaseManager)
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { manager.refresh() }
             }
     }
 }
@@ -145,8 +134,8 @@ public extension View {
     #if canImport(Observation) && canImport(StoreKit)
     /// Injects the active theme using PurchaseManager-aware access resolution.
     ///
-    /// During entitlement checking, the theme resolves against the last verified
-    /// persisted access state until StoreKit provides a newer result.
+    /// Startup restores the committed base plus any valid preview. Resolved access
+    /// is committed synchronously by the purchase binding, before refresh returns.
     func appFoundationTheme(
         _ manager: ThemeManager,
         purchaseManager: PurchaseManager

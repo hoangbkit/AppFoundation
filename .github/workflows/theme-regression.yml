@@ -8,7 +8,7 @@ on:
       - 'Sources/AppFoundation/UI/Theme*.swift'
       - 'Sources/AppFoundation/Purchases/PurchaseController.swift'
       - 'Tests/AppFoundationTests/Theme*.swift'
-      - 'Examples/Demo/DemoTests/DemoThemeLaunchTests.swift'
+      - 'Examples/Demo/DemoThemeTests/**'
       - 'Examples/Demo/project.yml'
       - '.github/workflows/theme-regression.yml'
   workflow_dispatch:
@@ -65,8 +65,8 @@ jobs:
         working-directory: Examples/Demo
         run: |
           xcodebuild test \
-            -project Demo.xcodeproj -scheme Demo \
+            -project Demo.xcodeproj -scheme DemoThemeRegression \
             -destination "platform=iOS Simulator,id=$THEME_SIMULATOR_ID" \
             -parallel-testing-enabled NO \
-            -only-testing:DemoTests/DemoThemeLaunchTests \
+            -only-testing:DemoThemeTests/DemoThemeLaunchTests \
             CODE_SIGNING_ALLOWED=NO

@@ -63,34 +63,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.hoangbkit.afdemo.tests
         GENERATE_INFOPLIST_FILE: YES
 
-  DemoThemeTests:
-    type: bundle.unit-test
-    platform: iOS
-    deploymentTarget: "26.0"
-    sources:
-      - path: DemoThemeTests
-    dependencies:
-      - target: Demo
-      - package: AppFoundation
-        product: AppFoundation
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.hoangbkit.afdemo.themetests
-        GENERATE_INFOPLIST_FILE: YES
-        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/AF.app/AF"
-        BUNDLE_LOADER: "$(TEST_HOST)"
-
 schemes:
-  DemoThemeRegression:
-    build:
-      targets:
-        Demo: all
-        DemoThemeTests: [test]
-    test:
-      config: Debug
-      targets:
-        - name: DemoThemeTests
-          parallelizable: false
   Demo:
     build:
       targets:

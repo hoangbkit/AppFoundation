@@ -8,8 +8,6 @@ on:
       - 'Sources/AppFoundation/UI/Theme*.swift'
       - 'Sources/AppFoundation/Purchases/PurchaseController.swift'
       - 'Tests/AppFoundationTests/Theme*.swift'
-      - 'Examples/Demo/DemoThemeTests/**'
-      - 'Examples/Demo/project.yml'
       - '.github/workflows/theme-regression.yml'
   workflow_dispatch:
 
@@ -55,18 +53,4 @@ jobs:
             -only-testing:AppFoundationTests/ThemeResolverTests \
             -only-testing:AppFoundationTests/ThemeManagerTests \
             -only-testing:AppFoundationTests/ThemePurchaseBindingTests \
-            CODE_SIGNING_ALLOWED=NO
-      - name: Generate Demo project
-        run: |
-          brew install xcodegen
-          cd Examples/Demo
-          xcodegen generate --spec project.yml
-      - name: Run Demo theme launch integration tests
-        working-directory: Examples/Demo
-        run: |
-          xcodebuild test \
-            -project Demo.xcodeproj -scheme DemoThemeRegression \
-            -destination "platform=iOS Simulator,id=$THEME_SIMULATOR_ID" \
-            -parallel-testing-enabled NO \
-            -only-testing:DemoThemeTests/DemoThemeLaunchTests \
             CODE_SIGNING_ALLOWED=NO

@@ -38,6 +38,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.hoangbkit.afdemo
         PRODUCT_NAME: AF
+        PRODUCT_MODULE_NAME: Demo
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: "AppIconMidnight AppIconRose"
         MARKETING_VERSION: 1.0

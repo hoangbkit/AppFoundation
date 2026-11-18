@@ -234,7 +234,7 @@ struct AnalyticsDemoView: View {
                 appID: id.isEmpty ? "appfoundation.demo.runtime" : id,
                 appKey: key.isEmpty ? nil : key,
                 baseURL: url,
-                stateStorageKey: "appfoundation.demo.analytics.runtime.\(id.isEmpty ? "default" : id)",
+                stateStorageKey: "appfoundation.demo.analytics.runtime",
                 transportRetryCount: 0,
                 storageMode: storageMode
             )

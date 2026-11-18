@@ -357,7 +357,7 @@ private func requestBody(_ request: URLRequest) throws -> [String: Any] {
         return try #require(request.value(forHTTPHeaderField: "X-Installation-ID"))
     }
 
-    let keychainID = try await trackedID(for: .keychain)
+    let keychainID = try await trackedID(for: .persisted)
     let inMemoryID = try await trackedID(for: .inMemory)
     #expect(inMemoryID != keychainID)
 }

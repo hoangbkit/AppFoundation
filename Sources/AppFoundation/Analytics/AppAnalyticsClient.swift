@@ -278,6 +278,7 @@ public actor AppAnalyticsClient {
     private let now: @Sendable () -> Date
     private let clientContext: AppAnalyticsClientContext
     private var inMemoryInstallationID: String?
+    private var lastClosedActiveSince: Date?
 
     public init(
         configuration: AppAnalyticsConfiguration,
@@ -497,12 +498,17 @@ public actor AppAnalyticsClient {
     }
 
     private func closeActiveSession(in state: inout PersistedState, at timestamp: Date) {
-        guard state.session?.activeSince != nil else { return }
+        guard let activeSince = state.session?.activeSince else { return }
+        // willResignActive and didEnterBackground can be processed concurrently; both
+        // may load the same pre-close snapshot. Only the first close of a given session
+        // may checkpoint its active interval, otherwise sessionSeconds is counted twice.
+        guard lastClosedActiveSince != activeSince else { return }
         checkpointActiveSession(in: &state, at: timestamp)
         guard var session = state.session else { return }
         session.lastActivityAt = timestamp
         session.activeSince = nil
         state.session = session
+        lastClosedActiveSince = activeSince
     }
 
     private enum FlushReason: Equatable {
@@ -573,10 +579,14 @@ public actor AppAnalyticsClient {
         }
 
         if reason == .background {
-            let lastUploadAt = state.lastUploadAt ?? .distantPast
+            let lastUploadAt = state.lastUploadAt
+            let threshold = lastUploadAt ?? .distantPast
             let hasUnuploadedChanges = state.days.values.contains { day in
-                guard let modifiedAt = day.lastModifiedAt else { return true }
-                return modifiedAt > lastUploadAt
+                // State persisted before the marker existed has no timestamp. Treat it as
+                // dirty only until the first successful upload records `lastUploadAt`;
+                // otherwise an upgraded install would re-upload that day on every background.
+                guard let modifiedAt = day.lastModifiedAt else { return lastUploadAt == nil }
+                return modifiedAt > threshold
             }
             if !hasUnuploadedChanges {
                 try await saveState(state)
@@ -602,6 +612,7 @@ public actor AppAnalyticsClient {
         do {
             for batch in batches {
                 try Task.checkCancellation()
+                guard configuration.enabled else { return }
                 try await send(batch, installationID: installationID)
                 for day in batch.days where day.day != currentDay {
                     state.days.removeValue(forKey: day.day)

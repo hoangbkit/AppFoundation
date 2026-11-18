@@ -407,13 +407,14 @@ private func phase2Event(
         now: { clock.now() }
     )
 
+    // The first track uploads immediately because no previous upload exists.
     try await client.track("generation_completed", count: 1)
-    try await client.flush()
     #expect(await transport.capturedRequests().count == 1)
 
     clock.set(phase2Date("2026-09-05T10:02:00Z"))
     try await client.applicationDidEnterBackground()
 
+    // Nothing changed since that upload, so the background flush is skipped.
     #expect(await transport.capturedRequests().count == 1)
 }
 
@@ -428,11 +429,13 @@ private func phase2Event(
     )
 
     try await client.track("generation_completed", count: 1)
-    try await client.flush()
     #expect(await transport.capturedRequests().count == 1)
 
     clock.set(phase2Date("2026-09-05T10:01:00Z"))
     try await client.track("generation_completed", count: 1)
+    // The scheduled flush is throttled by uploadInterval.
+    #expect(await transport.capturedRequests().count == 1)
+
     clock.set(phase2Date("2026-09-05T10:02:00Z"))
     try await client.applicationDidEnterBackground()
 

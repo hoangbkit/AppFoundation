@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - develop
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -32,11 +33,10 @@ jobs:
 
       # Package test execution is intentionally disabled for now. The async/keychain
       # suites can wedge the simulator runner and make Fast CI take many minutes.
-      # Keep CI focused on compile/integration validation until those tests are
-      # reworked into deterministic, isolated suites.
-      - name: Build package for iOS Simulator
+      # Compile the test bundle so test-source errors are still caught.
+      - name: Build tests for iOS Simulator
         run: |
-          xcodebuild build \
+          xcodebuild build-for-testing \
             -scheme AppFoundation-Package \
             -destination "generic/platform=iOS Simulator"
 

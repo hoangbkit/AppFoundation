@@ -8,8 +8,9 @@ permissions:
 
 jobs:
   build-and-test:
-    name: Build on iOS
+    name: Build and test on iOS
     runs-on: macos-26
+    timeout-minutes: 30
 
     steps:
       - name: Check out repository
@@ -27,14 +28,34 @@ jobs:
       - name: Validate package manifest
         run: swift package dump-package >/dev/null
 
-      # Package test execution is intentionally disabled for now. Keep Full CI
-      # aligned with Fast CI so both workflows avoid simulator-device availability
-      # issues and the currently hanging async/keychain test suites.
-      - name: Build package for iOS Simulator
+      # Full CI is manually dispatched only, so it can afford a concrete simulator
+      # and a full test run. The job timeout bounds the historically hanging
+      # async/keychain suites. Fast CI stays compile-only for quick PR feedback.
+      - name: Select an available iOS 26 simulator
         run: |
-          xcodebuild build \
+          xcrun simctl list devices available --json > /tmp/full-ci-simulators.json
+          python3 - <<'PY' >> "$GITHUB_ENV"
+          import json
+          with open('/tmp/full-ci-simulators.json') as source:
+              devices = json.load(source)['devices']
+          for runtime, candidates in devices.items():
+              if 'iOS-26-' not in runtime and not runtime.endswith('iOS-26-0'):
+                  continue
+              phone = next((device for device in candidates if device['name'].startswith('iPhone')), None)
+              if phone:
+                  print('TEST_SIMULATOR_ID=' + phone['udid'])
+                  break
+          else:
+              raise SystemExit('No available iOS 26 iPhone simulator')
+          PY
+
+      - name: Run package tests on iOS Simulator
+        run: |
+          xcodebuild test \
             -scheme AppFoundation-Package \
-            -destination "generic/platform=iOS Simulator"
+            -destination "platform=iOS Simulator,id=$TEST_SIMULATOR_ID" \
+            -parallel-testing-enabled NO \
+            CODE_SIGNING_ALLOWED=NO
 
       - name: Install XcodeGen
         run: brew install xcodegen

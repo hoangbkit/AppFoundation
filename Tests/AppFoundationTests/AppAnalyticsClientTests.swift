@@ -384,7 +384,8 @@ private func requestBody(_ request: URLRequest) throws -> [String: Any] {
     try await client.applicationDidEnterBackground(at: isoDate("2026-09-05T10:02:00Z"))
     try await client.flush()
 
-    #expect(await transport.capturedRequests().isEmpty)
+    // Only the initial track uploaded; disabling prevents any further requests.
+    #expect(await transport.capturedRequests().count == 1)
     #expect(try await client.pendingDayCount() == 0)
 }
 

@@ -62,8 +62,31 @@ private actor Phase2AnalyticsTransport: AppAnalyticsTransport {
     func capturedRequests() -> [URLRequest] { requests }
 }
 
+private actor Phase2RateLimitedAnalyticsTransport: AppAnalyticsTransport {
+    private var count = 0
+
+    func data(for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        count += 1
+        let payload: [String: Any] = [
+            "error": ["code": "rate_limited", "message": "Slow down."]
+        ]
+        return (
+            try JSONSerialization.data(withJSONObject: payload),
+            HTTPURLResponse(
+                url: request.url!,
+                statusCode: 429,
+                httpVersion: nil,
+                headerFields: ["Retry-After": "300"]
+            )!
+        )
+    }
+
+    func requestCount() -> Int { count }
+}
+
 private func phase2Configuration(
-    uploadInterval: TimeInterval = 86_400
+    uploadInterval: TimeInterval = 86_400,
+    transportRetryCount: Int = 0
 ) -> AppAnalyticsConfiguration {
     AppAnalyticsConfiguration(
         appID: "analytics-test",
@@ -73,7 +96,7 @@ private func phase2Configuration(
         stateStorageKey: "analytics-phase2-state-\(UUID().uuidString)",
         appVersion: "1.2.3",
         uploadInterval: uploadInterval,
-        transportRetryCount: 0
+        transportRetryCount: transportRetryCount
     )
 }
 
@@ -372,4 +395,108 @@ private func phase2Event(
     #expect(day["sessions"] as? Int == 1)
     #expect(day["sessionSeconds"] as? Int == 900)
     #expect(try phase2Event(day, name: "generation_completed", dimension: "nano")["count"] as? Int == 5)
+}
+
+@Test func backgroundFlushSkipsUploadWhenNothingChangedSinceLastUpload() async throws {
+    let clock = Phase2AnalyticsClock(phase2Date("2026-09-05T10:00:00Z"))
+    let transport = Phase2AnalyticsTransport()
+    let client = AppAnalyticsClient(
+        configuration: phase2Configuration(),
+        transport: transport,
+        stateStore: Phase2MemoryAnalyticsStateStore(),
+        now: { clock.now() }
+    )
+
+    try await client.track("generation_completed", count: 1)
+    try await client.flush()
+    #expect(await transport.capturedRequests().count == 1)
+
+    clock.set(phase2Date("2026-09-05T10:02:00Z"))
+    try await client.applicationDidEnterBackground()
+
+    #expect(await transport.capturedRequests().count == 1)
+}
+
+@Test func backgroundFlushUploadsNewDataWithinUploadInterval() async throws {
+    let clock = Phase2AnalyticsClock(phase2Date("2026-09-05T10:00:00Z"))
+    let transport = Phase2AnalyticsTransport()
+    let client = AppAnalyticsClient(
+        configuration: phase2Configuration(),
+        transport: transport,
+        stateStore: Phase2MemoryAnalyticsStateStore(),
+        now: { clock.now() }
+    )
+
+    try await client.track("generation_completed", count: 1)
+    try await client.flush()
+    #expect(await transport.capturedRequests().count == 1)
+
+    clock.set(phase2Date("2026-09-05T10:01:00Z"))
+    try await client.track("generation_completed", count: 1)
+    clock.set(phase2Date("2026-09-05T10:02:00Z"))
+    try await client.applicationDidEnterBackground()
+
+    let requests = await transport.capturedRequests()
+    #expect(requests.count == 2)
+    let day = try phase2Day(requests[1], day: "2026-09-05")
+    #expect(try phase2Event(day, name: "generation_completed")["count"] as? Int == 2)
+}
+
+@Test func backgroundFlushRespectsRateLimitBackoff() async throws {
+    let clock = Phase2AnalyticsClock(phase2Date("2026-09-05T10:00:00Z"))
+    let transport = Phase2RateLimitedAnalyticsTransport()
+    let client = AppAnalyticsClient(
+        configuration: phase2Configuration(transportRetryCount: 0),
+        transport: transport,
+        stateStore: Phase2MemoryAnalyticsStateStore(),
+        now: { clock.now() }
+    )
+
+    try await client.track("generation_completed", count: 1)
+    try await client.applicationDidEnterBackground(at: phase2Date("2026-09-05T10:00:00Z"))
+    #expect(await transport.requestCount() == 1)
+
+    clock.set(phase2Date("2026-09-05T10:01:00Z"))
+    try await client.applicationDidEnterBackground()
+    #expect(await transport.requestCount() == 1)
+
+    clock.set(phase2Date("2026-09-05T10:06:00Z"))
+    try await client.applicationDidEnterBackground()
+    #expect(await transport.requestCount() == 2)
+}
+
+@Test func backgroundFlushCheckpointsStillActiveSession() async throws {
+    let clock = Phase2AnalyticsClock(phase2Date("2026-09-05T10:00:00Z"))
+    let transport = Phase2AnalyticsTransport()
+    let client = AppAnalyticsClient(
+        configuration: phase2Configuration(),
+        transport: transport,
+        stateStore: Phase2MemoryAnalyticsStateStore(),
+        now: { clock.now() }
+    )
+
+    try await client.applicationDidBecomeActive(at: phase2Date("2026-09-05T10:00:00Z"))
+    clock.set(phase2Date("2026-09-05T10:10:00Z"))
+    try await client.applicationDidEnterBackground()
+
+    let request = try #require(await transport.capturedRequests().last)
+    let day = try phase2Day(request, day: "2026-09-05")
+    #expect(day["sessions"] as? Int == 1)
+    #expect(day["sessionSeconds"] as? Int == 600)
+}
+
+@Test func backgroundFlushIsNoOpWhenAnalyticsDisabled() async throws {
+    var configuration = phase2Configuration()
+    configuration.enabled = false
+    let transport = Phase2AnalyticsTransport()
+    let client = AppAnalyticsClient(
+        configuration: configuration,
+        transport: transport,
+        stateStore: Phase2MemoryAnalyticsStateStore(),
+        now: { phase2Date("2026-09-05T10:00:00Z") }
+    )
+
+    try await client.applicationDidEnterBackground()
+    try await client.flush()
+    #expect(await transport.capturedRequests().isEmpty)
 }

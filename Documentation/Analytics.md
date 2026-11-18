@@ -63,6 +63,15 @@ AppAnalyticsConfiguration(
 
 Disabled analytics is fully inert: event/error tracking, lifecycle accounting, opportunistic uploads, and explicit `flush()` calls are no-ops. No analytics state is read or written, and no installation identity is created while disabled. Previously persisted analytics state remains untouched and is not uploaded until analytics is enabled again; `resetLocalState()` remains available if the app wants to discard that state explicitly. The default is `enabled: true`.
 
+To change this at runtime — for example from a settings toggle — call `setEnabled` on the existing client:
+
+```swift
+await analytics.setEnabled(false)  // user opted out
+await analytics.setEnabled(true)   // user opted back in
+```
+
+The modifier keeps observing the same client, so there is no need to reinstall `.managesAnalytics(...)`. Disabling takes effect immediately, performs no final upload, and **clears locally pending analytics state** (unlike a client created with `enabled: false`, which leaves existing state untouched). The installation identity is not changed. Re-enabling resumes with a clean local slate.
+
 ### Automatic Pro paywall events
 
 The canonical `ProPaywallView` records only this bounded commerce funnel when the shared analytics client is present:
@@ -76,7 +85,7 @@ The canonical `ProPaywallView` records only this bounded commerce funnel when th
 
 The paywall never sends product identifiers, StoreKit transaction identifiers, prices, receipts, localized error messages, or user content.
 
-On iOS, lifecycle tracking uses `UIApplication.didBecomeActiveNotification` and `UIApplication.willResignActiveNotification`. It is application-level rather than view-level, so navigation and scene content changes inside the active app do not end a session.
+On iOS, lifecycle tracking uses `UIApplication.didBecomeActiveNotification`, `UIApplication.willResignActiveNotification`, and `UIApplication.didEnterBackgroundNotification`. It is application-level rather than view-level, so navigation and scene content changes inside the active app do not end a session. A short background execution assertion is held from `willResignActive` until the background upload finishes; it does not post a user notification or require any background mode. Apps that do not use `.managesAnalytics(...)` (for example, UIKit-only apps) can call `applicationDidEnterBackground()` from their own background callback.
 
 ## Events
 
@@ -135,7 +144,7 @@ Only active application time contributes to `sessionSeconds`. Time while the app
 
 The client stores cumulative UTC-day snapshots locally and uploads opportunistically. Defaults are aligned with the server contract:
 
-- 5-minute upload interval
+- 20-second upload interval
 - 7 UTC days per batch
 - 6-day offline age plus the current day
 - 50 event/dimension counters per day
@@ -150,19 +159,41 @@ The client stores cumulative UTC-day snapshots locally and uploads opportunistic
 - 32 KiB maximum request body
 - 1 transport retry
 
-Automatic uploads are best effort. Tracking and lifecycle calls suppress upload errors so analytics cannot block normal product behavior. Call `flush()` when an explicit upload operation should surface an error:
+There are three upload tiers:
 
-```swift
-try await analytics.flush()
-```
+- **Opportunistic** — tracking and lifecycle calls attempt an upload at most once per `uploadInterval` (20 seconds by default).
+- **Background** — entering the background calls `applicationDidEnterBackground()`, which bypasses `uploadInterval` so the latest activity is uploaded promptly. It skips the request when no local data changed since the last successful upload, and still respects the server's `Retry-After` window.
+- **Explicit** — call `flush()` when the upload operation should surface an error:
+
+  ```swift
+  try await analytics.flush()
+  ```
+
+  This bypasses both the interval and the backoff.
+
+All automatic uploads are best effort: tracking, lifecycle, and background calls suppress upload errors so analytics cannot block normal product behavior.
 
 The server stores cumulative snapshots using retry-safe maximum semantics. The client therefore keeps the current UTC day cumulative and may safely resend it. Successful historical days are removed locally after acceptance.
 
-If the server returns HTTP `429 rate_limited`, automatic uploads persist and respect the server's `Retry-After` window before trying again. Events continue accumulating locally during that backoff. Explicit `flush()` bypasses the opportunistic schedule and surfaces the server error to the caller.
+If the server returns HTTP `429 rate_limited`, opportunistic and background uploads persist and respect the server's `Retry-After` window before trying again. Events continue accumulating locally during that backoff. Explicit `flush()` bypasses the opportunistic schedule and surfaces the server error to the caller.
 
 ## Installation identity
 
-The client creates a random installation UUID and stores it in Keychain under `<appID>.installation`. The opaque identifier is sent to `analytics-server` so cumulative snapshots from the same app installation can be associated. It is an installation identifier, not a human identity.
+The client creates a random installation UUID and, by default, stores it in Keychain under `<appID>.installation`. The opaque identifier is sent to `analytics-server` so cumulative snapshots from the same app installation can be associated. It is an installation identifier, not a human identity.
+
+To keep **all** analytics data in memory — both the installation ID and the daily counters — opt in explicitly:
+
+```swift
+let analytics = AppAnalyticsClient(
+    configuration: AppAnalyticsConfiguration(
+        appID: "my-app",
+        baseURL: URL(string: "https://api.example.com")!,
+        storageMode: .inMemory
+    )
+)
+```
+
+`storageMode` defaults to `.persisted`, which is the behavior described above. In `.inMemory` mode the client generates a random UUID on first upload and holds it for that client instance only; it never reads or writes the Keychain, and daily counters are held in `InMemoryAppAnalyticsStateStore` rather than `UserDefaults`. Nothing analytics-related survives process death: a new client instance gets a new ID and empty counters, while repeated uploads from the same client stay consistent. `resetLocalState()` and `setEnabled(false)` clear the in-memory state; the installation ID itself is kept until the client is deallocated.
 
 The default Keychain service is:
 
@@ -174,7 +205,7 @@ This intentionally matches `AppAIClient`, so an app using the default configurat
 
 ## Local state
 
-Daily counters use `UserDefaults` by default. Supply an `AppAnalyticsStateStoring` implementation when the app needs a different local store or deterministic tests.
+Daily counters use `UserDefaults` with the default `.persisted` storage mode. `.inMemory` mode uses `InMemoryAppAnalyticsStateStore` instead, so nothing is written to disk. Supply your own `AppAnalyticsStateStoring` implementation through the injecting initializer when the app needs a different local store or deterministic tests; an explicitly supplied store is used regardless of `storageMode`.
 
 To clear local counters without changing the installation identity:
 
@@ -182,7 +213,7 @@ To clear local counters without changing the installation identity:
 try await analytics.resetLocalState()
 ```
 
-Corrupt local analytics state is discarded safely rather than crashing the app. The installation identity remains in Keychain and is not affected by `resetLocalState()`.
+Corrupt local analytics state is discarded safely rather than crashing the app. In `.persisted` mode the installation identity remains in Keychain and is not affected by `resetLocalState()`.
 
 ## Cross-package parity
 

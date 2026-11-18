@@ -2,3 +2,4 @@
 - Backward compaitibility is important
 - Only commit and push if asked
 - Focus on iOS only, ignore macOS related code.
+- Do not run build or tests.

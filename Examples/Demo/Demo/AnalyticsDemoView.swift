@@ -22,6 +22,10 @@ struct AnalyticsDemoView: View {
     @State private var statusMessage: String?
     @State private var statusIsError = false
 
+    @AppStorage("appfoundation.demo.analytics.storageMode") private var storageModeRaw = "persisted"
+    @AppStorage("appfoundation.demo.analytics.enabled") private var analyticsEnabled = true
+    @State private var runtimeClient: AppAnalyticsClient = AnalyticsDemoView.defaultRuntimeClient()
+
     var body: some View {
         ZStack {
             AppThemeBackground(theme: theme)
@@ -31,6 +35,7 @@ struct AnalyticsDemoView: View {
                 eventSection
                 errorSection
                 localStateSection
+                runtimeSection
 
                 if let statusMessage {
                     Section("Result") {
@@ -48,6 +53,16 @@ struct AnalyticsDemoView: View {
             }
             .scrollContentBackground(.hidden)
             .foregroundStyle(theme.primaryForegroundColor)
+            .task {
+                if storageMode == .inMemory {
+                    await rebuildRuntimeClient()
+                } else {
+                    await runtimeClient.setEnabled(analyticsEnabled)
+                }
+            }
+            .onChange(of: storageModeRaw) { _ in
+                Task { await rebuildRuntimeClient() }
+            }
         }
         .navigationTitle("Analytics")
         .navigationBarTitleDisplayMode(.inline)
@@ -158,6 +173,93 @@ struct AnalyticsDemoView: View {
                 .foregroundStyle(theme.secondaryForegroundColor)
         }
         .listRowBackground(theme.surfaceColor)
+    }
+
+    private var runtimeSection: some View {
+        Section("Runtime Controls") {
+            Picker("Storage Mode", selection: $storageModeRaw) {
+                Text("Persisted").tag("persisted")
+                Text("In Memory").tag("inMemory")
+            }
+            .pickerStyle(.segmented)
+
+            Toggle("Analytics Enabled", isOn: Binding(
+                get: { analyticsEnabled },
+                set: { newValue in
+                    analyticsEnabled = newValue
+                    Task { await runtimeClient.setEnabled(newValue) }
+                }
+            ))
+
+            Button("Send Runtime Event", systemImage: "paperplane.fill") {
+                Task { await sendRuntimeEvent() }
+            }
+            .disabled(isSending)
+
+            Button("Simulate Background", systemImage: "arrow.down.circle.fill") {
+                Task { await simulateBackground() }
+            }
+            .disabled(isSending)
+
+            Text("Runtime controls use one retained client. Changing storage mode creates a new client; in-memory mode keeps the ID and counters only until that client is released.")
+                .font(.caption)
+                .foregroundStyle(theme.secondaryForegroundColor)
+        }
+        .listRowBackground(theme.surfaceColor)
+    }
+
+    private var storageMode: AppAnalyticsStorageMode {
+        storageModeRaw == "inMemory" ? .inMemory : .persisted
+    }
+
+    private static func defaultRuntimeClient() -> AppAnalyticsClient {
+        AppAnalyticsClient(
+            configuration: AppAnalyticsConfiguration(
+                appID: "appfoundation.demo.runtime",
+                baseURL: URL(string: "https://analytics.133043.xyz")!,
+                stateStorageKey: "appfoundation.demo.analytics.runtime",
+                transportRetryCount: 0,
+                storageMode: .persisted
+            )
+        )
+    }
+
+    private func makeRuntimeClient() -> AppAnalyticsClient {
+        let id = trimmed(appID)
+        let key = trimmed(appKey)
+        let url = URL(string: trimmed(serverURL)).flatMap { $0.host == nil ? nil : $0 }
+            ?? URL(string: "https://analytics.133043.xyz")!
+        return AppAnalyticsClient(
+            configuration: AppAnalyticsConfiguration(
+                appID: id.isEmpty ? "appfoundation.demo.runtime" : id,
+                appKey: key.isEmpty ? nil : key,
+                baseURL: url,
+                stateStorageKey: "appfoundation.demo.analytics.runtime.\(id.isEmpty ? "default" : id)",
+                transportRetryCount: 0,
+                storageMode: storageMode
+            )
+        )
+    }
+
+    private func rebuildRuntimeClient() async {
+        let client = makeRuntimeClient()
+        await client.setEnabled(analyticsEnabled)
+        runtimeClient = client
+    }
+
+    private func sendRuntimeEvent() async {
+        await perform {
+            try await runtimeClient.track("runtime_probe")
+            try await runtimeClient.flush()
+            return "Runtime event sent with \(storageModeRaw) storage."
+        }
+    }
+
+    private func simulateBackground() async {
+        await perform {
+            try await runtimeClient.applicationDidEnterBackground()
+            return "Background flush attempted with \(storageModeRaw) storage."
+        }
     }
 
     private func sendEvent() async {

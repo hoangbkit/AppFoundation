@@ -3,6 +3,13 @@ import Foundation
 import FoundationNetworking
 #endif
 
+public enum AppAnalyticsStorageMode: Equatable, Sendable {
+    /// Persists the installation ID in the Keychain and daily counters in `UserDefaults` (default).
+    case persisted
+    /// Keeps the installation ID and daily counters in memory only, for the lifetime of the client.
+    case inMemory
+}
+
 public struct AppAnalyticsConfiguration: Sendable {
     public var appID: String
     public var appKey: String?
@@ -13,6 +20,7 @@ public struct AppAnalyticsConfiguration: Sendable {
     public var appVersion: String?
     public var uploadInterval: TimeInterval
     public var transportRetryCount: Int
+    public var storageMode: AppAnalyticsStorageMode
 
     public init(
         appID: String,
@@ -22,8 +30,9 @@ public struct AppAnalyticsConfiguration: Sendable {
         keychainService: String = "com.hoangbkit.AppFoundation.AppAI",
         stateStorageKey: String? = nil,
         appVersion: String? = nil,
-        uploadInterval: TimeInterval = 5 * 60,
-        transportRetryCount: Int = 1
+        uploadInterval: TimeInterval = 20,
+        transportRetryCount: Int = 1,
+        storageMode: AppAnalyticsStorageMode = .persisted
     ) {
         self.appID = appID
         self.appKey = appKey
@@ -35,6 +44,7 @@ public struct AppAnalyticsConfiguration: Sendable {
         self.appVersion = appVersion
         self.uploadInterval = max(0, uploadInterval)
         self.transportRetryCount = max(0, transportRetryCount)
+        self.storageMode = storageMode
     }
 }
 
@@ -109,4 +119,18 @@ public actor UserDefaultsAppAnalyticsStateStore: AppAnalyticsStateStoring {
     public func remove() async throws {
         UserDefaults.standard.removeObject(forKey: storageKey)
     }
+}
+
+/// An in-memory state store used by `AppAnalyticsStorageMode.inMemory`. Nothing it
+/// holds survives the lifetime of the store instance.
+public actor InMemoryAppAnalyticsStateStore: AppAnalyticsStateStoring {
+    private var data: Data?
+
+    public init() {}
+
+    public func load() async throws -> Data? { data }
+
+    public func save(_ data: Data) async throws { self.data = data }
+
+    public func remove() async throws { data = nil }
 }

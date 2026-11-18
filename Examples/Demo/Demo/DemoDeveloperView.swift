@@ -111,6 +111,45 @@ struct DemoDeveloperView: View {
                         ),
                     ]
                 ),
+                FoundationDeveloperSection(
+                    id: "analytics",
+                    title: "Analytics",
+                    items: [
+                        .destination(
+                            FoundationDeveloperDestination(
+                                id: "analytics-runtime",
+                                title: "Analytics Runtime",
+                                systemImage: "chart.bar.fill"
+                            ) {
+                                AnalyticsDemoView()
+                            }
+                        ),
+                        .value(
+                            FoundationDeveloperValue(
+                                id: "analytics-storage-mode",
+                                title: "Storage Mode",
+                                value: {
+                                    UserDefaults.standard.string(
+                                        forKey: "appfoundation.demo.analytics.storageMode"
+                                    ) ?? "persisted"
+                                }
+                            )
+                        ),
+                        .value(
+                            FoundationDeveloperValue(
+                                id: "analytics-enabled",
+                                title: "Analytics Enabled",
+                                value: {
+                                    let key = "appfoundation.demo.analytics.enabled"
+                                    guard UserDefaults.standard.object(forKey: key) != nil else {
+                                        return "true"
+                                    }
+                                    return UserDefaults.standard.bool(forKey: key).description
+                                }
+                            )
+                        ),
+                    ]
+                ),
             ]
         )
     }

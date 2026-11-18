@@ -412,7 +412,7 @@ private func phase2Event(
     #expect(await transport.capturedRequests().count == 1)
 
     clock.set(phase2Date("2026-09-05T10:02:00Z"))
-    try await client.applicationDidEnterBackground()
+    try await client.applicationDidEnterBackground(at: phase2Date("2026-09-05T10:02:00Z"))
 
     // Nothing changed since that upload, so the background flush is skipped.
     #expect(await transport.capturedRequests().count == 1)
@@ -437,7 +437,7 @@ private func phase2Event(
     #expect(await transport.capturedRequests().count == 1)
 
     clock.set(phase2Date("2026-09-05T10:02:00Z"))
-    try await client.applicationDidEnterBackground()
+    try await client.applicationDidEnterBackground(at: phase2Date("2026-09-05T10:02:00Z"))
 
     let requests = await transport.capturedRequests()
     #expect(requests.count == 2)
@@ -460,11 +460,11 @@ private func phase2Event(
     #expect(await transport.requestCount() == 1)
 
     clock.set(phase2Date("2026-09-05T10:01:00Z"))
-    try await client.applicationDidEnterBackground()
+    try await client.applicationDidEnterBackground(at: phase2Date("2026-09-05T10:01:00Z"))
     #expect(await transport.requestCount() == 1)
 
     clock.set(phase2Date("2026-09-05T10:06:00Z"))
-    try await client.applicationDidEnterBackground()
+    try await client.applicationDidEnterBackground(at: phase2Date("2026-09-05T10:06:00Z"))
     #expect(await transport.requestCount() == 2)
 }
 
@@ -480,7 +480,7 @@ private func phase2Event(
 
     try await client.applicationDidBecomeActive(at: phase2Date("2026-09-05T10:00:00Z"))
     clock.set(phase2Date("2026-09-05T10:10:00Z"))
-    try await client.applicationDidEnterBackground()
+    try await client.applicationDidEnterBackground(at: phase2Date("2026-09-05T10:10:00Z"))
 
     let request = try #require(await transport.capturedRequests().last)
     let day = try phase2Day(request, day: "2026-09-05")

@@ -6,8 +6,8 @@ struct AnalyticsDemoView: View {
     @Environment(\.appFoundationTheme) private var theme
 
     @State private var serverURL = "https://analytics.133043.xyz"
-    @State private var appID = ""
-    @State private var appKey = ""
+    @State private var appID = "maf"
+    @State private var appKey = Bundle.main.bundleIdentifier ?? ""
 
     @State private var eventName = ""
     @State private var eventDimension = ""

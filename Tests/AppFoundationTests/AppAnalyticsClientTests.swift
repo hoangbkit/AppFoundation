@@ -404,7 +404,7 @@ private func requestBody(_ request: URLRequest) throws -> [String: Any] {
     try await client.track("generation_completed")
     try await client.flush()
 
-    let request = try #require(await transport.capturedRequests().first)
+    let request = try #require(await transport.capturedRequests().last)
     let body = try requestBody(request)
     let days = try #require(body["days"] as? [[String: Any]])
     let events = try #require(days[0]["events"] as? [[String: Any]])
@@ -429,7 +429,8 @@ private func requestBody(_ request: URLRequest) throws -> [String: Any] {
     try await client.track("generation_completed")
     try await client.flush()
 
-    #expect(await transport.capturedRequests().count == 1)
+    // The track uploads immediately and the explicit flush uploads once more.
+    #expect(await transport.capturedRequests().count == 2)
 }
 
 @Test func resetLocalStateWorksWhileAnalyticsDisabled() async throws {

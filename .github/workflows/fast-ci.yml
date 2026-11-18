@@ -1,9 +1,6 @@
 name: Fast CI
 
 on:
-  push:
-    branches:
-      - develop
   workflow_dispatch:
 
 permissions:
@@ -11,8 +8,9 @@ permissions:
 
 jobs:
   build-and-test:
-    name: Build on iOS
+    name: Build and test on iOS
     runs-on: macos-26
+    timeout-minutes: 30
 
     steps:
       - name: Check out repository
@@ -30,15 +28,33 @@ jobs:
       - name: Validate package manifest
         run: swift package dump-package >/dev/null
 
-      # Package test execution is intentionally disabled for now. The async/keychain
-      # suites can wedge the simulator runner and make Fast CI take many minutes.
-      # Keep CI focused on compile/integration validation until those tests are
-      # reworked into deterministic, isolated suites.
-      - name: Build package for iOS Simulator
+      # Fast CI is manually dispatched only and runs the full package test suite
+      # on a concrete simulator. The job timeout bounds unusually long test runs.
+      - name: Select an available iOS 26 simulator
         run: |
-          xcodebuild build \
+          xcrun simctl list devices available --json > /tmp/fast-ci-simulators.json
+          python3 - <<'PY' >> "$GITHUB_ENV"
+          import json
+          with open('/tmp/fast-ci-simulators.json') as source:
+              devices = json.load(source)['devices']
+          for runtime, candidates in devices.items():
+              if 'iOS-26-' not in runtime and not runtime.endswith('iOS-26-0'):
+                  continue
+              phone = next((device for device in candidates if device['name'].startswith('iPhone')), None)
+              if phone:
+                  print('TEST_SIMULATOR_ID=' + phone['udid'])
+                  break
+          else:
+              raise SystemExit('No available iOS 26 iPhone simulator')
+          PY
+
+      - name: Run package tests on iOS Simulator
+        run: |
+          xcodebuild test \
             -scheme AppFoundation-Package \
-            -destination "generic/platform=iOS Simulator"
+            -destination "platform=iOS Simulator,id=$TEST_SIMULATOR_ID" \
+            -parallel-testing-enabled NO \
+            CODE_SIGNING_ALLOWED=NO
 
       - name: Install XcodeGen
         run: brew install xcodegen

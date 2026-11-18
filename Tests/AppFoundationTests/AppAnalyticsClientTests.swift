@@ -46,7 +46,8 @@ private actor MockAnalyticsTransport: AppAnalyticsTransport {
 private func analyticsConfiguration(
     appKey: String? = "test-key-123456789",
     enabled: Bool = true,
-    uploadInterval: TimeInterval = 21_600
+    uploadInterval: TimeInterval = 21_600,
+    storageMode: AppAnalyticsStorageMode = .persisted
 ) -> AppAnalyticsConfiguration {
     AppAnalyticsConfiguration(
         appID: "analytics-test",
@@ -57,18 +58,20 @@ private func analyticsConfiguration(
         stateStorageKey: "analytics-state-\(UUID().uuidString)",
         appVersion: "1.2.3",
         uploadInterval: uploadInterval,
-        transportRetryCount: 0
+        transportRetryCount: 0,
+        storageMode: storageMode
     )
 }
 
-@Test func analyticsConfigurationDefaultsToFiveMinuteUploadInterval() {
+@Test func analyticsConfigurationDefaultsToTwentySecondUploadInterval() {
     let configuration = AppAnalyticsConfiguration(
         appID: "analytics-test",
         baseURL: URL(string: "https://example.com")!
     )
 
     #expect(configuration.enabled)
-    #expect(configuration.uploadInterval == 5 * 60)
+    #expect(configuration.uploadInterval == 20)
+    #expect(configuration.storageMode == .persisted)
 }
 
 @Test func disabledAnalyticsIsCompletelyInert() async throws {
@@ -282,4 +285,205 @@ private func requestBody(_ request: URLRequest) throws -> [String: Any] {
         try await client.track("Not Valid")
     }
     #expect(try await client.pendingDayCount() == 0)
+}
+
+@Test func inMemoryInstallationIDIsStableWithinClient() async throws {
+    let transport = MockAnalyticsTransport()
+    let client = AppAnalyticsClient(
+        configuration: analyticsConfiguration(uploadInterval: 0, storageMode: .inMemory),
+        transport: transport,
+        stateStore: MemoryAnalyticsStateStore(),
+        now: { isoDate("2026-09-05T10:00:00Z") }
+    )
+
+    try await client.track("generation_completed")
+    try await client.track("export_completed")
+
+    let requests = await transport.capturedRequests()
+    #expect(requests.count == 2)
+    let firstID = try #require(requests[0].value(forHTTPHeaderField: "X-Installation-ID"))
+    let secondID = try #require(requests[1].value(forHTTPHeaderField: "X-Installation-ID"))
+    #expect(firstID == secondID)
+}
+
+@Test func inMemoryInstallationIDIsUniquePerClient() async throws {
+    let service = "com.hoangbkit.AppFoundationTests.InMemory.\(UUID().uuidString)"
+
+    func trackedID() async throws -> String {
+        let transport = MockAnalyticsTransport()
+        let client = AppAnalyticsClient(
+            configuration: AppAnalyticsConfiguration(
+                appID: "analytics-test",
+                baseURL: URL(string: "https://example.com")!,
+                keychainService: service,
+                stateStorageKey: "analytics-state-\(UUID().uuidString)",
+                uploadInterval: 0,
+                storageMode: .inMemory
+            ),
+            transport: transport,
+            stateStore: MemoryAnalyticsStateStore(),
+            now: { isoDate("2026-09-05T10:00:00Z") }
+        )
+        try await client.track("generation_completed")
+        let request = try #require(await transport.capturedRequests().first)
+        return try #require(request.value(forHTTPHeaderField: "X-Installation-ID"))
+    }
+
+    let first = try await trackedID()
+    let second = try await trackedID()
+    #expect(first != second)
+}
+
+@Test func inMemoryInstallationIDIgnoresKeychainIdentity() async throws {
+    let service = "com.hoangbkit.AppFoundationTests.InMemory.\(UUID().uuidString)"
+
+    func trackedID(for mode: AppAnalyticsStorageMode) async throws -> String {
+        let transport = MockAnalyticsTransport()
+        let client = AppAnalyticsClient(
+            configuration: AppAnalyticsConfiguration(
+                appID: "analytics-test",
+                baseURL: URL(string: "https://example.com")!,
+                keychainService: service,
+                stateStorageKey: "analytics-state-\(UUID().uuidString)",
+                uploadInterval: 0,
+                storageMode: mode
+            ),
+            transport: transport,
+            stateStore: MemoryAnalyticsStateStore(),
+            now: { isoDate("2026-09-05T10:00:00Z") }
+        )
+        try await client.track("generation_completed")
+        let request = try #require(await transport.capturedRequests().first)
+        return try #require(request.value(forHTTPHeaderField: "X-Installation-ID"))
+    }
+
+    let keychainID = try await trackedID(for: .persisted)
+    let inMemoryID = try await trackedID(for: .inMemory)
+    #expect(inMemoryID != keychainID)
+}
+
+@Test func setEnabledFalseStopsAllAnalyticsWorkAndClearsState() async throws {
+    let transport = MockAnalyticsTransport()
+    let client = AppAnalyticsClient(
+        configuration: analyticsConfiguration(uploadInterval: 86_400),
+        transport: transport,
+        stateStore: MemoryAnalyticsStateStore(),
+        now: { isoDate("2026-09-05T10:00:00Z") }
+    )
+
+    try await client.track("generation_completed")
+    #expect(try await client.pendingDayCount() == 1)
+
+    await client.setEnabled(false)
+    #expect(try await client.pendingDayCount() == 0)
+
+    try await client.track("export_completed")
+    try await client.trackError("model_load_failed", component: "generation")
+    try await client.applicationDidBecomeActive(at: isoDate("2026-09-05T10:00:00Z"))
+    try await client.applicationWillResignActive(at: isoDate("2026-09-05T10:01:00Z"))
+    try await client.applicationDidEnterBackground(at: isoDate("2026-09-05T10:02:00Z"))
+    try await client.flush()
+
+    // Only the initial track uploaded; disabling prevents any further requests.
+    #expect(await transport.capturedRequests().count == 1)
+    #expect(try await client.pendingDayCount() == 0)
+}
+
+@Test func reEnablingAnalyticsStartsFromCleanState() async throws {
+    let transport = MockAnalyticsTransport()
+    let client = AppAnalyticsClient(
+        configuration: analyticsConfiguration(uploadInterval: 86_400),
+        transport: transport,
+        stateStore: MemoryAnalyticsStateStore(),
+        now: { isoDate("2026-09-05T10:00:00Z") }
+    )
+
+    try await client.track("generation_completed", count: 5)
+    await client.setEnabled(false)
+    await client.setEnabled(true)
+
+    try await client.track("generation_completed")
+    try await client.flush()
+
+    let request = try #require(await transport.capturedRequests().last)
+    let body = try requestBody(request)
+    let days = try #require(body["days"] as? [[String: Any]])
+    let events = try #require(days[0]["events"] as? [[String: Any]])
+    #expect(events.count == 1)
+    #expect(events[0]["count"] as? Int == 1)
+}
+
+@Test func setEnabledIsIdempotent() async throws {
+    let transport = MockAnalyticsTransport()
+    let client = AppAnalyticsClient(
+        configuration: analyticsConfiguration(uploadInterval: 86_400),
+        transport: transport,
+        stateStore: MemoryAnalyticsStateStore(),
+        now: { isoDate("2026-09-05T10:00:00Z") }
+    )
+
+    await client.setEnabled(false)
+    await client.setEnabled(false)
+    await client.setEnabled(true)
+    await client.setEnabled(true)
+
+    try await client.track("generation_completed")
+    try await client.flush()
+
+    // The track uploads immediately and the explicit flush uploads once more.
+    #expect(await transport.capturedRequests().count == 2)
+}
+
+@Test func resetLocalStateWorksWhileAnalyticsDisabled() async throws {
+    let client = AppAnalyticsClient(
+        configuration: analyticsConfiguration(enabled: false),
+        transport: MockAnalyticsTransport(),
+        stateStore: MemoryAnalyticsStateStore(),
+        now: { isoDate("2026-09-05T10:00:00Z") }
+    )
+
+    try await client.resetLocalState()
+    #expect(try await client.pendingDayCount() == 0)
+}
+
+@Test func inMemoryStorageModeDoesNotWriteUserDefaults() async throws {
+    let key = "analytics-in-memory-\(UUID().uuidString)"
+    let configuration = AppAnalyticsConfiguration(
+        appID: "analytics-test",
+        baseURL: URL(string: "https://example.com")!,
+        stateStorageKey: key,
+        uploadInterval: 86_400,
+        storageMode: .inMemory
+    )
+
+    let client = AppAnalyticsClient(
+        configuration: configuration,
+        transport: MockAnalyticsTransport()
+    )
+    try await client.track("generation_completed", count: 3)
+    try await client.flush()
+
+    #expect(UserDefaults.standard.data(forKey: key) == nil)
+}
+
+@Test func inMemoryStorageModeCountersArePerClient() async throws {
+    let configuration = AppAnalyticsConfiguration(
+        appID: "analytics-test",
+        baseURL: URL(string: "https://example.com")!,
+        uploadInterval: 86_400,
+        storageMode: .inMemory
+    )
+
+    let first = AppAnalyticsClient(
+        configuration: configuration,
+        transport: MockAnalyticsTransport()
+    )
+    try await first.track("generation_completed", count: 3)
+    #expect(try await first.pendingDayCount() == 1)
+
+    let second = AppAnalyticsClient(
+        configuration: configuration,
+        transport: MockAnalyticsTransport()
+    )
+    #expect(try await second.pendingDayCount() == 0)
 }

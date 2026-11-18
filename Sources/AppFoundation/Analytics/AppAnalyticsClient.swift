@@ -151,6 +151,7 @@ public actor AppAnalyticsClient {
         var sessionSeconds: Int = 0
         var events: [String: EventState] = [:]
         var errors: [String: ErrorState]?
+        var lastModifiedAt: Date?
     }
 
     private struct SessionState: Codable, Sendable {
@@ -268,7 +269,7 @@ public actor AppAnalyticsClient {
         let error: Detail
     }
 
-    private let configuration: AppAnalyticsConfiguration
+    private var configuration: AppAnalyticsConfiguration
     private let transport: any AppAnalyticsTransport
     private let stateStore: any AppAnalyticsStateStoring
     private let secureStore: AppAISecureStore
@@ -276,6 +277,8 @@ public actor AppAnalyticsClient {
     private let decoder: JSONDecoder
     private let now: @Sendable () -> Date
     private let clientContext: AppAnalyticsClientContext
+    private var inMemoryInstallationID: String?
+    private var lastClosedActiveSince: Date?
 
     public init(
         configuration: AppAnalyticsConfiguration,
@@ -283,9 +286,14 @@ public actor AppAnalyticsClient {
     ) {
         self.configuration = configuration
         self.transport = transport
-        self.stateStore = UserDefaultsAppAnalyticsStateStore(
-            storageKey: configuration.stateStorageKey
-        )
+        switch configuration.storageMode {
+        case .inMemory:
+            self.stateStore = InMemoryAppAnalyticsStateStore()
+        case .persisted:
+            self.stateStore = UserDefaultsAppAnalyticsStateStore(
+                storageKey: configuration.stateStorageKey
+            )
+        }
         self.secureStore = AppAISecureStore(service: configuration.keychainService)
         self.encoder = Self.makeEncoder()
         self.decoder = Self.makeDecoder()
@@ -367,6 +375,7 @@ public actor AppAnalyticsClient {
             )
         }
 
+        day.lastModifiedAt = timestamp
         state.days[dayKey] = day
         try await saveState(state)
         try? await flushIfDue(at: timestamp)
@@ -419,6 +428,7 @@ public actor AppAnalyticsClient {
         }
 
         day.errors = errors
+        day.lastModifiedAt = timestamp
         state.days[dayKey] = day
         try await saveState(state)
         try? await flushIfDue(at: timestamp)
@@ -451,6 +461,7 @@ public actor AppAnalyticsClient {
             let dayKey = Self.dayKey(for: timestamp)
             var day = dayState(in: state, for: dayKey)
             day.sessions = min(Limits.maxSessionsPerDay, day.sessions + 1)
+            day.lastModifiedAt = timestamp
             state.days[dayKey] = day
             state.session = SessionState(
                 lastActivityAt: timestamp,
@@ -466,21 +477,62 @@ public actor AppAnalyticsClient {
         guard configuration.enabled else { return }
         var state = try await loadState()
         pruneExpiredDays(in: &state, relativeTo: timestamp)
-        if state.session?.activeSince != nil {
-            checkpointActiveSession(in: &state, at: timestamp)
-            if var session = state.session {
-                session.lastActivityAt = timestamp
-                session.activeSince = nil
-                state.session = session
-            }
-        }
+        closeActiveSession(in: &state, at: timestamp)
         try await saveState(state)
         try? await flushIfDue(at: timestamp)
     }
 
+    /// Performs a final best-effort upload when the application enters the background.
+    ///
+    /// Unlike the opportunistic flush, this bypasses `uploadInterval` so activity from
+    /// the current session is uploaded promptly. It still respects the server's
+    /// `Retry-After` backoff and skips the request when no local data changed since the
+    /// last successful upload.
+    public func applicationDidEnterBackground(at timestamp: Date = Date()) async throws {
+        guard configuration.enabled else { return }
+        var state = try await loadState()
+        pruneExpiredDays(in: &state, relativeTo: timestamp)
+        closeActiveSession(in: &state, at: timestamp)
+        try await saveState(state)
+        try? await flush(at: timestamp, reason: .background)
+    }
+
+    private func closeActiveSession(in state: inout PersistedState, at timestamp: Date) {
+        guard let activeSince = state.session?.activeSince else { return }
+        // willResignActive and didEnterBackground can be processed concurrently; both
+        // may load the same pre-close snapshot. Only the first close of a given session
+        // may checkpoint its active interval, otherwise sessionSeconds is counted twice.
+        guard lastClosedActiveSince != activeSince else { return }
+        checkpointActiveSession(in: &state, at: timestamp)
+        guard var session = state.session else { return }
+        session.lastActivityAt = timestamp
+        session.activeSince = nil
+        state.session = session
+        lastClosedActiveSince = activeSince
+    }
+
+    private enum FlushReason: Equatable {
+        case scheduled
+        case background
+        case explicit
+    }
+
     public func flush() async throws {
         guard configuration.enabled else { return }
-        try await flush(at: now(), force: true)
+        try await flush(at: now(), reason: .explicit)
+    }
+
+    /// Enables or disables analytics at runtime, for example from a settings toggle.
+    ///
+    /// Disabling takes effect immediately and clears locally pending analytics state.
+    /// It performs no final upload and does not change the installation identity.
+    /// Re-enabling resumes with a clean local slate.
+    public func setEnabled(_ enabled: Bool) async {
+        guard configuration.enabled != enabled else { return }
+        configuration.enabled = enabled
+        if !enabled {
+            try? await stateStore.remove()
+        }
     }
 
     public func resetLocalState() async throws {
@@ -495,10 +547,10 @@ public actor AppAnalyticsClient {
 
     private func flushIfDue(at timestamp: Date) async throws {
         guard configuration.enabled else { return }
-        try await flush(at: timestamp, force: false)
+        try await flush(at: timestamp, reason: .scheduled)
     }
 
-    private func flush(at timestamp: Date, force: Bool) async throws {
+    private func flush(at timestamp: Date, reason: FlushReason) async throws {
         guard configuration.enabled else { return }
         var state = try await loadState()
         pruneExpiredDays(in: &state, relativeTo: timestamp)
@@ -510,14 +562,33 @@ public actor AppAnalyticsClient {
             return
         }
 
-        if !force {
+        if reason != .explicit {
             if let nextUploadAttemptAt = state.nextUploadAttemptAt,
                timestamp < nextUploadAttemptAt {
                 try await saveState(state)
                 return
             }
+        }
+
+        if reason == .scheduled {
             if let lastUploadAt = state.lastUploadAt,
                timestamp.timeIntervalSince(lastUploadAt) < configuration.uploadInterval {
+                try await saveState(state)
+                return
+            }
+        }
+
+        if reason == .background {
+            let lastUploadAt = state.lastUploadAt
+            let threshold = lastUploadAt ?? .distantPast
+            let hasUnuploadedChanges = state.days.values.contains { day in
+                // State persisted before the marker existed has no timestamp. Treat it as
+                // dirty only until the first successful upload records `lastUploadAt`;
+                // otherwise an upgraded install would re-upload that day on every background.
+                guard let modifiedAt = day.lastModifiedAt else { return lastUploadAt == nil }
+                return modifiedAt > threshold
+            }
+            if !hasUnuploadedChanges {
                 try await saveState(state)
                 return
             }
@@ -529,6 +600,7 @@ public actor AppAnalyticsClient {
             state.days[currentDay] = dayState(in: state, for: currentDay)
         }
         let installationID = try await installationID()
+        guard configuration.enabled else { return }
         let batches = try makeBatches(from: state)
         guard !batches.isEmpty else {
             try await saveState(state)
@@ -540,6 +612,7 @@ public actor AppAnalyticsClient {
         do {
             for batch in batches {
                 try Task.checkCancellation()
+                guard configuration.enabled else { return }
                 try await send(batch, installationID: installationID)
                 for day in batch.days where day.day != currentDay {
                     state.days.removeValue(forKey: day.day)
@@ -633,35 +706,44 @@ public actor AppAnalyticsClient {
     }
 
     private func installationID() async throws -> String {
-        let account = "\(configuration.appID).installation"
-        let gateKey = "installation|\(configuration.keychainService)|\(configuration.appID)"
-        await AppAnalyticsInstallationGate.shared.acquire(gateKey)
-        do {
+        switch configuration.storageMode {
+        case .inMemory:
+            if let value = inMemoryInstallationID { return value }
             try Task.checkCancellation()
-            let value: String
-            if let stored = try await secureStore.string(for: account) {
-                value = stored
-            } else {
-                let generated = UUID().uuidString.lowercased()
-                do {
-                    try await secureStore.set(generated, for: account)
-                    value = generated
-                } catch {
-                    if let racedValue = try? await secureStore.string(for: account) {
-                        value = racedValue
-                    } else {
-                        throw error
+            let generated = UUID().uuidString.lowercased()
+            inMemoryInstallationID = generated
+            return generated
+        case .persisted:
+            let account = "\(configuration.appID).installation"
+            let gateKey = "installation|\(configuration.keychainService)|\(configuration.appID)"
+            await AppAnalyticsInstallationGate.shared.acquire(gateKey)
+            do {
+                try Task.checkCancellation()
+                let value: String
+                if let stored = try await secureStore.string(for: account) {
+                    value = stored
+                } else {
+                    let generated = UUID().uuidString.lowercased()
+                    do {
+                        try await secureStore.set(generated, for: account)
+                        value = generated
+                    } catch {
+                        if let racedValue = try? await secureStore.string(for: account) {
+                            value = racedValue
+                        } else {
+                            throw error
+                        }
                     }
                 }
+                await AppAnalyticsInstallationGate.shared.release(gateKey)
+                return value
+            } catch {
+                await AppAnalyticsInstallationGate.shared.release(gateKey)
+                if let analyticsError = error as? AppAnalyticsError {
+                    throw analyticsError
+                }
+                throw AppAnalyticsError.storage("Secure analytics installation storage is unavailable.")
             }
-            await AppAnalyticsInstallationGate.shared.release(gateKey)
-            return value
-        } catch {
-            await AppAnalyticsInstallationGate.shared.release(gateKey)
-            if let analyticsError = error as? AppAnalyticsError {
-                throw analyticsError
-            }
-            throw AppAnalyticsError.storage("Secure analytics installation storage is unavailable.")
         }
     }
 
@@ -676,6 +758,7 @@ public actor AppAnalyticsClient {
     }
 
     private func saveState(_ state: PersistedState) async throws {
+        guard configuration.enabled else { return }
         do {
             try await stateStore.save(encoder.encode(state))
         } catch let error as AppAnalyticsError {
@@ -731,6 +814,7 @@ public actor AppAnalyticsClient {
                     Limits.maxSessionSecondsPerDay,
                     day.sessionSeconds + seconds
                 )
+                day.lastModifiedAt = end
                 state.days[key] = day
             }
             cursor = segmentEnd
